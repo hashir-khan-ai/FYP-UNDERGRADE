@@ -1,6 +1,5 @@
 """Application configuration management using Pydantic Settings."""
 
-import os
 from pathlib import Path
 from typing import Literal
 
@@ -117,7 +116,7 @@ class Settings(BaseSettings):
         description="Hard cap on prompt + completion tokens per run before stopping",
     )
 
-    # Fallback Cloud LLM Provider
+    # Optional dev-only failover (unused under demo to keep runs reproducible)
     FALLBACK_LLM_BASE_URL: str = Field(
         default="https://openrouter.ai/api/v1",
         description="Base URL for fallback OpenAI-compatible API endpoint",
@@ -141,7 +140,7 @@ class Settings(BaseSettings):
         description="Local CPU Cross-Encoder re-ranking model",
     )
 
-    # Storage & Cache Directories
+    # Storage Directories
     DATABASE_PATH: str = Field(
         default="./data/sqlite/app.db",
         description="Path to SQLite database file",
@@ -149,10 +148,6 @@ class Settings(BaseSettings):
     QDRANT_STORAGE_PATH: str = Field(
         default="./data/qdrant",
         description="Directory for local embedded Qdrant vector storage",
-    )
-    CACHE_DIR: str = Field(
-        default="./data/cache",
-        description="Directory for on-disk response memoization cache",
     )
 
     # Ablation Experiment Flags
@@ -195,14 +190,14 @@ class Settings(BaseSettings):
         selected ``LLM_PROFILE``.
 
         Raises:
-            RuntimeError: if a live profile is resolved while pytest is running.
+            RuntimeError: if ``APP_ENV=test`` and a live profile is selected.
             ValueError: if the selected live profile has no API key configured.
         """
         profile = self.LLM_PROFILE
-        if profile != "mock" and os.environ.get("PYTEST_CURRENT_TEST"):
+        if self.APP_ENV == "test" and profile != "mock":
             raise RuntimeError(
-                "Live LLM profiles are forbidden in automated tests; "
-                "set LLM_PROFILE=mock in tests/conftest.py."
+                "LLM_PROFILE must be 'mock' when APP_ENV=test; "
+                "live profiles are forbidden in automated tests."
             )
 
         if profile == "mock":
@@ -257,7 +252,6 @@ class Settings(BaseSettings):
         """Create necessary storage directories on startup."""
         Path(self.DATABASE_PATH).parent.mkdir(parents=True, exist_ok=True)
         Path(self.QDRANT_STORAGE_PATH).mkdir(parents=True, exist_ok=True)
-        Path(self.CACHE_DIR).mkdir(parents=True, exist_ok=True)
 
 
 # Global singleton instance

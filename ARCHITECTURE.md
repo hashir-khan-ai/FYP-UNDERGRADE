@@ -262,6 +262,7 @@ APP_ENV=development
 API_HOST=127.0.0.1
 API_PORT=8000
 CORS_ORIGINS=http://localhost:8501,http://127.0.0.1:8501
+SECRET_KEY=dev-secret-key-change-in-production-32-chars-min
 
 # LLM Profile: mock | dev | demo  (tests force mock)
 LLM_PROFILE=dev
@@ -291,7 +292,6 @@ FALLBACK_LLM_MODEL=
 PROMPT_VERSION=v1
 LLM_CACHE_ENABLED=true
 LLM_CACHE_TTL_DAYS=30
-CACHE_DIR=./data/cache
 
 # Spend Guard (per run)
 LLM_MAX_CALLS_PER_RUN=40

@@ -99,7 +99,7 @@ CREATE TABLE IF NOT EXISTS documents (
 
 -- 7. LLM Response Memoization Cache
 CREATE TABLE IF NOT EXISTS llm_cache (
-    cache_key TEXT PRIMARY KEY,            -- SHA256(model + prompt + temp + schema)
+    cache_key TEXT PRIMARY KEY,            -- SHA256(profile + model + prompt version + prompt + params)
     prompt_hash TEXT NOT NULL,
     model_name TEXT NOT NULL,
     response_text TEXT NOT NULL,

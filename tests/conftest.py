@@ -7,14 +7,21 @@ from pathlib import Path
 from typing import Any
 import pytest
 
-from src.db.migrations import SCHEMA_DDL
-from src.db.repository import Repository
-
-# Force test environment variables
+# Force the zero-quota test environment BEFORE importing application settings.
 os.environ["APP_ENV"] = "test"
+os.environ["LLM_PROFILE"] = "mock"
 os.environ["DATABASE_PATH"] = ":memory:"
-os.environ["LLM_API_KEY"] = "mock-test-key-no-external-spend"
-os.environ["FALLBACK_LLM_API_KEY"] = "mock-fallback-key"
+
+from src.db.migrations import SCHEMA_DDL  # noqa: E402
+from src.db.repository import Repository  # noqa: E402
+from src.config import settings  # noqa: E402
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _force_mock_llm_profile() -> None:
+    """Fail the session immediately if tests could reach a live LLM."""
+    assert settings.LLM_PROFILE == "mock"
+    assert settings.llm.is_mock is True
 
 
 class MockLLMResponse:

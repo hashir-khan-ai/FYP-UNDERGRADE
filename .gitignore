@@ -25,6 +25,10 @@ share/python-wheels/
 .installed.cfg
 *.egg
 
+# External resources and skill templates
+RESOURCES DATA MATERIAL/
+skills/
+
 # Virtual environments
 .venv/
 venv/
