@@ -19,6 +19,7 @@ from src.api.schemas import (
     ChatQueryRequest,
     ChatQueryResponse,
     Citation,
+    GraderStats,
     LoginRequest,
     LoginResponse,
     LogoutResponse,
@@ -535,6 +536,17 @@ def chat_query(
             router_fallback_reason=decision.fallback_reason if decision is not None else None,
             sub_questions=list(decision.sub_questions) if decision is not None else [],
             step_timings=step_timings,
+            grader_path=result.grader_path if result is not None else None,
+            grader_relevant_count=result.grader_relevant_count if result is not None else None,
+            grader_ambiguous_count=result.grader_ambiguous_count if result is not None else None,
+            grader_irrelevant_count=result.grader_irrelevant_count if result is not None else None,
+            grader_rewrite_used=result.grader_rewrite_used if result is not None else None,
+            grader_rewritten_query=result.grader_rewritten_query if result is not None else None,
+            grader_refused=result.grader_refused if result is not None else None,
+            grader_refusal_reason=result.grader_refusal_reason if result is not None else None,
+            grader_calls=result.grader_calls if result is not None else None,
+            grader_tokens=result.grader_tokens if result is not None else None,
+            grader_latency_ms=result.grader_latency_ms if result is not None else None,
         )
 
     return ChatQueryResponse(
@@ -581,6 +593,19 @@ def chat_query(
             direct_category=direct_category,
             latency_ms=round(decision.latency_ms, 2) if decision is not None else 0.0,
             tokens_used=decision.tokens_used if decision is not None else 0,
+        ),
+        grader=GraderStats(
+            enabled=settings.ENABLE_CORRECTIVE_GRADER,
+            path=result.grader_path if result is not None else None,
+            relevant_count=result.grader_relevant_count if result is not None else 0,
+            ambiguous_count=result.grader_ambiguous_count if result is not None else 0,
+            irrelevant_count=result.grader_irrelevant_count if result is not None else 0,
+            rewrite_used=result.grader_rewrite_used if result is not None else False,
+            refused=result.grader_refused if result is not None else False,
+            refusal_reason=result.grader_refusal_reason if result is not None else "",
+            grader_calls=result.grader_calls if result is not None else 0,
+            tokens_used=result.grader_tokens if result is not None else 0,
+            latency_ms=result.grader_latency_ms if result is not None else 0.0,
         ),
     )
 

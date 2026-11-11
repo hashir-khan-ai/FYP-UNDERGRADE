@@ -99,6 +99,22 @@ class RouterStats(BaseModel):
     tokens_used: int = 0
 
 
+class GraderStats(BaseModel):
+    """Phase 5 corrective grader observability for one request (no passage text)."""
+
+    enabled: bool = False
+    path: str | None = None  # shortcut_keep | shortcut_reject | llm_grade
+    relevant_count: int = 0
+    ambiguous_count: int = 0
+    irrelevant_count: int = 0
+    rewrite_used: bool = False
+    refused: bool = False
+    refusal_reason: str = ""
+    grader_calls: int = 0
+    tokens_used: int = 0
+    latency_ms: float = 0.0
+
+
 class ChatQueryResponse(BaseModel):
     session_id: str
     answer: str
@@ -114,6 +130,7 @@ class ChatQueryResponse(BaseModel):
     rbac_enabled: bool
     candidates_filtered_by_role: int
     router: RouterStats = Field(default_factory=RouterStats)
+    grader: GraderStats = Field(default_factory=GraderStats)
 
 
 class SessionCreateRequest(BaseModel):

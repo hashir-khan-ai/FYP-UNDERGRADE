@@ -169,6 +169,7 @@ _LLM_CALLS_EXTRA_COLUMNS: dict[str, str] = {
 # Phase 3 audit columns: role-filter counters, model identity and cache flag.
 # Phase 4 adds router observability: confidence, fallback reason, the user's own
 # derived sub-questions and per-step latency/token timings. Additive only.
+# Phase 5 adds corrective grader observability. All nullable; existing rows remain valid.
 _AUDIT_LOG_EXTRA_COLUMNS: dict[str, str] = {
     "llm_profile": "TEXT NOT NULL DEFAULT 'mock'",
     "llm_calls": "INTEGER NOT NULL DEFAULT 0",
@@ -182,6 +183,18 @@ _AUDIT_LOG_EXTRA_COLUMNS: dict[str, str] = {
     "router_fallback_reason": "TEXT",
     "sub_questions": "TEXT",
     "step_timings_json": "TEXT",
+    # Phase 5 grader columns
+    "grader_path": "TEXT",
+    "grader_relevant_count": "INTEGER",
+    "grader_ambiguous_count": "INTEGER",
+    "grader_irrelevant_count": "INTEGER",
+    "grader_rewrite_used": "INTEGER",
+    "grader_rewritten_query": "TEXT",
+    "grader_refused": "INTEGER",
+    "grader_refusal_reason": "TEXT",
+    "grader_calls": "INTEGER",
+    "grader_tokens": "INTEGER",
+    "grader_latency_ms": "REAL",
 }
 
 # Phase 3 messages column: the role used when each turn was produced.

@@ -523,21 +523,110 @@ class BaselineRAGPipeline:
         total_start = time.perf_counter()
         normalized_role = normalize_role(role)
         context = self.prepare_split(sub_questions, normalized_role)
+
+        # Phase 5: corrective grader — runs on the merged, role-permitted passage set.
+        # RBAC has already been enforced in prepare_split before the grader sees anything.
+        grader_dec = None
+        final_passages = context.passages
+        grader_step_timing: dict[str, Any] = {}
+
+        if settings.ENABLE_CORRECTIVE_GRADER:
+            from src.core.grader import grade, grader_metadata
+
+            def _split_retry_retrieval(rewritten: str) -> list[dict[str, Any]]:
+                """Retry retrieval for split route with same role filter."""
+                # For split, retry each sub-question that had no relevant passage.
+                # Conservative: re-run all sub-questions with the rewritten query
+                # (one additional retrieval call within the spend guard).
+                retry_cands, _, _ = self.retrieve(rewritten, normalized_role)
+                retry_passages, _, _ = self.rerank(rewritten, retry_cands, normalized_role)
+                return retry_passages
+
+            grader_dec = grade(
+                llm=self.llm,
+                question=query,
+                passages=context.passages,
+                retrieval_fn=_split_retry_retrieval,
+                role=normalized_role,
+                session_id=session_id,
+            )
+            grader_step_timing = {
+                "step": "grader",
+                "path": grader_dec.path,
+                "latency_ms": round(grader_dec.total_latency_ms, 2),
+                "tokens": grader_dec.total_tokens,
+            }
+
+            if grader_dec.refused:
+                # Uniform refusal — does not reveal whether restricted docs exist.
+                llm_cfg = settings.llm
+                step_timings = list(context.step_timings) + [grader_step_timing]
+                return BaselineRAGResponse(
+                    query=query,
+                    answer=REFUSAL_TEXT,
+                    role=normalized_role,
+                    rbac_enabled=settings.rbac_enabled,
+                    sources=[],
+                    chunk_ids_used=[],
+                    timings=RAGTimings(
+                        retrieval_ms=round(context.retrieval_ms, 2),
+                        rerank_ms=round(context.rerank_ms, 2),
+                        generation_ms=0.0,
+                        total_ms=round((time.perf_counter() - total_start) * 1000.0, 2),
+                    ),
+                    retrieval_stats=RetrievalStats(
+                        candidates_retrieved=context.candidates_retrieved,
+                        candidates_filtered_by_role=context.candidates_filtered_by_role,
+                        total_chunks_retrieved=0,
+                        top_rerank_score=0.0,
+                        rewritten_query=grader_dec.rewritten_query,
+                    ),
+                    llm_stats=LLMStats(
+                        profile=llm_cfg.profile,
+                        model=llm_cfg.model,
+                        prompt_version=settings.PROMPT_VERSION,
+                        calls=0,
+                        cached_calls=0,
+                        prompt_tokens=0,
+                        completion_tokens=0,
+                        cached_response=False,
+                    ),
+                    cached=False,
+                    llm_profile=llm_cfg.profile,
+                    llm_model=llm_cfg.model,
+                    step_timings=step_timings,
+                    grader_path=grader_dec.path,
+                    grader_relevant_count=grader_dec.relevant_count,
+                    grader_ambiguous_count=grader_dec.ambiguous_count,
+                    grader_irrelevant_count=grader_dec.irrelevant_count,
+                    grader_rewrite_used=grader_dec.rewrite_used,
+                    grader_rewritten_query=grader_dec.rewritten_query,
+                    grader_refused=grader_dec.refused,
+                    grader_refusal_reason=grader_dec.refusal_reason,
+                    grader_calls=grader_dec.grader_calls,
+                    grader_tokens=grader_dec.total_tokens,
+                    grader_latency_ms=round(grader_dec.total_latency_ms, 2),
+                )
+            final_passages = grader_dec.kept_passages
+
         answer, cited_ids, cached, generation_ms, usage = self.generate(
-            query, context.passages, session_id=session_id
+            query, final_passages, session_id=session_id
         )
 
         llm = settings.llm
         retrieval_stats = RetrievalStats(
             candidates_retrieved=context.candidates_retrieved,
             candidates_filtered_by_role=context.candidates_filtered_by_role,
-            total_chunks_retrieved=len(context.passages),
+            total_chunks_retrieved=len(final_passages),
             top_rerank_score=max(
-                (float(passage.get("score", 0.0)) for passage in context.passages),
+                (float(passage.get("score", 0.0)) for passage in final_passages),
                 default=0.0,
             ),
+            rewritten_query=grader_dec.rewritten_query if grader_dec else None,
         )
         step_timings = list(context.step_timings)
+        if grader_dec is not None:
+            step_timings.append(grader_step_timing)
         step_timings.append(
             {
                 "step": "generation",
@@ -550,7 +639,7 @@ class BaselineRAGPipeline:
             answer=answer,
             role=normalized_role,
             rbac_enabled=settings.rbac_enabled,
-            sources=self._to_sources(context.passages),
+            sources=self._to_sources(final_passages),
             chunk_ids_used=cited_ids,
             timings=RAGTimings(
                 retrieval_ms=round(context.retrieval_ms, 2),
@@ -573,6 +662,17 @@ class BaselineRAGPipeline:
             llm_profile=llm.profile,
             llm_model=llm.model,
             step_timings=step_timings,
+            grader_path=grader_dec.path if grader_dec else None,
+            grader_relevant_count=grader_dec.relevant_count if grader_dec else 0,
+            grader_ambiguous_count=grader_dec.ambiguous_count if grader_dec else 0,
+            grader_irrelevant_count=grader_dec.irrelevant_count if grader_dec else 0,
+            grader_rewrite_used=grader_dec.rewrite_used if grader_dec else False,
+            grader_rewritten_query=grader_dec.rewritten_query if grader_dec else None,
+            grader_refused=grader_dec.refused if grader_dec else False,
+            grader_refusal_reason=grader_dec.refusal_reason if grader_dec else "",
+            grader_calls=grader_dec.grader_calls if grader_dec else 0,
+            grader_tokens=grader_dec.total_tokens if grader_dec else 0,
+            grader_latency_ms=round(grader_dec.total_latency_ms, 2) if grader_dec else 0.0,
         )
 
     def ask(
@@ -602,12 +702,86 @@ class BaselineRAGPipeline:
         final_passages, rerank_ms, dropped = self.rerank(
             retrieval_query, candidates, normalized_role
         )
+
+        # Phase 5: corrective grader — runs after re-ranking, before generation.
+        # RBAC has already been enforced in retrieve + rerank before the grader sees anything.
+        grader_dec = None
+        effective_passages = final_passages
+
+        if settings.ENABLE_CORRECTIVE_GRADER:
+            from src.core.grader import grade
+
+            def _single_retry_retrieval(rewritten: str) -> list[dict[str, Any]]:
+                """Retry retrieval with the same role filter."""
+                retry_cands, _, _ = self.retrieve(rewritten, normalized_role)
+                retry_passages, _, _ = self.rerank(rewritten, retry_cands, normalized_role)
+                return retry_passages
+
+            grader_dec = grade(
+                llm=self.llm,
+                question=retrieval_query,
+                passages=final_passages,
+                retrieval_fn=_single_retry_retrieval,
+                role=normalized_role,
+                session_id=session_id,
+            )
+
+            if grader_dec.refused:
+                llm_cfg = settings.llm
+                return BaselineRAGResponse(
+                    query=query,
+                    answer=REFUSAL_TEXT,
+                    role=normalized_role,
+                    rbac_enabled=rbac_enabled,
+                    sources=[],
+                    chunk_ids_used=[],
+                    timings=RAGTimings(
+                        retrieval_ms=round(retrieval_ms, 2),
+                        rerank_ms=round(rerank_ms, 2),
+                        generation_ms=0.0,
+                        total_ms=round((time.perf_counter() - total_start) * 1000.0, 2),
+                    ),
+                    retrieval_stats=RetrievalStats(
+                        candidates_retrieved=filter_stats["candidates_retrieved"],
+                        candidates_filtered_by_role=(
+                            filter_stats["candidates_filtered_by_role"] + dropped
+                        ),
+                        total_chunks_retrieved=0,
+                        top_rerank_score=0.0,
+                        rewritten_query=grader_dec.rewritten_query or rewritten_query,
+                    ),
+                    llm_stats=LLMStats(
+                        profile=llm_cfg.profile,
+                        model=llm_cfg.model,
+                        prompt_version=settings.PROMPT_VERSION,
+                        calls=0,
+                        cached_calls=0,
+                        prompt_tokens=0,
+                        completion_tokens=0,
+                        cached_response=False,
+                    ),
+                    cached=False,
+                    llm_profile=llm_cfg.profile,
+                    llm_model=llm_cfg.model,
+                    grader_path=grader_dec.path,
+                    grader_relevant_count=grader_dec.relevant_count,
+                    grader_ambiguous_count=grader_dec.ambiguous_count,
+                    grader_irrelevant_count=grader_dec.irrelevant_count,
+                    grader_rewrite_used=grader_dec.rewrite_used,
+                    grader_rewritten_query=grader_dec.rewritten_query,
+                    grader_refused=grader_dec.refused,
+                    grader_refusal_reason=grader_dec.refusal_reason,
+                    grader_calls=grader_dec.grader_calls,
+                    grader_tokens=grader_dec.total_tokens,
+                    grader_latency_ms=round(grader_dec.total_latency_ms, 2),
+                )
+            effective_passages = grader_dec.kept_passages
+
         answer, cited_ids, cached, generation_ms, usage = self.generate(
-            retrieval_query, final_passages, session_id=session_id
+            retrieval_query, effective_passages, session_id=session_id
         )
 
-        sources = self._to_sources(final_passages)
-
+        sources = self._to_sources(effective_passages)
 
         llm = settings.llm
         retrieval_stats = RetrievalStats(
@@ -615,9 +789,9 @@ class BaselineRAGPipeline:
             candidates_filtered_by_role=(
                 filter_stats["candidates_filtered_by_role"] + dropped
             ),
-            total_chunks_retrieved=len(final_passages),
+            total_chunks_retrieved=len(effective_passages),
             top_rerank_score=max(
-                (float(passage.get("score", 0.0)) for passage in final_passages),
+                (float(passage.get("score", 0.0)) for passage in effective_passages),
                 default=0.0,
             ),
             rewritten_query=rewritten_query,
@@ -649,6 +823,17 @@ class BaselineRAGPipeline:
             cached=cached,
             llm_profile=llm.profile,
             llm_model=llm.model,
+            grader_path=grader_dec.path if grader_dec else None,
+            grader_relevant_count=grader_dec.relevant_count if grader_dec else 0,
+            grader_ambiguous_count=grader_dec.ambiguous_count if grader_dec else 0,
+            grader_irrelevant_count=grader_dec.irrelevant_count if grader_dec else 0,
+            grader_rewrite_used=grader_dec.rewrite_used if grader_dec else False,
+            grader_rewritten_query=grader_dec.rewritten_query if grader_dec else None,
+            grader_refused=grader_dec.refused if grader_dec else False,
+            grader_refusal_reason=grader_dec.refusal_reason if grader_dec else "",
+            grader_calls=grader_dec.grader_calls if grader_dec else 0,
+            grader_tokens=grader_dec.total_tokens if grader_dec else 0,
+            grader_latency_ms=round(grader_dec.total_latency_ms, 2) if grader_dec else 0.0,
         )
 
 

@@ -277,6 +277,18 @@ class Repository:
         router_fallback_reason: str | None = None,
         sub_questions: list[str] | str | None = None,
         step_timings: list[dict[str, Any]] | str | None = None,
+        # Phase 5 grader observability (all nullable)
+        grader_path: str | None = None,
+        grader_relevant_count: int | None = None,
+        grader_ambiguous_count: int | None = None,
+        grader_irrelevant_count: int | None = None,
+        grader_rewrite_used: bool | None = None,
+        grader_rewritten_query: str | None = None,
+        grader_refused: bool | None = None,
+        grader_refusal_reason: str | None = None,
+        grader_calls: int | None = None,
+        grader_tokens: int | None = None,
+        grader_latency_ms: float | None = None,
     ) -> int:
         # Normalize collections to JSON strings
         chunks_str = json.dumps(retrieved_chunk_ids) if isinstance(retrieved_chunk_ids, list) else retrieved_chunk_ids
@@ -296,8 +308,12 @@ class Repository:
                 tokens_prompt, tokens_completion, llm_profile, llm_calls,
                 cached_calls, spend_guard_hit, prompt_version, llm_model,
                 candidates_retrieved, candidates_filtered, router_confidence,
-                router_fallback_reason, sub_questions, step_timings_json
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                router_fallback_reason, sub_questions, step_timings_json,
+                grader_path, grader_relevant_count, grader_ambiguous_count,
+                grader_irrelevant_count, grader_rewrite_used, grader_rewritten_query,
+                grader_refused, grader_refusal_reason, grader_calls, grader_tokens,
+                grader_latency_ms
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
             """,
             (
                 session_id,
@@ -327,6 +343,17 @@ class Repository:
                 router_fallback_reason,
                 subs_str,
                 timings_str,
+                grader_path,
+                grader_relevant_count,
+                grader_ambiguous_count,
+                grader_irrelevant_count,
+                1 if grader_rewrite_used else (0 if grader_rewrite_used is not None else None),
+                grader_rewritten_query,
+                1 if grader_refused else (0 if grader_refused is not None else None),
+                grader_refusal_reason,
+                grader_calls,
+                grader_tokens,
+                grader_latency_ms,
             ),
         )
         return cur.lastrowid

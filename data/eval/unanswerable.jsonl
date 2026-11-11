@@ -1,0 +1,41 @@
+{"_meta": {"status": "draft", "note": "DRAFT — requires student review. 20 unanswerable + 20 answerable questions for refusal evaluation.", "created_by": "Phase 5 implementation"}}
+{"question": "What was the Board's risk appetite statement for 2026?", "answerable": false, "note": "Specific future document not in corpus"}
+{"question": "What penalty did the FCA impose on Barclays in 2024?", "answerable": false, "note": "Specific enforcement action not in corpus"}
+{"question": "Who is the current Chief Compliance Officer of this bank?", "answerable": false, "note": "Personnel not documented in corpus"}
+{"question": "What is the Bitcoin price today?", "answerable": false, "note": "Real-time data not in corpus"}
+{"question": "How many staff members does the compliance department have?", "answerable": false, "note": "Operational detail not in corpus"}
+{"question": "What was discussed at the February 2025 board meeting?", "answerable": false, "note": "Specific meeting minutes not in corpus"}
+{"question": "What is the bank's target CET1 ratio for 2027?", "answerable": false, "note": "Forward guidance not in corpus"}
+{"question": "Which vendor provides the bank's KYC screening software?", "answerable": false, "note": "Vendor detail not in corpus"}
+{"question": "What is the LIBOR rate as of November 2026?", "answerable": false, "note": "LIBOR discontinued; not in corpus"}
+{"question": "How many suspicious activity reports did we file in Q3 2025?", "answerable": false, "note": "Operational metric not in corpus"}
+{"question": "What is the name of the firm's data protection officer?", "answerable": false, "note": "Personnel not in corpus"}
+{"question": "What is the bank's current stock price?", "answerable": false, "note": "Market data not in corpus"}
+{"question": "Who signed off on the 2024 internal audit findings?", "answerable": false, "note": "Specific signatory not in corpus"}
+{"question": "What is the monthly rent for the compliance department's office space?", "answerable": false, "note": "Operational cost not in corpus"}
+{"question": "What was the outcome of the PRA's stress test for our bank in 2025?", "answerable": false, "note": "Firm-specific test result not in corpus"}
+{"question": "How many customers does the bank have as of Q4 2025?", "answerable": false, "note": "Customer count not in corpus"}
+{"question": "What is the CEO's salary for fiscal year 2025?", "answerable": false, "note": "Executive compensation not in corpus"}
+{"question": "Which law firm conducted the independent review of the compliance framework?", "answerable": false, "note": "Specific advisor not in corpus"}
+{"question": "What is the bank's net promoter score for 2026?", "answerable": false, "note": "Customer metric not in corpus"}
+{"question": "What was the reason for the emergency board meeting in January 2026?", "answerable": false, "note": "Specific event not in corpus"}
+{"question": "What minimum CET1 capital ratio must banks maintain under Basel III?", "answerable": true, "note": "Directly answered by Basel III document"}
+{"question": "What customer due diligence measures must firms apply when establishing a new business relationship?", "answerable": true, "note": "Directly answered by FCA MLR document"}
+{"question": "What is the minimum leverage ratio under Basel III?", "answerable": true, "note": "Directly answered by Basel III document"}
+{"question": "When must a firm submit a Suspicious Activity Report to the NCA?", "answerable": true, "note": "Directly answered by FCA MLR document"}
+{"question": "What is the Net Stable Funding Ratio minimum?", "answerable": true, "note": "Directly answered by Basel III document"}
+{"question": "What records must firms keep under the Money Laundering Regulations and for how long?", "answerable": true, "note": "Directly answered by FCA MLR document"}
+{"question": "When is enhanced due diligence required under anti-money laundering rules?", "answerable": true, "note": "Directly answered by FCA MLR document"}
+{"question": "What is the Liquidity Coverage Ratio requirement?", "answerable": true, "note": "Directly answered by Basel III document"}
+{"question": "What is tipping off and is it permitted under the Proceeds of Crime Act?", "answerable": true, "note": "Directly answered by FCA MLR document"}
+{"question": "What is the capital conservation buffer requirement under Basel III?", "answerable": true, "note": "Directly answered by Basel III document"}
+{"question": "What BCOBS obligations apply to basic bank accounts?", "answerable": true, "note": "Directly answered by FCA BCOBS document"}
+{"question": "What is the minimum period for retaining AML records?", "answerable": true, "note": "Directly answered by FCA MLR document"}
+{"question": "What are the requirements for a nominated officer under MLR 2017?", "answerable": true, "note": "Directly answered by FCA MLR document"}
+{"question": "What risk-based approach must firms adopt for customer due diligence?", "answerable": true, "note": "Directly answered by FCA MLR document"}
+{"question": "What are the Basel III Tier 1 capital requirements?", "answerable": true, "note": "Directly answered by Basel III document"}
+{"question": "What conditions trigger enhanced due diligence for politically exposed persons?", "answerable": true, "note": "Directly answered by FCA MLR document"}
+{"question": "What is the BCOBS requirement for communicating material changes to terms?", "answerable": true, "note": "Directly answered by FCA BCOBS document"}
+{"question": "What are the reporting obligations for a money laundering nominated officer?", "answerable": true, "note": "Directly answered by FCA MLR document"}
+{"question": "What counter-cyclical capital buffer requirements exist under Basel III?", "answerable": true, "note": "Directly answered by Basel III document"}
+{"question": "What are the high-risk third country enhanced due diligence requirements?", "answerable": true, "note": "Directly answered by FCA MLR document"}
