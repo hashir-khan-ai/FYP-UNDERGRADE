@@ -196,6 +196,26 @@ class Settings(BaseSettings):
         description="Number of previous messages loaded into short-term memory",
     )
 
+    # Phase 4 adaptive router. All caps degrade to SINGLE_SEARCH, never to a
+    # direct reply, so a misclassification can never bypass retrieval or RBAC.
+    ROUTER_CONFIDENCE_THRESHOLD: float = Field(
+        default=0.6,
+        ge=0.0,
+        le=1.0,
+        description="Router confidence below which the route degrades to SINGLE_SEARCH",
+    )
+    ROUTER_MAX_SUB_QUESTIONS: int = Field(
+        default=3,
+        ge=2,
+        le=3,
+        description="Hard cap on decomposed sub-questions (PLAN.md allows 2-3)",
+    )
+    ROUTER_MAX_RETRIEVAL_CALLS: int = Field(
+        default=3,
+        ge=1,
+        description="Hard cap on hybrid retrieval calls per request",
+    )
+
     # Local demo authentication
     AUTH_TOKEN_TTL_MINUTES: int = Field(
         default=60,
@@ -212,6 +232,13 @@ class Settings(BaseSettings):
     AUTH_LOGIN_RATE_LIMIT_PER_MINUTE: int = Field(
         default=10,
         description="Login attempts allowed per minute per username and client",
+    )
+
+    # Seed script credential. Intentionally has no built-in default: the seed
+    # script refuses to run outside APP_ENV=test unless this is supplied.
+    SEED_DEFAULT_PASSWORD: str = Field(
+        default="",
+        description="Password hashed for the three synthetic demo users by scripts/seed_data.py",
     )
 
     # Retrieval Hyperparameters

@@ -59,6 +59,32 @@ class LLMResponse(BaseModel):
     profile: str = ""
 
 
+def _mock_route_decision(question: str) -> dict[str, object]:
+    """Deterministic offline router output for the ``mock`` profile.
+
+    The heuristic is intentionally simple: it only exists so mock-profile tests
+    and routing evaluation are stable and free. Live profiles use the LLM.
+    """
+    lowered = question.lower()
+    parts = [
+        part.strip(" ?.,")
+        for part in re.split(
+            r"\s+(?:and|versus|vs\.?|compared with)\s+",
+            question,
+        )
+        if part.strip(" ?.,")
+    ]
+    wants_comparison = any(
+        marker in lowered
+        for marker in ("compare", "versus", " vs ", "difference between", "differ")
+    )
+    if wants_comparison and len(parts) >= 2:
+        return {"route": "split", "sub_questions": parts[:2], "confidence": 0.7}
+    if question.count("?") >= 2 and len(parts) >= 2:
+        return {"route": "split", "sub_questions": parts[:2], "confidence": 0.7}
+    return {"route": "single_search", "sub_questions": [], "confidence": 0.9}
+
+
 def parse_json_response(raw_text: str, schema: type[T]) -> T | None:
     """Extract a JSON object from model text and validate it with Pydantic.
 
@@ -571,6 +597,16 @@ class ResilientLLMClient:
             match = re.search(r"(?im)^\s*Follow-up question\s*:\s*(.+?)\s*$", prompt)
             question = match.group(1).strip() if match else ""
             return json.dumps({"standalone_question": question})
+
+        if "sub_questions" in lowered and "confidence" in lowered:
+            # Adaptive router step: deterministic, schema-valid, offline.
+            match = re.search(
+                r"<user_question>\s*(.*?)\s*</user_question>",
+                prompt,
+                re.DOTALL,
+            )
+            question = match.group(1).strip() if match else ""
+            return json.dumps(_mock_route_decision(question))
 
         if "authoritative_documents" in lowered or "authoritative_passages" in lowered:
             cited = ", ".join(chunk_ids[:5]) if chunk_ids else "NONE"

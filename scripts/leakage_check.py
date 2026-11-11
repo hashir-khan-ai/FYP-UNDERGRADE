@@ -49,6 +49,34 @@ QUESTIONS = {
         "auditor reports."
     ),
 }
+# Split-route questions deliberately mix a permitted topic with a restricted one
+# so every sub-question retrieval must still apply the same role filter.
+SPLIT_QUESTIONS: dict[str, tuple[str, list[str]]] = {
+    "split_public_manager": (
+        "What customer due diligence must firms apply to new clients, and what is "
+        "the escalation procedure for material breaches?",
+        [
+            "What customer due diligence must firms apply to new clients?",
+            "What is the escalation procedure for material breaches to the compliance committee?",
+        ],
+    ),
+    "split_public_auditor": (
+        "What customer due diligence must firms apply, and what did the audit "
+        "conclude about control gaps in the KYC remediation plan?",
+        [
+            "What customer due diligence must firms apply to new clients?",
+            "What did the audit conclude about control gaps in the KYC remediation plan?",
+        ],
+    ),
+    "split_manager_auditor": (
+        "What is the escalation procedure for material breaches, and what did the "
+        "audit conclude about control gaps in the KYC remediation plan?",
+        [
+            "What is the escalation procedure for material breaches to the compliance committee?",
+            "What did the audit conclude about control gaps in the KYC remediation plan?",
+        ],
+    ),
+}
 FORBIDDEN = {
     "analyst": {MANAGER_MARKER, AUDITOR_MARKER},
     "manager": {AUDITOR_MARKER},
@@ -146,33 +174,45 @@ def run() -> int:
     logging.getLogger().setLevel(logging.DEBUG)
 
     rows: list[tuple[str, str, bool, list[str]]] = []
+
+    def evaluate(role: str, question_key: str, invoke) -> None:
+        llm.prompts.clear()
+        log_buffer.seek(0)
+        log_buffer.truncate(0)
+        before_cache = _cache_rows()
+
+        response = invoke()
+
+        new_cache_text = " ".join(
+            text for key, text in _cache_rows().items() if key not in before_cache
+        )
+        surfaces = {
+            "passages": json.dumps([source.model_dump() for source in response.sources]),
+            "prompt": "\n".join(llm.prompts),
+            "answer": response.answer,
+            "citations": " ".join(response.chunk_ids_used),
+            "logs": log_buffer.getvalue(),
+            "cache": new_cache_text,
+        }
+        leaked_surfaces = [
+            name
+            for name, text in surfaces.items()
+            if any(marker in text for marker in FORBIDDEN[role])
+        ]
+        rows.append((role, question_key, bool(leaked_surfaces), leaked_surfaces))
+
     try:
         for role in ROLES:
             for question_key, question in QUESTIONS.items():
-                llm.prompts.clear()
-                log_buffer.seek(0)
-                log_buffer.truncate(0)
-                before_cache = _cache_rows()
-
-                response = pipeline.ask(question, role=role)
-
-                new_cache_text = " ".join(
-                    text for key, text in _cache_rows().items() if key not in before_cache
+                evaluate(role, question_key, lambda q=question, r=role: pipeline.ask(q, role=r))
+            for question_key, (question, sub_questions) in SPLIT_QUESTIONS.items():
+                evaluate(
+                    role,
+                    question_key,
+                    lambda q=question, s=sub_questions, r=role: pipeline.ask_split(
+                        q, s, role=r
+                    ),
                 )
-                surfaces = {
-                    "passages": json.dumps([source.model_dump() for source in response.sources]),
-                    "prompt": "\n".join(llm.prompts),
-                    "answer": response.answer,
-                    "citations": " ".join(response.chunk_ids_used),
-                    "logs": log_buffer.getvalue(),
-                    "cache": new_cache_text,
-                }
-                leaked_surfaces = [
-                    name
-                    for name, text in surfaces.items()
-                    if any(marker in text for marker in FORBIDDEN[role])
-                ]
-                rows.append((role, question_key, bool(leaked_surfaces), leaked_surfaces))
     finally:
         qdrant.close()
         logging.getLogger().removeHandler(handler)

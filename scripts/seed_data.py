@@ -1,6 +1,11 @@
-"""Database seeding script for synthetic roles, users, and documents."""
+"""Database seeding script for synthetic roles, users, and documents.
 
-import json
+The demo password is never hardcoded: it must be supplied through
+``SEED_DEFAULT_PASSWORD`` (in ``.env`` or the environment) unless the run is
+explicitly labelled ``APP_ENV=test``, in which case a non-credential test value
+is used so the automated suite stays deterministic.
+"""
+
 import os
 import sys
 from pathlib import Path
@@ -8,15 +13,39 @@ from pathlib import Path
 # Ensure project root is in sys.path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from src.config import settings
 from src.core.auth import hash_password
 from src.db.connection import get_db_connection
 from src.db.migrations import init_db
 from src.db.repository import Repository
 
-SYNTHETIC_DEMO_PASSWORD = os.environ.get("SEED_DEFAULT_PASSWORD", "password123")
+TEST_ONLY_SEED_PASSWORD = "test-only-seed-password"
+
+
+def resolve_seed_password() -> str:
+    """Return the password to hash for the synthetic demo users.
+
+    Returns:
+        The configured ``SEED_DEFAULT_PASSWORD``.
+
+    Raises:
+        SystemExit: outside ``APP_ENV=test`` when no password is configured, so
+            a shared environment can never be seeded with a known default.
+    """
+    configured = (settings.SEED_DEFAULT_PASSWORD or os.environ.get("SEED_DEFAULT_PASSWORD", "")).strip()
+    if configured:
+        return configured
+    if settings.APP_ENV.strip().lower() == "test":
+        return TEST_ONLY_SEED_PASSWORD
+    raise SystemExit(
+        "SEED_DEFAULT_PASSWORD is not set. Add it to .env (or the environment) "
+        "before running scripts/seed_data.py; there is no built-in default "
+        "outside APP_ENV=test."
+    )
 
 
 def seed() -> None:
+    password = resolve_seed_password()
     print("Initializing SQLite schema...")
     init_db()
 
@@ -37,7 +66,7 @@ def seed() -> None:
 
         # 2. Seed Synthetic Users (Argon2id hashes; upsert preserves user IDs)
         print("Seeding synthetic users...")
-        pwd_hash = hash_password(SYNTHETIC_DEMO_PASSWORD)
+        pwd_hash = hash_password(password)
 
         repo.upsert_user(
             username="analyst_user",

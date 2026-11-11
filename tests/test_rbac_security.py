@@ -43,6 +43,24 @@ RESTRICTED_QUESTIONS = {
 
 LEAKAGE_QUESTIONS = ("public", "manager_only", "auditor_only")
 
+# Multi-part variants used by the adaptive split route. Each pair is a realistic
+# decomposition of the matching restricted question, so the sub-questions alone
+# would surface the restricted marker if the role filter were not enforced.
+SPLIT_SUB_QUESTIONS: dict[str, list[str]] = {
+    "public": [
+        "What customer due diligence must firms apply to new clients?",
+        "How should firms verify the identity of new clients?",
+    ],
+    "manager_only": [
+        "What is the escalation procedure for material breaches?",
+        "Who receives material breach escalations from the compliance committee?",
+    ],
+    "auditor_only": [
+        "What did the audit conclude about control gaps?",
+        "What did the audit find about the KYC remediation plan?",
+    ],
+}
+
 
 def _chunk(
     chunk_id: str,
@@ -190,6 +208,94 @@ def test_leakage_matrix_is_zero(
     leakage_cells = sum(1 for _, _, leaked in matrix if leaked)
     leakage_rate = leakage_cells / len(matrix)
     assert leakage_rate == 0.0
+
+
+def test_split_route_leakage_matrix_is_zero(
+    rbac_pipeline: BaselineRAGPipeline,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """The split path applies the same role filter to every sub-question."""
+    matrix: list[tuple[str, str, bool]] = []
+
+    for role in ("analyst", "manager", "auditor"):
+        for question_key in LEAKAGE_QUESTIONS:
+            question = RESTRICTED_QUESTIONS[question_key]
+            sub_questions = SPLIT_SUB_QUESTIONS[question_key]
+            forbidden = FORBIDDEN_MARKERS[role]
+
+            rbac_pipeline.llm.prompts.clear()
+            caplog.clear()
+            caplog.set_level(logging.DEBUG)
+            before_cache = _cache_rows()
+
+            response = rbac_pipeline.ask_split(question, sub_questions, role=role)
+
+            new_cache_text = " ".join(
+                text
+                for key, text in _cache_rows().items()
+                if key not in before_cache
+            )
+            surfaces = {
+                "sources": json.dumps([source.model_dump() for source in response.sources]),
+                "answer": response.answer,
+                "chunk_ids": " ".join(response.chunk_ids_used),
+                "prompt": "\n".join(rbac_pipeline.llm.prompts),
+                "logs": caplog.text,
+                "cache": new_cache_text,
+            }
+            leaked = [
+                name
+                for name, text in surfaces.items()
+                if any(marker in text for marker in forbidden)
+            ]
+            matrix.append((role, question_key, bool(leaked)))
+            assert not leaked, f"split {role} leaked {leaked} for {question_key}"
+            assert response.role == role
+
+    leakage_cells = sum(1 for _, _, leaked in matrix if leaked)
+    assert leakage_cells / len(matrix) == 0.0
+    assert len(matrix) == 9, "3 roles x 3 restricted questions"
+
+
+def test_split_route_still_returns_permitted_passages(
+    rbac_pipeline: BaselineRAGPipeline,
+) -> None:
+    """Split retrieval must not over-filter: authorised markers still surface."""
+    manager = rbac_pipeline.ask_split(
+        RESTRICTED_QUESTIONS["manager_only"],
+        SPLIT_SUB_QUESTIONS["manager_only"],
+        role="manager",
+    )
+    manager_text = json.dumps([source.model_dump() for source in manager.sources])
+    assert MANAGER_MARKER in manager_text
+
+    analyst = rbac_pipeline.ask_split(
+        RESTRICTED_QUESTIONS["public"],
+        SPLIT_SUB_QUESTIONS["public"],
+        role="analyst",
+    )
+    analyst_text = json.dumps([source.model_dump() for source in analyst.sources])
+    assert PUBLIC_MARKER in analyst_text
+    assert MANAGER_MARKER not in analyst_text
+    assert AUDITOR_MARKER not in analyst_text
+
+
+def test_split_leakage_detector_catches_a_labelled_ablation(
+    rbac_pipeline: BaselineRAGPipeline,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Positive control for the split matrix: RBAC off makes the leak appear."""
+    monkeypatch.setattr(settings, "ENABLE_RBAC", False)
+    monkeypatch.setattr(settings, "APP_ENV", "test")
+
+    response = rbac_pipeline.ask_split(
+        RESTRICTED_QUESTIONS["auditor_only"],
+        SPLIT_SUB_QUESTIONS["auditor_only"],
+        role="analyst",
+    )
+    rendered = json.dumps([source.model_dump() for source in response.sources])
+    assert AUDITOR_MARKER in rendered, "ablation control should expose the marker"
+    assert response.rbac_enabled is False
 
 
 def test_allowed_markers_are_still_retrievable(rbac_pipeline: BaselineRAGPipeline) -> None:

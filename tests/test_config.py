@@ -70,3 +70,43 @@ def test_live_profile_is_rejected_when_app_env_is_test() -> None:
 
 def test_mock_profile_remains_usable_when_app_env_is_test() -> None:
     assert _settings(APP_ENV="test", LLM_PROFILE="mock").ensure_llm_ready().is_mock is True
+
+
+def test_seed_password_is_required_outside_the_test_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A shared environment must never be seeded with a built-in default."""
+    from scripts.seed_data import resolve_seed_password
+    from src.config import settings
+
+    monkeypatch.setattr(settings, "SEED_DEFAULT_PASSWORD", "")
+    monkeypatch.setattr(settings, "APP_ENV", "development")
+    monkeypatch.delenv("SEED_DEFAULT_PASSWORD", raising=False)
+
+    with pytest.raises(SystemExit, match="SEED_DEFAULT_PASSWORD"):
+        resolve_seed_password()
+
+
+def test_seed_password_falls_back_only_when_app_env_is_test(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from scripts.seed_data import TEST_ONLY_SEED_PASSWORD, resolve_seed_password
+    from src.config import settings
+
+    monkeypatch.setattr(settings, "SEED_DEFAULT_PASSWORD", "")
+    monkeypatch.setattr(settings, "APP_ENV", "test")
+    monkeypatch.delenv("SEED_DEFAULT_PASSWORD", raising=False)
+
+    assert resolve_seed_password() == TEST_ONLY_SEED_PASSWORD
+
+
+def test_configured_seed_password_is_used_verbatim(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from scripts.seed_data import resolve_seed_password
+    from src.config import settings
+
+    monkeypatch.setattr(settings, "SEED_DEFAULT_PASSWORD", "local-demo-secret")
+    monkeypatch.setattr(settings, "APP_ENV", "development")
+
+    assert resolve_seed_password() == "local-demo-secret"

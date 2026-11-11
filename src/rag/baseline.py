@@ -8,6 +8,7 @@ after re-ranking as defence in depth.
 import logging
 import re
 import time
+from dataclasses import dataclass, field
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -90,6 +91,22 @@ class BaselineRAGResponse(BaseModel):
     cached: bool = False
     llm_profile: str = ""
     llm_model: str = ""
+    # Per-step observability for the split route. Empty on the baseline path so
+    # router-off behaviour is byte-identical.
+    step_timings: list[dict[str, Any]] = Field(default_factory=list)
+
+
+@dataclass
+class SplitContext:
+    """Merged, de-duplicated passages produced by the split retrieval path."""
+
+    passages: list[dict[str, Any]]
+    candidates_retrieved: int
+    candidates_filtered_by_role: int
+    retrieval_ms: float
+    rerank_ms: float
+    retrieval_calls: int
+    step_timings: list[dict[str, Any]] = field(default_factory=list)
 
 
 
@@ -370,6 +387,177 @@ class BaselineRAGPipeline:
 
         return answer, cited, response.cached, generation_ms, usage
 
+    def _to_sources(self, passages: list[dict[str, Any]]) -> list[SourceChunk]:
+        """Convert final passages into citation objects (identifiers + snippet)."""
+        sources: list[SourceChunk] = []
+        for passage in passages:
+            text = passage.get("text_content", "")
+            sources.append(
+                SourceChunk(
+                    chunk_id=passage.get("chunk_id", ""),
+                    doc_id=passage.get("doc_id", "") or "",
+                    doc_title=passage.get("doc_title", "Document"),
+                    section=passage.get("section_label", ""),
+                    clause=passage.get("clause_label"),
+                    page=passage.get("page"),
+                    score=float(passage.get("score", 0.0)),
+                    snippet=text[:200] + ("..." if len(text) > 200 else ""),
+                )
+            )
+        return sources
+
+    def prepare_split(self, sub_questions: list[str], role: str) -> SplitContext:
+        """Retrieve and re-rank each sub-question with the same role filter.
+
+        Passages are merged and de-duplicated by ``chunk_id`` keeping the best
+        score, then capped to the final ``RERANKER_TOP_N`` budget. Every
+        sub-question runs through :meth:`retrieve` and :meth:`rerank`, so the
+        native role filter and the post-rerank guard apply to each one.
+
+        Args:
+            sub_questions: Decomposed sub-questions from the router.
+            role: Authenticated user role; always server-derived.
+
+        Returns:
+            A :class:`SplitContext` with merged permitted passages and counters.
+        """
+        normalized_role = normalize_role(role)
+        limit = min(
+            len(sub_questions),
+            settings.ROUTER_MAX_SUB_QUESTIONS,
+            settings.ROUTER_MAX_RETRIEVAL_CALLS,
+        )
+        selected = [question for question in sub_questions[:limit] if question.strip()]
+
+        merged: dict[str, dict[str, Any]] = {}
+        candidates_retrieved = 0
+        filtered = 0
+        retrieval_ms = 0.0
+        rerank_ms = 0.0
+        step_timings: list[dict[str, Any]] = []
+
+        for index, sub_question in enumerate(selected, start=1):
+            candidates, sub_retrieval_ms, filter_stats = self.retrieve(
+                sub_question, normalized_role
+            )
+            passages, sub_rerank_ms, dropped = self.rerank(
+                sub_question, candidates, normalized_role
+            )
+            retrieval_ms += sub_retrieval_ms
+            rerank_ms += sub_rerank_ms
+            candidates_retrieved += filter_stats["candidates_retrieved"]
+            filtered += filter_stats["candidates_filtered_by_role"] + dropped
+
+            for passage in passages:
+                chunk_id = passage.get("chunk_id")
+                if not chunk_id:
+                    continue
+                existing = merged.get(chunk_id)
+                if existing is None or float(passage.get("score", 0.0)) > float(
+                    existing.get("score", 0.0)
+                ):
+                    merged[chunk_id] = passage
+
+            step_timings.append(
+                {
+                    "step": "split_retrieval",
+                    "sub_question_index": index,
+                    "retrieval_ms": round(sub_retrieval_ms, 2),
+                    "rerank_ms": round(sub_rerank_ms, 2),
+                    "candidates": filter_stats["candidates_retrieved"],
+                    "permitted": len(passages),
+                    "dropped_by_role_guard": dropped,
+                }
+            )
+
+        ordered = sorted(
+            merged.values(),
+            key=lambda passage: (-float(passage.get("score", 0.0)), passage.get("chunk_id", "")),
+        )
+        final_passages = ordered[: settings.RERANKER_TOP_N]
+        return SplitContext(
+            passages=final_passages,
+            candidates_retrieved=candidates_retrieved,
+            candidates_filtered_by_role=filtered,
+            retrieval_ms=retrieval_ms,
+            rerank_ms=rerank_ms,
+            retrieval_calls=len(selected),
+            step_timings=step_timings,
+        )
+
+    def ask_split(
+        self,
+        query: str,
+        sub_questions: list[str],
+        role: str,
+        session_id: str | None = None,
+    ) -> BaselineRAGResponse:
+        """Answer a multi-part question with one generation over merged passages.
+
+        Args:
+            query: Standalone question used for generation (the user's own text).
+            sub_questions: Decomposed sub-questions from the router.
+            role: Authenticated user role; always server-derived.
+            session_id: Session identifier for per-call telemetry linkage.
+
+        Returns:
+            A role-filtered response whose citations come from the merged set.
+        """
+        total_start = time.perf_counter()
+        normalized_role = normalize_role(role)
+        context = self.prepare_split(sub_questions, normalized_role)
+        answer, cited_ids, cached, generation_ms, usage = self.generate(
+            query, context.passages, session_id=session_id
+        )
+
+        llm = settings.llm
+        retrieval_stats = RetrievalStats(
+            candidates_retrieved=context.candidates_retrieved,
+            candidates_filtered_by_role=context.candidates_filtered_by_role,
+            total_chunks_retrieved=len(context.passages),
+            top_rerank_score=max(
+                (float(passage.get("score", 0.0)) for passage in context.passages),
+                default=0.0,
+            ),
+        )
+        step_timings = list(context.step_timings)
+        step_timings.append(
+            {
+                "step": "generation",
+                "latency_ms": round(generation_ms, 2),
+                "tokens": usage["prompt_tokens"] + usage["completion_tokens"],
+            }
+        )
+        return BaselineRAGResponse(
+            query=query,
+            answer=answer,
+            role=normalized_role,
+            rbac_enabled=settings.rbac_enabled,
+            sources=self._to_sources(context.passages),
+            chunk_ids_used=cited_ids,
+            timings=RAGTimings(
+                retrieval_ms=round(context.retrieval_ms, 2),
+                rerank_ms=round(context.rerank_ms, 2),
+                generation_ms=round(generation_ms, 2),
+                total_ms=round((time.perf_counter() - total_start) * 1000.0, 2),
+            ),
+            retrieval_stats=retrieval_stats,
+            llm_stats=LLMStats(
+                profile=llm.profile,
+                model=llm.model,
+                prompt_version=settings.PROMPT_VERSION,
+                calls=usage["calls"],
+                cached_calls=usage["cached_calls"],
+                prompt_tokens=usage["prompt_tokens"],
+                completion_tokens=usage["completion_tokens"],
+                cached_response=cached,
+            ),
+            cached=cached,
+            llm_profile=llm.profile,
+            llm_model=llm.model,
+            step_timings=step_timings,
+        )
+
     def ask(
         self,
         query: str,
@@ -401,21 +589,7 @@ class BaselineRAGPipeline:
             retrieval_query, final_passages, session_id=session_id
         )
 
-        sources: list[SourceChunk] = []
-        for passage in final_passages:
-            text = passage.get("text_content", "")
-            sources.append(
-                SourceChunk(
-                    chunk_id=passage.get("chunk_id", ""),
-                    doc_id=passage.get("doc_id", "") or "",
-                    doc_title=passage.get("doc_title", "Document"),
-                    section=passage.get("section_label", ""),
-                    clause=passage.get("clause_label"),
-                    page=passage.get("page"),
-                    score=float(passage.get("score", 0.0)),
-                    snippet=text[:200] + ("..." if len(text) > 200 else ""),
-                )
-            )
+        sources = self._to_sources(final_passages)
 
 
         llm = settings.llm

@@ -52,6 +52,7 @@ def test_chat_writes_complete_audit_row(auth_headers) -> None:
     # Passages are recorded as identifiers only; the trace holds no passage text.
     trace = " ".join(json.loads(row["reasoning_trace"]))
     assert "Section" not in trace
+    # The turn text is stored for the owner's own history, never for the auditor.
     assert row["query_text"] == "What CDD measures apply to corporate clients?"
 
 
@@ -70,6 +71,51 @@ def test_audit_logs_are_auditor_only(auth_headers) -> None:
     logs = auditor.json()
     assert logs
     assert {"audit_id", "user_role", "retrieved_chunk_ids", "latency_ms"} <= set(logs[0])
+
+
+def test_audit_endpoint_returns_summaries_without_turn_text(auth_headers) -> None:
+    """The auditor may read metadata, but never another user's stored text."""
+    question = "What CDD measures apply to corporate clients?"
+    _run_chat(auth_headers("manager"))
+
+    response = client.get("/api/v1/audit/logs?limit=50", headers=auth_headers("auditor"))
+    assert response.status_code == 200
+    logs = response.json()
+
+    for log in logs:
+        assert "query_text" not in log
+        assert "response_text" not in log
+        # Sub-questions are paraphrases of the user's own text, so they stay out.
+        assert "sub_questions" not in log
+
+    assert question not in response.text
+    assert "customer due diligence" not in response.text.lower()
+    assert {"router_confidence", "router_fallback_reason"} <= set(logs[0])
+
+
+def test_session_messages_are_owner_only(auth_headers) -> None:
+    """Only the owner can read their session turn text (IDOR guard)."""
+    manager_headers = auth_headers("manager")
+    session_id, body = _run_chat(manager_headers)
+    question = "What CDD measures apply to corporate clients?"
+
+    owner = client.get(
+        f"/api/v1/sessions/{session_id}/messages",
+        headers=manager_headers,
+    )
+    assert owner.status_code == 200
+    contents = [message["content"] for message in owner.json()["messages"]]
+    assert any(question in content for content in contents)
+
+    for role in ("analyst", "auditor"):
+        foreign = client.get(
+            f"/api/v1/sessions/{session_id}/messages",
+            headers=auth_headers(role),
+        )
+        assert foreign.status_code == 404
+        assert foreign.json()["error"]["code"] == "SESSION_NOT_FOUND"
+        assert question not in foreign.text
+        assert body["answer"] not in foreign.text
 
 
 def test_audit_endpoint_never_returns_secrets(auth_headers) -> None:

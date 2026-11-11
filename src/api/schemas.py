@@ -85,6 +85,20 @@ class ChatQueryRequest(BaseModel):
     config_overrides: ConfigOverrides | None = None
 
 
+class RouterStats(BaseModel):
+    """Adaptive router observability for one request (no passage or prompt text)."""
+
+    enabled: bool = False
+    route: str = "SINGLE_SEARCH"
+    confidence: float | None = None
+    sub_questions: list[str] = Field(default_factory=list)
+    fallback_used: bool = False
+    fallback_reason: str | None = None
+    direct_category: str | None = None
+    latency_ms: float = 0.0
+    tokens_used: int = 0
+
+
 class ChatQueryResponse(BaseModel):
     session_id: str
     answer: str
@@ -99,6 +113,7 @@ class ChatQueryResponse(BaseModel):
     role: str
     rbac_enabled: bool
     candidates_filtered_by_role: int
+    router: RouterStats = Field(default_factory=RouterStats)
 
 
 class SessionCreateRequest(BaseModel):
@@ -132,14 +147,19 @@ class SessionMessagesResponse(BaseModel):
 
 
 class AuditLogEntry(BaseModel):
+    """Audit *summary* row.
+
+    Stored ``query_text`` and ``response_text`` are deliberately not exposed
+    here: the auditor may read summaries, but a user's own turn text is only
+    available to that user through their own session messages endpoint.
+    """
+
     audit_id: int
     session_id: str | None = None
     user_id: int
     user_role: str
-    query_text: str
     final_route: str
     retrieved_chunk_ids: list[str] = Field(default_factory=list)
-    response_text: str
     latency_ms: float
     tokens_prompt: int = 0
     tokens_completion: int = 0
@@ -149,6 +169,8 @@ class AuditLogEntry(BaseModel):
     cached_calls: int = 0
     candidates_retrieved: int = 0
     candidates_filtered: int = 0
+    router_confidence: float | None = None
+    router_fallback_reason: str | None = None
     created_at: str | None = None
 
 

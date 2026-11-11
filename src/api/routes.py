@@ -25,6 +25,7 @@ from src.api.schemas import (
     LLMStats,
     MessageSummary,
     RetrievalStats,
+    RouterStats,
     SessionCreateRequest,
     SessionListResponse,
     SessionMessagesResponse,
@@ -49,14 +50,24 @@ from src.core.memory import (
     memory_metadata,
     rewrite_follow_up,
 )
+from src.core.router import (
+    DIRECT,
+    DIRECT_REPLIES,
+    ROUTE_API_NAMES,
+    SPLIT,
+    RouteDecision,
+    classify_question,
+    router_metadata,
+)
 from src.core.spend_guard import spend_guard
 from src.db.connection import get_db_connection
 from src.db.repository import Repository
-from src.rag.baseline import baseline_pipeline
+from src.rag.baseline import BaselineRAGResponse, baseline_pipeline
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 PUBLIC_USER_LIST_ENVS = {"development", "test"}
+SINGLE_SEARCH_API = ROUTE_API_NAMES["single_search"]
 
 
 def _user_profile(row: Any) -> UserProfile:
@@ -286,6 +297,9 @@ def chat_query(
             else []
         )
 
+    step_timings: list[dict[str, Any]] = []
+    rewrite_started = time.perf_counter()
+    rewrite_tokens_before = spend_guard.tokens_count
     if settings.ENABLE_MEMORY:
         memory = rewrite_follow_up(
             baseline_pipeline.llm,
@@ -293,15 +307,97 @@ def chat_query(
             turns,
             session_id=session_id,
         )
+        step_timings.append(
+            {
+                "step": "memory_rewrite",
+                "latency_ms": round((time.perf_counter() - rewrite_started) * 1000.0, 2),
+                "tokens": spend_guard.tokens_count - rewrite_tokens_before,
+            }
+        )
     else:
         memory = MemoryContext(standalone_question=query, rewritten=False, turns_used=0)
 
-    result = baseline_pipeline.ask(
-        query,
-        role=user.role,
-        rewritten_query=memory.standalone_question if memory.rewritten else None,
-        session_id=session_id,
-    )
+    # Routing happens after the memory rewrite and the server-derived role, and
+    # before any retrieval. Every fallback inside the router is SINGLE_SEARCH.
+    router_enabled = settings.ENABLE_ADAPTIVE_ROUTER
+    decision: RouteDecision | None = None
+    route = SINGLE_SEARCH_API
+    if router_enabled:
+        decision = classify_question(
+            baseline_pipeline.llm,
+            memory.standalone_question,
+            session_id=session_id,
+        )
+        route = decision.api_route
+
+    result: BaselineRAGResponse | None = None
+    direct_category: str | None = None
+    if decision is not None and decision.route == DIRECT:
+        # Fixed template only: never model-written factual content.
+        answer = decision.direct_reply or DIRECT_REPLIES["out_of_scope"]
+        direct_category = decision.direct_category
+        sources = []
+        cached = False
+        rewritten_query: str | None = None
+        retrieval_total = 0
+        top_rerank_score = 0.0
+        candidates_retrieved = 0
+        candidates_filtered = 0
+        resolved_llm = settings.llm
+        step_timings.append(
+            {
+                "step": "direct_reply",
+                "latency_ms": round(decision.latency_ms, 2),
+                "tokens": decision.tokens_used,
+            }
+        )
+    else:
+        if decision is not None and decision.route == SPLIT:
+            result = baseline_pipeline.ask_split(
+                memory.standalone_question,
+                list(decision.sub_questions),
+                role=user.role,
+                session_id=session_id,
+            )
+            step_timings.extend(result.step_timings)
+        else:
+            result = baseline_pipeline.ask(
+                query,
+                role=user.role,
+                rewritten_query=memory.standalone_question if memory.rewritten else None,
+                session_id=session_id,
+            )
+            step_timings.extend(
+                [
+                    {
+                        "step": "retrieval",
+                        "latency_ms": result.timings.retrieval_ms,
+                        "tokens": 0,
+                    },
+                    {
+                        "step": "rerank",
+                        "latency_ms": result.timings.rerank_ms,
+                        "tokens": 0,
+                    },
+                    {
+                        "step": "generation",
+                        "latency_ms": result.timings.generation_ms,
+                        "tokens": (
+                            result.llm_stats.prompt_tokens + result.llm_stats.completion_tokens
+                        ),
+                    },
+                ]
+            )
+        answer = result.answer
+        sources = result.sources
+        cached = result.cached
+        rewritten_query = result.retrieval_stats.rewritten_query
+        retrieval_total = result.retrieval_stats.total_chunks_retrieved
+        top_rerank_score = result.retrieval_stats.top_rerank_score
+        candidates_retrieved = result.retrieval_stats.candidates_retrieved
+        candidates_filtered = result.retrieval_stats.candidates_filtered_by_role
+        resolved_llm = settings.llm
+
     latency_ms = (time.perf_counter() - started) * 1000.0
 
     citations = [
@@ -313,27 +409,76 @@ def chat_query(
             page_number=source.page,
             snippet=source.snippet,
         )
-        for source in result.sources
+        for source in sources
     ]
 
-    reasoning_trace = [
-        f"Step 1: Authenticated as role '{user.role}'.",
-        "Step 2: Server-side RBAC filter applied to BM25 candidates and Qdrant payloads.",
-        (
-            f"Step 3: Hybrid retrieval returned {result.retrieval_stats.candidates_retrieved} "
-            f"candidates; {result.retrieval_stats.candidates_filtered_by_role} excluded by role."
-        ),
-        (
-            f"Step 4: Cross-encoder re-ranked to "
-            f"{result.retrieval_stats.total_chunks_retrieved} permitted passage(s)."
-        ),
-        "Step 5: Grounded answer generated from permitted passages only.",
-    ]
-    if memory.rewritten:
-        reasoning_trace.insert(
-            2,
-            f"Step 2b: Follow-up rewritten using {memory.turns_used} prior turn(s).",
+    if not router_enabled:
+        # Router-off path: identical trace to the Phase 3 baseline.
+        reasoning_trace = [
+            f"Step 1: Authenticated as role '{user.role}'.",
+            "Step 2: Server-side RBAC filter applied to BM25 candidates and Qdrant payloads.",
+            (
+                f"Step 3: Hybrid retrieval returned {candidates_retrieved} "
+                f"candidates; {candidates_filtered} excluded by role."
+            ),
+            (
+                f"Step 4: Cross-encoder re-ranked to "
+                f"{retrieval_total} permitted passage(s)."
+            ),
+            "Step 5: Grounded answer generated from permitted passages only.",
+        ]
+        if memory.rewritten:
+            reasoning_trace.insert(
+                2,
+                f"Step 2b: Follow-up rewritten using {memory.turns_used} prior turn(s).",
+            )
+    else:
+        assert decision is not None
+        confidence_label = (
+            f"{decision.confidence:.2f}" if decision.confidence is not None else "n/a"
         )
+        reasoning_trace = [
+            f"Step 1: Authenticated as role '{user.role}'.",
+            (
+                f"Step 2: Adaptive router selected {route} "
+                f"(confidence {confidence_label}, source {decision.source})."
+            ),
+        ]
+        if memory.rewritten:
+            reasoning_trace.append(
+                f"Step 2b: Follow-up rewritten using {memory.turns_used} prior turn(s)."
+            )
+        if decision.fallback_used:
+            reasoning_trace.append(
+                f"Step 2c: Router degraded to SINGLE_SEARCH ({decision.fallback_reason})."
+            )
+        if decision.route == SPLIT:
+            reasoning_trace.append(
+                "Step 2d: Sub-questions: "
+                + "; ".join(f'"{question}"' for question in decision.sub_questions)
+            )
+        if decision.route == DIRECT:
+            reasoning_trace.append(
+                "Step 3: Direct reply template returned; no retrieval was performed."
+            )
+        else:
+            reasoning_trace.append(
+                "Step 3: Server-side RBAC filter applied to every BM25 candidate and "
+                "Qdrant payload for this route."
+            )
+            retrieval_calls = (
+                len(decision.sub_questions) if decision.route == SPLIT else 1
+            )
+            reasoning_trace.append(
+                f"Step 4: Hybrid retrieval ran {retrieval_calls} time(s) and returned "
+                f"{candidates_retrieved} candidates; {candidates_filtered} excluded by role."
+            )
+            reasoning_trace.append(
+                f"Step 5: Cross-encoder re-ranked to {retrieval_total} permitted passage(s)."
+            )
+            reasoning_trace.append(
+                "Step 6: One grounded answer generated from the permitted passages only."
+            )
 
     with get_db_connection() as conn:
         repo = Repository(conn)
@@ -349,16 +494,17 @@ def chat_query(
         repo.add_message(
             session_id=session_id,
             sender="assistant",
-            content=result.answer,
-            route_used="SINGLE_SEARCH",
+            content=answer,
+            route_used=route,
             user_role=user.role,
             metadata_json=json.dumps(
                 {
-                    "chunk_ids": [source.chunk_id for source in result.sources],
+                    "chunk_ids": [source.chunk_id for source in sources],
                     "latency_ms": round(latency_ms, 2),
-                    "cached": result.cached,
+                    "cached": cached,
                     "tokens_prompt": usage["prompt_tokens"],
                     "tokens_completion": usage["completion_tokens"],
+                    "router": router_metadata(decision) if decision is not None else None,
                 }
             ),
         )
@@ -367,47 +513,51 @@ def chat_query(
             user_id=user.id,
             user_role=user.role,
             query_text=query,
-            final_route="SINGLE_SEARCH",
-            retrieved_chunk_ids=[source.chunk_id for source in result.sources],
-            relevance_scores=[round(source.score, 6) for source in result.sources],
-            response_text=result.answer,
+            final_route=route,
+            retrieved_chunk_ids=[source.chunk_id for source in sources],
+            relevance_scores=[round(source.score, 6) for source in sources],
+            response_text=answer,
             latency_ms=round(latency_ms, 2),
-            rewritten_query=memory.standalone_question if memory.rewritten else None,
+            rewritten_query=rewritten_query,
             reasoning_trace=reasoning_trace,
             citations_json=[citation.model_dump() for citation in citations],
             tokens_prompt=usage["prompt_tokens"],
             tokens_completion=usage["completion_tokens"],
-            llm_profile=result.llm_stats.profile,
+            llm_profile=resolved_llm.profile,
             llm_calls=usage["calls"],
             cached_calls=usage["cached_calls"],
             spend_guard_hit=spend_guard.exhausted,
             prompt_version=settings.PROMPT_VERSION,
-            llm_model=result.llm_stats.model,
-            candidates_retrieved=result.retrieval_stats.candidates_retrieved,
-            candidates_filtered=result.retrieval_stats.candidates_filtered_by_role,
+            llm_model=resolved_llm.model,
+            candidates_retrieved=candidates_retrieved,
+            candidates_filtered=candidates_filtered,
+            router_confidence=decision.confidence if decision is not None else None,
+            router_fallback_reason=decision.fallback_reason if decision is not None else None,
+            sub_questions=list(decision.sub_questions) if decision is not None else [],
+            step_timings=step_timings,
         )
 
     return ChatQueryResponse(
         session_id=session_id,
-        answer=result.answer,
-        route_taken="SINGLE_SEARCH",
+        answer=answer,
+        route_taken=route,
         citations=citations,
         reasoning_trace=reasoning_trace,
         retrieval_stats=RetrievalStats(
-            total_chunks_retrieved=result.retrieval_stats.total_chunks_retrieved,
-            top_rerank_score=result.retrieval_stats.top_rerank_score,
+            total_chunks_retrieved=retrieval_total,
+            top_rerank_score=top_rerank_score,
             retry_count=0,
-            rewritten_query=result.retrieval_stats.rewritten_query,
+            rewritten_query=rewritten_query,
         ),
         llm_stats=LLMStats(
-            profile=result.llm_stats.profile,
-            model=result.llm_stats.model,
-            prompt_version=result.llm_stats.prompt_version,
+            profile=resolved_llm.profile,
+            model=resolved_llm.model,
+            prompt_version=settings.PROMPT_VERSION,
             calls=usage["calls"],
             cached_calls=usage["cached_calls"],
             prompt_tokens=usage["prompt_tokens"],
             completion_tokens=usage["completion_tokens"],
-            cached_response=result.cached,
+            cached_response=cached,
         ),
         spend=SpendStats(
             calls_used=spend_guard.calls_count,
@@ -419,8 +569,19 @@ def chat_query(
         latency_ms=round(latency_ms, 2),
         audit_id=int(audit_id),
         role=user.role,
-        rbac_enabled=result.rbac_enabled,
-        candidates_filtered_by_role=result.retrieval_stats.candidates_filtered_by_role,
+        rbac_enabled=settings.rbac_enabled,
+        candidates_filtered_by_role=candidates_filtered,
+        router=RouterStats(
+            enabled=router_enabled,
+            route=route,
+            confidence=decision.confidence if decision is not None else None,
+            sub_questions=list(decision.sub_questions) if decision is not None else [],
+            fallback_used=decision.fallback_used if decision is not None else False,
+            fallback_reason=decision.fallback_reason if decision is not None else None,
+            direct_category=direct_category,
+            latency_ms=round(decision.latency_ms, 2) if decision is not None else 0.0,
+            tokens_used=decision.tokens_used if decision is not None else 0,
+        ),
     )
 
 
@@ -434,7 +595,12 @@ def audit_logs(
     start_date: str | None = Query(default=None),
     user: CurrentUser = Depends(require_role("auditor")),
 ) -> list[AuditLogEntry]:
-    """Return the audit trail. Restricted to the auditor role."""
+    """Return audit *summaries*. Restricted to the auditor role.
+
+    Stored query and response text is never returned here. A user's own turn
+    text is only available to that user through their own session messages
+    endpoint, so an auditor cannot read another user's conversation content.
+    """
     with get_db_connection() as conn:
         rows = Repository(conn).list_audit_logs(
             limit=limit,
@@ -447,10 +613,8 @@ def audit_logs(
             session_id=row["session_id"],
             user_id=int(row["user_id"]),
             user_role=str(row["user_role"]),
-            query_text=str(row["query_text"]),
             final_route=str(row["final_route"]),
             retrieved_chunk_ids=_json_list(row["retrieved_chunk_ids"]),
-            response_text=str(row["response_text"]),
             latency_ms=float(row["latency_ms"] or 0.0),
             tokens_prompt=int(row["tokens_prompt"] or 0),
             tokens_completion=int(row["tokens_completion"] or 0),
@@ -460,6 +624,12 @@ def audit_logs(
             cached_calls=int(row["cached_calls"] or 0),
             candidates_retrieved=int(row["candidates_retrieved"] or 0),
             candidates_filtered=int(row["candidates_filtered"] or 0),
+            router_confidence=(
+                float(row["router_confidence"])
+                if row["router_confidence"] is not None
+                else None
+            ),
+            router_fallback_reason=row["router_fallback_reason"],
             created_at=str(row["created_at"]) if row["created_at"] is not None else None,
         )
         for row in rows

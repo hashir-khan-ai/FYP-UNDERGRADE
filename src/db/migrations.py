@@ -84,6 +84,10 @@ CREATE TABLE IF NOT EXISTS audit_log (
     llm_model TEXT,
     candidates_retrieved INTEGER NOT NULL DEFAULT 0,
     candidates_filtered INTEGER NOT NULL DEFAULT 0,
+    router_confidence REAL,
+    router_fallback_reason TEXT,
+    sub_questions TEXT,
+    step_timings_json TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (session_id) REFERENCES sessions (id) ON DELETE SET NULL,
     FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
@@ -163,6 +167,8 @@ _LLM_CALLS_EXTRA_COLUMNS: dict[str, str] = {
 }
 
 # Phase 3 audit columns: role-filter counters, model identity and cache flag.
+# Phase 4 adds router observability: confidence, fallback reason, the user's own
+# derived sub-questions and per-step latency/token timings. Additive only.
 _AUDIT_LOG_EXTRA_COLUMNS: dict[str, str] = {
     "llm_profile": "TEXT NOT NULL DEFAULT 'mock'",
     "llm_calls": "INTEGER NOT NULL DEFAULT 0",
@@ -172,6 +178,10 @@ _AUDIT_LOG_EXTRA_COLUMNS: dict[str, str] = {
     "llm_model": "TEXT",
     "candidates_retrieved": "INTEGER NOT NULL DEFAULT 0",
     "candidates_filtered": "INTEGER NOT NULL DEFAULT 0",
+    "router_confidence": "REAL",
+    "router_fallback_reason": "TEXT",
+    "sub_questions": "TEXT",
+    "step_timings_json": "TEXT",
 }
 
 # Phase 3 messages column: the role used when each turn was produced.

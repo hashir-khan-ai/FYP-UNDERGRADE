@@ -218,3 +218,125 @@ no Streamlit UI were added. `route_taken` is the constant `SINGLE_SEARCH`,
 
 **Why:** Phase 4 and Phase 5 are not authorised. The response fields exist only
 because API.md's frozen shape requires them.
+
+---
+
+## Phase 4 — Adaptive Router & Hardening
+
+### 15. Audit endpoint returns summaries, not stored turn text (API.md deviation)
+**Decision:** `GET /api/v1/audit/logs` stays **auditor-only** but no longer returns
+`query_text` or `response_text`. `AuditLogEntry` now carries `router_confidence` and
+`router_fallback_reason` instead, and `sub_questions` is deliberately withheld.
+
+**Why:** The security instruction for this phase is stricter than the frozen API.md
+shape: an auditor may read audit summaries, but only the owning user may read their
+own turn text. Sub-questions are paraphrases of the user's question, so exposing them
+would leak the same text indirectly. The user's own history remains available through
+`GET /api/v1/sessions/{id}/messages`, which is owner-only and returns 404 for a
+foreign session. Both rules are covered by tests.
+
+### 16. Additive audit columns (DATABASE.md deviation)
+**Decision:** Four nullable columns were added to `audit_log` via
+`apply_migrations`: `router_confidence`, `router_fallback_reason`, `sub_questions`,
+`step_timings_json`.
+
+**Why:** The phase requires per-step observability (route, confidence, sub-questions,
+fallback reasons, latency/tokens per step). The migration is additive and nullable, so
+existing rows and the frozen schema remain valid; no data is rewritten.
+
+### 17. Route naming: lowercase in the model, uppercase in the API/DB
+**Decision:** The router prompt and `RouterOutput` use `direct|single_search|split`.
+`RouteDecision.route` uses the same lowercase values internally, and `ROUTE_API_NAMES`
+maps them to the frozen API/DB values `DIRECT_REPLY|SINGLE_SEARCH|MULTI_PART_SPLIT`.
+
+**Why:** Short lowercase tokens are the least error-prone JSON the model can emit and
+are what the prompt documents; the frozen external contract is preserved unchanged.
+
+### 18. Router prompt location
+**Decision:** The prompt lives at `prompts/router/v1.md` with no YAML front-matter,
+loaded through the existing `load_prompt` helper.
+
+**Why:** Matches the PLAN.md layout and the loader's candidate paths, and keeps the
+prompt style consistent with the existing `prompts/v1/*.txt` files.
+
+### 19. Rule pre-check scope and the short-input clarification
+**Decision:** The deterministic pre-check covers greetings, thanks, capability
+questions, unsafe requests, clearly out-of-scope topics, and inputs shorter than 12
+characters or at most two tokens. A greeting/thanks followed by a real question does
+**not** match and is classified normally.
+
+**Why:** These cases are cheap and unambiguous, and matching them avoids a paid call.
+The short-input rule prevents a one-word query from being turned into a fabricated
+answer; it returns the clarification template, which contains no facts and no digits.
+
+### 20. `direct` can only ever return a fixed template
+**Decision:** Both the rule pre-check and the LLM may select `direct`, but the reply
+is always one of the six fixed `DIRECT_REPLIES` templates. The model never writes
+factual content on the direct path, and no retrieval happens.
+
+**Why:** A model-authored "direct" answer would be ungrounded content outside the
+RBAC-filtered corpus, which is exactly what the project forbids. Fixed templates make
+the path safe by construction.
+
+### 21. Every fallback degrades to `single_search`, never to `direct`
+**Decision:** Invalid JSON, provider errors, low confidence
+(`< ROUTER_CONFIDENCE_THRESHOLD`), more than `ROUTER_MAX_SUB_QUESTIONS`, fewer than two
+sub-questions, and exceeding `ROUTER_MAX_RETRIEVAL_CALLS` all resolve to
+`single_search` with a recorded `fallback_reason`.
+
+**Why:** `single_search` is the conservative baseline: it still retrieves with the
+same role filter. Degrading to `direct` would skip retrieval and could produce an
+unhelpful or unsafe reply, so it is never used as a fallback.
+
+### 22. Split retrieval semantics
+**Decision:** Each sub-question runs through `retrieve` + `rerank` with the
+authenticated role, so the native payload filter and the post-rerank guard apply to
+every part. Passages are merged by `chunk_id` keeping the best score and capped to
+`RERANKER_TOP_N`, then a **single** generation call answers the original question.
+
+**Why:** One generation over the merged evidence keeps cost and latency bounded and
+avoids the model answering from separate, partial contexts. The merge is also what the
+leakage matrix and the de-duplication test verify.
+
+### 23. Token accounting per step is the spend-guard delta
+**Decision:** Per-step `tokens` records the change in `spend_guard.tokens_count`
+across the step rather than a prompt/completion split the pipeline cannot attribute
+per step.
+
+**Why:** Reporting a fabricated split would be dishonest. The delta is exact, and the
+existing aggregate prompt/completion counters in `llm_stats` are unchanged.
+
+### 24. Router-off behaviour is unchanged
+**Decision:** `ENABLE_ADAPTIVE_ROUTER` defaults to `false` in `src/config.py` (all
+tests and the baseline) and is `true` in `.env.example`. With it off, the chat path is
+the Phase 3 path: no router call, `route_taken` is `SINGLE_SEARCH`, the five original
+reasoning-trace lines are byte-identical, and the router audit columns stay null/empty.
+
+**Why:** The dissertation baseline must remain reproducible. A regression test asserts
+the trace and that no `step='router'` call is written when the flag is off.
+
+### 25. Routing labels are draft
+**Decision:** `data/eval/routing_labels.jsonl` contains 42 hand-written questions
+(12 direct, 20 single_search, 10 split) plus a `_meta` record marked
+`"status": "draft"`.
+
+**Why:** The mock-profile evaluation is a harness sanity check, not a dissertation
+result. The labels need student review before any number is quoted as a finding. The
+current mock accuracy (85.7%, 36/42) mostly reflects the deterministic mock router
+heuristic, not a real model's routing quality.
+
+### 26. Seed password has no default
+**Decision:** `scripts/seed_data.py` reads `SEED_DEFAULT_PASSWORD` and refuses to run
+outside `APP_ENV=test` when it is unset. The `test` environment uses a clearly
+non-credential constant so the suite stays deterministic.
+
+**Why:** A hardcoded demo password is a real credential smell. The failure message
+names the variable to set, and `.env.example` documents it. This supersedes decision 11.
+
+### 27. Live `dev` smoke still skipped
+**Decision:** `.env` does not exist in this workspace, so the live
+`scripts/smoke_demo.py --profile dev` run was skipped again and the `mock` profile was
+reported instead.
+
+**Why:** No key is available, and the `dev` profile correctly refuses to resolve
+without one. Nothing is claimed about live-provider latency or token use.

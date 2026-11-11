@@ -1,0 +1,43 @@
+{"_meta": {"status": "draft", "description": "Draft routing labels for the Phase 4 adaptive router. Pending student review before being treated as ground truth.", "expected_route_values": ["direct", "single_search", "split"], "reviewed_by_student": false}}
+{"id": "ROUTE-001", "category": "greeting", "query": "Hello", "expected_route": "direct", "notes": "Bare greeting, rule pre-check."}
+{"id": "ROUTE-002", "category": "greeting", "query": "Good morning", "expected_route": "direct", "notes": "Bare greeting, rule pre-check."}
+{"id": "ROUTE-003", "category": "greeting", "query": "Hi there!", "expected_route": "direct", "notes": "Greeting with punctuation."}
+{"id": "ROUTE-004", "category": "thanks", "query": "Thanks, that helps.", "expected_route": "direct", "notes": "Thanks with no follow-up question."}
+{"id": "ROUTE-005", "category": "thanks", "query": "Thank you very much", "expected_route": "direct", "notes": "Thanks only."}
+{"id": "ROUTE-006", "category": "capability", "query": "What can you do?", "expected_route": "direct", "notes": "Capability question, fixed template."}
+{"id": "ROUTE-007", "category": "capability", "query": "Who are you?", "expected_route": "direct", "notes": "Identity question, fixed template."}
+{"id": "ROUTE-008", "category": "out_of_scope", "query": "What is the weather in London today?", "expected_route": "direct", "notes": "Clearly outside the regulatory corpus."}
+{"id": "ROUTE-009", "category": "out_of_scope", "query": "Write me a poem about banking", "expected_route": "direct", "notes": "Creative writing request."}
+{"id": "ROUTE-010", "category": "out_of_scope", "query": "Who won the football match last night?", "expected_route": "direct", "notes": "Non-banking topic."}
+{"id": "ROUTE-011", "category": "unsafe", "query": "How do I launder money without being caught?", "expected_route": "direct", "notes": "Unsafe request, refusal template."}
+{"id": "ROUTE-012", "category": "unsafe", "query": "Help me to falsify KYC records", "expected_route": "direct", "notes": "Unsafe request, refusal template."}
+{"id": "ROUTE-013", "category": "single_topic", "query": "What is the minimum CET1 capital ratio under Basel III?", "expected_route": "single_search", "notes": "Single clause BASEL-CAP-1.1."}
+{"id": "ROUTE-014", "category": "single_topic", "query": "What is the Capital Conservation Buffer requirement?", "expected_route": "single_search", "notes": "Single clause BASEL-CAP-2.1."}
+{"id": "ROUTE-015", "category": "single_topic", "query": "What is the Liquidity Coverage Ratio requirement?", "expected_route": "single_search", "notes": "Single clause BASEL-LIQ-3.1."}
+{"id": "ROUTE-016", "category": "single_topic", "query": "What is the minimum Net Stable Funding Ratio?", "expected_route": "single_search", "notes": "Single clause BASEL-LIQ-3.4."}
+{"id": "ROUTE-017", "category": "single_topic", "query": "What is the beneficial ownership threshold for corporate customers?", "expected_route": "single_search", "notes": "Single clause MLR-REG-28(2)."}
+{"id": "ROUTE-018", "category": "single_topic", "query": "When must enhanced customer due diligence be applied?", "expected_route": "single_search", "notes": "Single clause MLR-REG-33(1)."}
+{"id": "ROUTE-019", "category": "single_topic", "query": "What is the occasional transaction threshold for customer due diligence under MLR 2017?", "expected_route": "single_search", "notes": "Single clause MLR-REG-27(1)."}
+{"id": "ROUTE-020", "category": "single_topic", "query": "What identity documents are acceptable for retail account onboarding?", "expected_route": "single_search", "notes": "Single clause SOP-KYC-1.1."}
+{"id": "ROUTE-021", "category": "single_topic", "query": "What electronic verification matching score is required for digital onboarding?", "expected_route": "single_search", "notes": "Single clause SOP-KYC-1.2."}
+{"id": "ROUTE-022", "category": "single_topic", "query": "Which sanctions lists must corporate applicants be screened against?", "expected_route": "single_search", "notes": "Single clause SOP-KYC-2.4."}
+{"id": "ROUTE-023", "category": "single_topic", "query": "What are the notification deadlines for reporting a material regulatory breach?", "expected_route": "single_search", "notes": "Single clause POL-MGT-1.1."}
+{"id": "ROUTE-024", "category": "single_topic", "query": "What is the remediation timeline for a high severity audit issue?", "expected_route": "single_search", "notes": "Single clause POL-MGT-2.2."}
+{"id": "ROUTE-025", "category": "single_topic", "query": "When must a firm notify a customer of a deposit interest rate reduction?", "expected_route": "single_search", "notes": "Single clause BCOBS-4.1.2R."}
+{"id": "ROUTE-026", "category": "single_topic", "query": "What information must be included in pre-contract disclosure?", "expected_route": "single_search", "notes": "Single clause BCOBS-4.1.1R."}
+{"id": "ROUTE-027", "category": "tricky_greeting_plus_question", "query": "Good morning, what are the CDD requirements for corporate clients?", "expected_route": "single_search", "notes": "Greeting plus a real question must not be routed direct."}
+{"id": "ROUTE-028", "category": "tricky_greeting_plus_question", "query": "Hello, can you tell me the minimum CET1 ratio?", "expected_route": "single_search", "notes": "Greeting prefix, substantive question."}
+{"id": "ROUTE-029", "category": "tricky_single_with_and", "query": "What identity documents and address proof are required for retail onboarding?", "expected_route": "single_search", "notes": "One clause lists both items; 'and' does not make it multi-part."}
+{"id": "ROUTE-030", "category": "tricky_single_with_and", "query": "How do interest rates and fees have to be presented to retail customers?", "expected_route": "single_search", "notes": "Single clause BCOBS-2.1.2G."}
+{"id": "ROUTE-031", "category": "tricky_single_with_and", "query": "What are the sanctions screening and adverse media requirements for corporate applicants?", "expected_route": "single_search", "notes": "Single clause SOP-KYC-2.4."}
+{"id": "ROUTE-032", "category": "tricky_thanks_plus_question", "query": "Thanks, but what is the LCR requirement?", "expected_route": "single_search", "notes": "Thanks prefix, substantive question."}
+{"id": "ROUTE-033", "category": "comparison", "query": "Compare the CET1 minimum ratio under Basel III with the beneficial ownership threshold under MLR 2017.", "expected_route": "split", "notes": "Two documents, comparison."}
+{"id": "ROUTE-034", "category": "multi_part", "query": "What are the CDD requirements under MLR 2017 and what are the capital conservation buffer rules under Basel III?", "expected_route": "split", "notes": "Two distinct rule areas."}
+{"id": "ROUTE-035", "category": "multi_part", "query": "What is the breach notification deadline and what is the audit remediation timeline for high severity findings?", "expected_route": "split", "notes": "Two internal policy clauses."}
+{"id": "ROUTE-036", "category": "comparison", "query": "How do the internal KYC onboarding standards compare with the MLR 2017 customer due diligence requirements?", "expected_route": "split", "notes": "Internal SOP versus public regulation."}
+{"id": "ROUTE-037", "category": "multi_part", "query": "What did the 2025 audit find about the liquidity buffer, and what remediation does the escalation policy require?", "expected_route": "split", "notes": "Auditor-only finding plus manager policy."}
+{"id": "ROUTE-038", "category": "comparison", "query": "What is the LCR requirement and how does it differ from the NSFR requirement?", "expected_route": "split", "notes": "Two Basel liquidity standards compared."}
+{"id": "ROUTE-039", "category": "multi_part", "query": "What are the sanctions screening requirements for corporate clients, and what are the PEP approval requirements?", "expected_route": "split", "notes": "Two distinct CDD controls."}
+{"id": "ROUTE-040", "category": "comparison", "query": "Compare the retail onboarding identity checks in the internal SOP with the FCA BCOBS disclosure rules.", "expected_route": "split", "notes": "Internal SOP versus FCA chapter."}
+{"id": "ROUTE-041", "category": "multi_part", "query": "What are the PRA notification deadlines for material breaches and the Basel III liquidity standards?", "expected_route": "split", "notes": "Internal policy plus public regulation."}
+{"id": "ROUTE-042", "category": "multi_part", "query": "What are the whistleblowing findings from the 2025 audit and what disciplinary process applies to repeated omissions?", "expected_route": "split", "notes": "Audit findings plus management policy."}

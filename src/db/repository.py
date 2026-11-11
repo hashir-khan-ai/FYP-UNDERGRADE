@@ -273,12 +273,18 @@ class Repository:
         llm_model: str | None = None,
         candidates_retrieved: int = 0,
         candidates_filtered: int = 0,
+        router_confidence: float | None = None,
+        router_fallback_reason: str | None = None,
+        sub_questions: list[str] | str | None = None,
+        step_timings: list[dict[str, Any]] | str | None = None,
     ) -> int:
         # Normalize collections to JSON strings
         chunks_str = json.dumps(retrieved_chunk_ids) if isinstance(retrieved_chunk_ids, list) else retrieved_chunk_ids
         scores_str = json.dumps(relevance_scores) if isinstance(relevance_scores, list) else relevance_scores
         trace_str = json.dumps(reasoning_trace) if isinstance(reasoning_trace, list) else reasoning_trace
         cites_str = json.dumps(citations_json) if isinstance(citations_json, list) else citations_json
+        subs_str = json.dumps(sub_questions) if isinstance(sub_questions, list) else sub_questions
+        timings_str = json.dumps(step_timings) if isinstance(step_timings, list) else step_timings
 
         cur = self.conn.cursor()
         cur.execute(
@@ -289,8 +295,9 @@ class Repository:
                 response_text, reasoning_trace, citations_json, latency_ms,
                 tokens_prompt, tokens_completion, llm_profile, llm_calls,
                 cached_calls, spend_guard_hit, prompt_version, llm_model,
-                candidates_retrieved, candidates_filtered
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                candidates_retrieved, candidates_filtered, router_confidence,
+                router_fallback_reason, sub_questions, step_timings_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
             """,
             (
                 session_id,
@@ -316,6 +323,10 @@ class Repository:
                 llm_model,
                 candidates_retrieved,
                 candidates_filtered,
+                router_confidence,
+                router_fallback_reason,
+                subs_str,
+                timings_str,
             ),
         )
         return cur.lastrowid
