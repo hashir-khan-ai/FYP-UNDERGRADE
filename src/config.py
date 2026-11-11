@@ -177,6 +177,43 @@ class Settings(BaseSettings):
         description="Layer 4: Clause-level citations, reasoning trace, audit log",
     )
 
+    # Phase 3 security and memory flags. RBAC is on by default and may only be
+    # disabled in tests or in an explicitly labelled baseline ablation.
+    ENABLE_RBAC: bool = Field(
+        default=True,
+        description="Server-side role filtering in Qdrant and BM25 (must stay on)",
+    )
+    ENABLE_MEMORY: bool = Field(
+        default=False,
+        description="Short-term session memory and follow-up query rewriting",
+    )
+    BASELINE_ABLATION: bool = Field(
+        default=False,
+        description="Explicit label allowing ENABLE_RBAC=false for a documented baseline run",
+    )
+    MEMORY_MAX_TURNS: int = Field(
+        default=6,
+        description="Number of previous messages loaded into short-term memory",
+    )
+
+    # Local demo authentication
+    AUTH_TOKEN_TTL_MINUTES: int = Field(
+        default=60,
+        description="Lifetime of a signed access token in minutes",
+    )
+    AUTH_MAX_LOGIN_ATTEMPTS: int = Field(
+        default=5,
+        description="Failed logins allowed before the account is temporarily locked",
+    )
+    AUTH_LOCKOUT_SECONDS: int = Field(
+        default=300,
+        description="Lockout duration after too many failed logins",
+    )
+    AUTH_LOGIN_RATE_LIMIT_PER_MINUTE: int = Field(
+        default=10,
+        description="Login attempts allowed per minute per username and client",
+    )
+
     # Retrieval Hyperparameters
     RETRIEVAL_TOP_K_HYBRID: int = Field(
         default=20,
@@ -194,6 +231,34 @@ class Settings(BaseSettings):
         default=0.65,
         description="Minimum average score for retrieved chunks before triggering rewrite/refusal",
     )
+
+    @property
+    def rbac_enabled(self) -> bool:
+        """Return whether server-side role filtering is active.
+
+        Disabling RBAC is refused unless this is the test environment or the
+        run is explicitly labelled as a baseline ablation, so a typo in ``.env``
+        can never silently expose restricted documents.
+
+        Raises:
+            RuntimeError: if RBAC is disabled without a permitted label.
+        """
+        if not self.ENABLE_RBAC:
+            permitted = self.APP_ENV == "test" or self.BASELINE_ABLATION
+            if not permitted:
+                raise RuntimeError(
+                    "ENABLE_RBAC=false is only permitted when APP_ENV=test or "
+                    "BASELINE_ABLATION=true (labelled baseline experiment)."
+                )
+        return self.ENABLE_RBAC
+
+    def validate_security_flags(self) -> None:
+        """Fail fast at startup when security flags are unsafe.
+
+        Raises:
+            RuntimeError: if RBAC is disabled without a permitted label.
+        """
+        _ = self.rbac_enabled
 
     @property
     def llm(self) -> ResolvedLLM:

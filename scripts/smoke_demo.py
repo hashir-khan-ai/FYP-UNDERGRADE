@@ -37,7 +37,7 @@ REPRESENTATIVE_QUESTIONS = [
 ]
 
 
-def run_smoke_demo(profile: str | None = None) -> int:
+def run_smoke_demo(profile: str | None = None, role: str = "auditor") -> int:
     """Run the smoke suite and return the number of failed questions."""
     if profile:
         os.environ["LLM_PROFILE"] = profile
@@ -53,7 +53,7 @@ def run_smoke_demo(profile: str | None = None) -> int:
 
     print("=" * 80)
     print(f"SMOKE DEMO: 10 Representative Questions (Profile: {active.profile})")
-    print(f"Model: {active.model} | Embeddings: {settings.EMBEDDING_MODEL_NAME}")
+    print(f"Model: {active.model} | Embeddings: {settings.EMBEDDING_MODEL_NAME} | Role: {role}")
     print("=" * 80)
 
     results: list[dict] = []
@@ -61,56 +61,63 @@ def run_smoke_demo(profile: str | None = None) -> int:
     total_calls_start = spend_guard.calls_count
     total_time_start = time.perf_counter()
 
-    for index, (question_id, query) in enumerate(REPRESENTATIVE_QUESTIONS, start=1):
-        print(f"\n[{index}/10] Query ({question_id}): {query}")
-        tokens_before = spend_guard.tokens_count
-        question_start = time.perf_counter()
-        try:
-            response = baseline_pipeline.ask(query)
-            elapsed_ms = (time.perf_counter() - question_start) * 1000.0
-            tokens_used = spend_guard.tokens_count - tokens_before
+    try:
+        for index, (question_id, query) in enumerate(REPRESENTATIVE_QUESTIONS, start=1):
+            print(f"\n[{index}/10] Query ({question_id}): {query}")
+            tokens_before = spend_guard.tokens_count
+            question_start = time.perf_counter()
+            try:
+                response = baseline_pipeline.ask(query, role=role)
+                elapsed_ms = (time.perf_counter() - question_start) * 1000.0
+                tokens_used = spend_guard.tokens_count - tokens_before
 
-            answered = len(response.answer.strip()) > 10
-            refusal_ok = REFUSAL_TEXT.lower() in response.answer.lower()
-            passed = answered and (bool(response.sources) or refusal_ok)
-            status = "PASS" if passed else "FAIL"
+                answered = len(response.answer.strip()) > 10
+                refusal_ok = REFUSAL_TEXT.lower() in response.answer.lower()
+                passed = answered and (bool(response.sources) or refusal_ok)
+                status = "PASS" if passed else "FAIL"
 
-            print(f"  Status   : {status}")
-            print(
-                f"  Latency  : {response.timings.total_ms:.1f} ms "
-                f"(retrieval {response.timings.retrieval_ms:.1f}, "
-                f"rerank {response.timings.rerank_ms:.1f}, "
-                f"generation {response.timings.generation_ms:.1f})"
-            )
-            print(f"  Tokens   : {tokens_used} | Cached: {response.cached}")
-            print(f"  Sources  : {len(response.sources)} | Cited: {', '.join(response.chunk_ids_used) or 'none'}")
-            print(f"  Answer   : {response.answer[:180]}...")
+                print(f"  Status   : {status}")
+                print(
+                    f"  Latency  : {response.timings.total_ms:.1f} ms "
+                    f"(retrieval {response.timings.retrieval_ms:.1f}, "
+                    f"rerank {response.timings.rerank_ms:.1f}, "
+                    f"generation {response.timings.generation_ms:.1f})"
+                )
+                print(f"  Tokens   : {tokens_used} | Cached: {response.cached}")
+                print(
+                    f"  Sources  : {len(response.sources)} | "
+                    f"Role-filtered: {response.retrieval_stats.candidates_filtered_by_role} | "
+                    f"Cited: {', '.join(response.chunk_ids_used) or 'none'}"
+                )
+                print(f"  Answer   : {response.answer[:180]}...")
 
-            results.append(
-                {
-                    "id": question_id,
-                    "passed": passed,
-                    "latency_ms": response.timings.total_ms,
-                    "tokens": tokens_used,
-                    "cached": response.cached,
-                    "sources": len(response.sources),
-                }
-            )
-        except SpendGuardExceededError as exc:
-            print(f"  Status   : STOPPED ({exc})")
-            break
-        except Exception as exc:
-            print(f"  Status   : ERROR ({type(exc).__name__}: {exc})")
-            results.append(
-                {
-                    "id": question_id,
-                    "passed": False,
-                    "latency_ms": (time.perf_counter() - question_start) * 1000.0,
-                    "tokens": spend_guard.tokens_count - tokens_before,
-                    "cached": False,
-                    "sources": 0,
-                }
-            )
+                results.append(
+                    {
+                        "id": question_id,
+                        "passed": passed,
+                        "latency_ms": response.timings.total_ms,
+                        "tokens": tokens_used,
+                        "cached": response.cached,
+                        "sources": len(response.sources),
+                    }
+                )
+            except SpendGuardExceededError as exc:
+                print(f"  Status   : STOPPED ({exc})")
+                break
+            except Exception as exc:
+                print(f"  Status   : ERROR ({type(exc).__name__}: {exc})")
+                results.append(
+                    {
+                        "id": question_id,
+                        "passed": False,
+                        "latency_ms": (time.perf_counter() - question_start) * 1000.0,
+                        "tokens": spend_guard.tokens_count - tokens_before,
+                        "cached": False,
+                        "sources": 0,
+                    }
+                )
+    finally:
+        baseline_pipeline.close()
 
     total_wall_time = time.perf_counter() - total_time_start
     total_tokens = spend_guard.tokens_count - total_tokens_start
@@ -138,7 +145,6 @@ def run_smoke_demo(profile: str | None = None) -> int:
             f"(cache hits {stats['cache_hits']}, tokens {stats['total_tokens']})"
         )
     print("=" * 80 + "\n")
-    baseline_pipeline.close()
     return len(results) - passed_count
 
 
@@ -150,8 +156,14 @@ def main() -> None:
         choices=["mock", "dev", "demo"],
         help="Override the LLM profile for this run only",
     )
+    parser.add_argument(
+        "--role",
+        default="auditor",
+        choices=["analyst", "manager", "auditor"],
+        help="Role used for the smoke run (server-side role filter)",
+    )
     args = parser.parse_args()
-    failures = run_smoke_demo(profile=args.profile)
+    failures = run_smoke_demo(profile=args.profile, role=args.role)
     raise SystemExit(1 if failures else 0)
 
 

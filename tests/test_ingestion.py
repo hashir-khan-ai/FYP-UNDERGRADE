@@ -74,7 +74,7 @@ def test_ingestion_is_idempotent(tmp_path, monkeypatch: pytest.MonkeyPatch) -> N
         qdrant.close()
 
     bm25 = BM25Indexer(index_path=str(tmp_path / "bm25.pkl"))
-    hits = bm25.search("CET1 ratio", top_k=3)
+    hits = bm25.search("CET1 ratio", top_k=3, role="analyst").hits
     assert hits
     assert hits[0]["doc_id"] == "DOC-INGEST-PUBLIC"
 

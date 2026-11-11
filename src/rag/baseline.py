@@ -1,4 +1,9 @@
-"""Baseline standard RAG: hybrid retrieval, RRF, CPU re-ranking, generation."""
+"""Baseline standard RAG: hybrid retrieval, RRF, CPU re-ranking, generation.
+
+Phase 3 adds server-side role filtering. The role is always supplied by the
+authenticated session, applied to both indexes before fusion, and re-checked
+after re-ranking as defence in depth.
+"""
 
 import logging
 import re
@@ -10,14 +15,13 @@ from pydantic import BaseModel, Field
 from src.config import settings
 from src.core.llm_client import ResilientLLMClient, llm_client
 from src.core.prompts import load_prompt
-from src.ingestion.indexer import BM25Indexer, QdrantIndexer
+from src.core.security import enforce_role_visibility, normalize_role
+from src.ingestion.indexer import BM25Indexer, QdrantIndexer, SearchResult
 
 logger = logging.getLogger(__name__)
 
-REFUSAL_TEXT = (
-    "I cannot find sufficient authoritative guidance in the current regulatory "
-    "corpus for this request."
-)
+REFUSAL_TEXT = "I can't find that in the documents available to your role."
+
 
 
 # ==============================================================================
@@ -27,12 +31,14 @@ class SourceChunk(BaseModel):
     """One citation returned with a baseline answer."""
 
     chunk_id: str
+    doc_id: str = ""
     doc_title: str
     section: str
     clause: str | None = None
     page: int | None = None
     score: float
     snippet: str
+
 
 
 class RAGTimings(BaseModel):
@@ -43,19 +49,48 @@ class RAGTimings(BaseModel):
 
 
 class BaselineRAGRequest(BaseModel):
-    query: str = Field(..., min_length=2, max_length=1000, description="User compliance question")
+    query: str = Field(..., min_length=2, max_length=2000, description="User compliance question")
     session_id: str | None = Field(default=None, description="Optional session identifier")
+
+
+class RetrievalStats(BaseModel):
+    """Retrieval and role-filter counters recorded in the audit trail."""
+
+    candidates_retrieved: int = 0
+    candidates_filtered_by_role: int = 0
+    total_chunks_retrieved: int = 0
+    top_rerank_score: float = 0.0
+    rewritten_query: str | None = None
+    retry_count: int = 0
+
+
+class LLMStats(BaseModel):
+    """Per-request LLM usage summary."""
+
+    profile: str = ""
+    model: str = ""
+    prompt_version: str = ""
+    calls: int = 0
+    cached_calls: int = 0
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    cached_response: bool = False
 
 
 class BaselineRAGResponse(BaseModel):
     query: str
     answer: str
+    role: str = ""
+    rbac_enabled: bool = True
     sources: list[SourceChunk] = Field(default_factory=list)
     chunk_ids_used: list[str] = Field(default_factory=list)
     timings: RAGTimings = Field(default_factory=RAGTimings)
+    retrieval_stats: RetrievalStats = Field(default_factory=RetrievalStats)
+    llm_stats: LLMStats = Field(default_factory=LLMStats)
     cached: bool = False
     llm_profile: str = ""
     llm_model: str = ""
+
 
 
 # ==============================================================================
@@ -182,39 +217,75 @@ class BaselineRAGPipeline:
         self.llm = llm or llm_client
         self._prompt_template = load_prompt("answer")
 
-    def retrieve(self, query: str) -> tuple[list[dict[str, Any]], float]:
-        """Run BM25 and dense retrieval, then merge with RRF."""
+    def retrieve(
+        self,
+        query: str,
+        role: str,
+    ) -> tuple[list[dict[str, Any]], float, dict[str, int]]:
+        """Run role-filtered BM25 and dense retrieval, then merge with RRF.
+
+        Args:
+            query: Query used for retrieval (may be a rewritten standalone one).
+            role: Authenticated user role.
+
+        Returns:
+            Tuple of (fused candidates, elapsed milliseconds, filter counters).
+
+        Raises:
+            RuntimeError: if RBAC is disabled without a permitted ablation label.
+        """
         start = time.perf_counter()
         top_k = settings.RETRIEVAL_TOP_K_HYBRID
+        effective_role = normalize_role(role) if settings.rbac_enabled else None
 
         try:
-            bm25_hits = self.bm25.search(query, top_k=top_k)
+            bm25_result = self.bm25.search(query, top_k=top_k, role=effective_role)
         except Exception as exc:
             logger.warning("BM25 retrieval failed (%s).", type(exc).__name__)
-            bm25_hits = []
+            bm25_result = SearchResult()
         try:
-            vector_hits = self.qdrant.search(query, top_k=top_k)
+            vector_result = self.qdrant.search(query, top_k=top_k, role=effective_role)
         except Exception as exc:
             logger.warning("Vector retrieval failed (%s).", type(exc).__name__)
-            vector_hits = []
+            vector_result = SearchResult()
 
         fused = reciprocal_rank_fusion(
-            bm25_hits,
-            vector_hits,
+            bm25_result.hits,
+            vector_result.hits,
             k=settings.RETRIEVAL_RRF_K,
             top_k=top_k,
         )
-        return fused, (time.perf_counter() - start) * 1000.0
+        stats = {
+            "candidates_retrieved": len(bm25_result.hits) + len(vector_result.hits),
+            "candidates_filtered_by_role": bm25_result.filtered,
+        }
+        return fused, (time.perf_counter() - start) * 1000.0, stats
 
     def rerank(
         self,
         query: str,
         candidates: list[dict[str, Any]],
-    ) -> tuple[list[dict[str, Any]], float]:
-        """Re-rank fused candidates with the CPU cross-encoder."""
+        role: str,
+    ) -> tuple[list[dict[str, Any]], float, int]:
+        """Re-rank fused candidates, then re-check role visibility.
+
+        Returns:
+            Tuple of (permitted passages, elapsed milliseconds, dropped count).
+        """
         start = time.perf_counter()
         reranked = self.reranker.rerank(query, candidates, top_n=settings.RERANKER_TOP_N)
-        return reranked, (time.perf_counter() - start) * 1000.0
+        if settings.rbac_enabled:
+            permitted, dropped = enforce_role_visibility(reranked, role)
+            if dropped:
+                # Count only: passage text is never written to logs.
+                logger.warning(
+                    "Defence-in-depth role guard dropped %s passage(s) after re-ranking.",
+                    dropped,
+                )
+        else:
+            permitted, dropped = reranked, 0
+        return permitted, (time.perf_counter() - start) * 1000.0, dropped
+
 
     def _format_passages(self, passages: list[dict[str, Any]]) -> str:
         blocks: list[str] = []
@@ -233,20 +304,42 @@ class BaselineRAGPipeline:
         self,
         query: str,
         passages: list[dict[str, Any]],
-    ) -> tuple[str, list[str], bool, float]:
-        """Generate an answer strictly from the final passages."""
+        session_id: str | None = None,
+    ) -> tuple[str, list[str], bool, float, dict[str, int]]:
+        """Generate an answer strictly from the final, role-permitted passages.
+
+        Returns:
+            Tuple of (answer, cited chunk IDs, cache hit, milliseconds, usage).
+        """
         start = time.perf_counter()
         passage_ids = [passage["chunk_id"] for passage in passages if passage.get("chunk_id")]
 
         if not passages:
-            return REFUSAL_TEXT, [], False, 0.0
+            return REFUSAL_TEXT, [], False, 0.0, {
+                "calls": 0,
+                "cached_calls": 0,
+                "prompt_tokens": 0,
+                "completion_tokens": 0,
+            }
 
         prompt = self._prompt_template.format(
             passages=self._format_passages(passages),
             question=query,
         )
-        response = self.llm.complete(prompt=prompt, temperature=0.0, step="answer")
+        response = self.llm.complete(
+            prompt=prompt,
+            temperature=0.0,
+            step="answer",
+            session_id=session_id,
+        )
         generation_ms = (time.perf_counter() - start) * 1000.0
+        usage = {
+            "calls": 1,
+            "cached_calls": 1 if response.cached else 0,
+            "prompt_tokens": response.prompt_tokens,
+            "completion_tokens": response.completion_tokens,
+        }
+
 
         raw_text = response.content.strip()
         cited: list[str] = []
@@ -269,21 +362,44 @@ class BaselineRAGPipeline:
         answer = re.sub(r"(?is)^\s*answer\s*:\s*", "", answer).strip()
 
         if not answer or REFUSAL_TEXT.lower() in raw_text.lower():
-            return REFUSAL_TEXT, [], response.cached, generation_ms
+            return REFUSAL_TEXT, [], response.cached, generation_ms, usage
         if not cited:
             # The model saw every final passage; if it omitted labels, cite the
             # supplied context rather than silently returning an unsourced answer.
             cited = passage_ids
 
-        return answer, cited, response.cached, generation_ms
+        return answer, cited, response.cached, generation_ms, usage
 
-    def ask(self, query: str) -> BaselineRAGResponse:
-        """Execute the complete baseline RAG request."""
+    def ask(
+        self,
+        query: str,
+        role: str,
+        rewritten_query: str | None = None,
+        session_id: str | None = None,
+    ) -> BaselineRAGResponse:
+        """Execute the complete baseline RAG request for one authenticated role.
+
+        Args:
+            query: Original user question, echoed in the response.
+            role: Authenticated user role; always server-derived.
+            rewritten_query: Standalone question produced by the memory layer.
+            session_id: Session identifier for per-call telemetry linkage.
+
+        Returns:
+            A role-filtered baseline response with retrieval and usage stats.
+        """
         total_start = time.perf_counter()
+        normalized_role = normalize_role(role)
+        retrieval_query = (rewritten_query or query).strip()
+        rbac_enabled = settings.rbac_enabled
 
-        candidates, retrieval_ms = self.retrieve(query)
-        final_passages, rerank_ms = self.rerank(query, candidates)
-        answer, cited_ids, cached, generation_ms = self.generate(query, final_passages)
+        candidates, retrieval_ms, filter_stats = self.retrieve(retrieval_query, normalized_role)
+        final_passages, rerank_ms, dropped = self.rerank(
+            retrieval_query, candidates, normalized_role
+        )
+        answer, cited_ids, cached, generation_ms, usage = self.generate(
+            retrieval_query, final_passages, session_id=session_id
+        )
 
         sources: list[SourceChunk] = []
         for passage in final_passages:
@@ -291,6 +407,7 @@ class BaselineRAGPipeline:
             sources.append(
                 SourceChunk(
                     chunk_id=passage.get("chunk_id", ""),
+                    doc_id=passage.get("doc_id", "") or "",
                     doc_title=passage.get("doc_title", "Document"),
                     section=passage.get("section_label", ""),
                     clause=passage.get("clause_label"),
@@ -300,10 +417,25 @@ class BaselineRAGPipeline:
                 )
             )
 
+
         llm = settings.llm
+        retrieval_stats = RetrievalStats(
+            candidates_retrieved=filter_stats["candidates_retrieved"],
+            candidates_filtered_by_role=(
+                filter_stats["candidates_filtered_by_role"] + dropped
+            ),
+            total_chunks_retrieved=len(final_passages),
+            top_rerank_score=max(
+                (float(passage.get("score", 0.0)) for passage in final_passages),
+                default=0.0,
+            ),
+            rewritten_query=rewritten_query,
+        )
         return BaselineRAGResponse(
             query=query,
             answer=answer,
+            role=normalized_role,
+            rbac_enabled=rbac_enabled,
             sources=sources,
             chunk_ids_used=cited_ids,
             timings=RAGTimings(
@@ -312,10 +444,22 @@ class BaselineRAGPipeline:
                 generation_ms=round(generation_ms, 2),
                 total_ms=round((time.perf_counter() - total_start) * 1000.0, 2),
             ),
+            retrieval_stats=retrieval_stats,
+            llm_stats=LLMStats(
+                profile=llm.profile,
+                model=llm.model,
+                prompt_version=settings.PROMPT_VERSION,
+                calls=usage["calls"],
+                cached_calls=usage["cached_calls"],
+                prompt_tokens=usage["prompt_tokens"],
+                completion_tokens=usage["completion_tokens"],
+                cached_response=cached,
+            ),
             cached=cached,
             llm_profile=llm.profile,
             llm_model=llm.model,
         )
+
 
     def close(self) -> None:
         """Release the embedded Qdrant file lock."""

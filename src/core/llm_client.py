@@ -505,6 +505,7 @@ class ResilientLLMClient:
         fallback: T | None = None,
         system_prompt: str | None = None,
         step: str = "answer",
+        session_id: str | None = None,
     ) -> T:
         """Request schema-validated JSON with exactly one repair retry.
 
@@ -524,6 +525,7 @@ class ResilientLLMClient:
             system_prompt=system_prompt,
             temperature=0.0,
             step=step,
+            session_id=session_id,
         )
         parsed = parse_json_response(first.content, schema)
         if parsed is not None:
@@ -541,6 +543,7 @@ class ResilientLLMClient:
             system_prompt=system_prompt,
             temperature=0.0,
             step=step,
+            session_id=session_id,
         )
         parsed_repair = parse_json_response(repaired.content, schema)
         if parsed_repair is not None:
@@ -560,8 +563,16 @@ class ResilientLLMClient:
         """Return a deterministic offline response, citing real prompt chunk IDs."""
         lowered = prompt.lower()
         chunk_ids = re.findall(r"\[Chunk ID:\s*([^\]]+)\]", prompt)
+        for quoted_id in re.findall(r'chunk_id="([^"]+)"', prompt):
+            if quoted_id not in chunk_ids:
+                chunk_ids.append(quoted_id)
 
-        if "authoritative_passages" in lowered or "supporting chunks:" in lowered:
+        if "rewrite the follow-up" in lowered and "standalone_question" in lowered:
+            match = re.search(r"(?im)^\s*Follow-up question\s*:\s*(.+?)\s*$", prompt)
+            question = match.group(1).strip() if match else ""
+            return json.dumps({"standalone_question": question})
+
+        if "authoritative_documents" in lowered or "authoritative_passages" in lowered:
             cited = ", ".join(chunk_ids[:5]) if chunk_ids else "NONE"
             return (
                 "The supplied authoritative passages set out the applicable "

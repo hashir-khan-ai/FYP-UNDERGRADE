@@ -49,6 +49,7 @@ CREATE TABLE IF NOT EXISTS messages (
     sender TEXT NOT NULL CHECK(sender IN ('user', 'assistant', 'system')),
     content TEXT NOT NULL,
     route_used TEXT,
+    user_role TEXT,                        -- Role used when the turn was produced
     metadata_json TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (session_id) REFERENCES sessions (id) ON DELETE CASCADE
@@ -75,6 +76,14 @@ CREATE TABLE IF NOT EXISTS audit_log (
     latency_ms REAL NOT NULL,
     tokens_prompt INTEGER DEFAULT 0,
     tokens_completion INTEGER DEFAULT 0,
+    llm_profile TEXT NOT NULL DEFAULT 'mock',
+    llm_calls INTEGER NOT NULL DEFAULT 0,
+    cached_calls INTEGER NOT NULL DEFAULT 0,
+    spend_guard_hit INTEGER NOT NULL DEFAULT 0,
+    prompt_version TEXT,
+    llm_model TEXT,
+    candidates_retrieved INTEGER NOT NULL DEFAULT 0,
+    candidates_filtered INTEGER NOT NULL DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (session_id) REFERENCES sessions (id) ON DELETE SET NULL,
     FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
@@ -153,19 +162,51 @@ _LLM_CALLS_EXTRA_COLUMNS: dict[str, str] = {
     "fallback_used": "INTEGER NOT NULL DEFAULT 0",
 }
 
+# Phase 3 audit columns: role-filter counters, model identity and cache flag.
+_AUDIT_LOG_EXTRA_COLUMNS: dict[str, str] = {
+    "llm_profile": "TEXT NOT NULL DEFAULT 'mock'",
+    "llm_calls": "INTEGER NOT NULL DEFAULT 0",
+    "cached_calls": "INTEGER NOT NULL DEFAULT 0",
+    "spend_guard_hit": "INTEGER NOT NULL DEFAULT 0",
+    "prompt_version": "TEXT",
+    "llm_model": "TEXT",
+    "candidates_retrieved": "INTEGER NOT NULL DEFAULT 0",
+    "candidates_filtered": "INTEGER NOT NULL DEFAULT 0",
+}
 
-def apply_migrations(conn: sqlite3.Connection) -> None:
-    """Apply additive schema migrations to an existing SQLite database."""
+# Phase 3 messages column: the role used when each turn was produced.
+_MESSAGES_EXTRA_COLUMNS: dict[str, str] = {
+    "user_role": "TEXT",
+}
+
+
+def _add_missing_columns(
+    conn: sqlite3.Connection,
+    table: str,
+    columns: dict[str, str],
+) -> None:
+    """Add columns to an existing table, ignoring ones already present.
+
+    Only identifiers declared in this module are interpolated; user data never
+    reaches the DDL string.
+    """
     cur = conn.cursor()
-    cur.execute("PRAGMA table_info(llm_calls);")
+    cur.execute(f"PRAGMA table_info({table});")
     existing = {row[1] for row in cur.fetchall()}
     if not existing:
         return
-
-    for column, ddl in _LLM_CALLS_EXTRA_COLUMNS.items():
+    for column, ddl in columns.items():
         if column not in existing:
-            cur.execute(f"ALTER TABLE llm_calls ADD COLUMN {column} {ddl};")
+            cur.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl};")
 
+
+def apply_migrations(conn: sqlite3.Connection) -> None:
+    """Apply additive schema migrations to an existing SQLite database."""
+    _add_missing_columns(conn, "llm_calls", _LLM_CALLS_EXTRA_COLUMNS)
+    _add_missing_columns(conn, "audit_log", _AUDIT_LOG_EXTRA_COLUMNS)
+    _add_missing_columns(conn, "messages", _MESSAGES_EXTRA_COLUMNS)
+
+    cur = conn.cursor()
     cur.execute("CREATE INDEX IF NOT EXISTS idx_llm_calls_step ON llm_calls(step);")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_llm_calls_profile ON llm_calls(llm_profile);")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_llm_calls_audit_id ON llm_calls(audit_id);")

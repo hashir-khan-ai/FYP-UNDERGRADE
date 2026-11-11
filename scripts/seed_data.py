@@ -1,6 +1,5 @@
 """Database seeding script for synthetic roles, users, and documents."""
 
-import hashlib
 import json
 import os
 import sys
@@ -9,15 +8,12 @@ from pathlib import Path
 # Ensure project root is in sys.path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from src.core.auth import hash_password
 from src.db.connection import get_db_connection
 from src.db.migrations import init_db
 from src.db.repository import Repository
 
-
-def hash_password(password: str) -> str:
-    """Deterministic hash for synthetic dev users (SHA-256 with project salt)."""
-    salt = "enterprise-rag-synthetic-salt-2026"
-    return hashlib.sha256(f"{salt}:{password}".encode("utf-8")).hexdigest()
+SYNTHETIC_DEMO_PASSWORD = os.environ.get("SEED_DEFAULT_PASSWORD", "password123")
 
 
 def seed() -> None:
@@ -39,29 +35,25 @@ def seed() -> None:
 
         assert analyst_role and manager_role and auditor_role
 
-        # 2. Seed Synthetic Users
+        # 2. Seed Synthetic Users (Argon2id hashes; upsert preserves user IDs)
         print("Seeding synthetic users...")
-        pwd_hash = hash_password("password123")
+        pwd_hash = hash_password(SYNTHETIC_DEMO_PASSWORD)
 
-        cur = conn.cursor()
-        # Clean existing test users if any
-        cur.execute("DELETE FROM users WHERE username IN ('analyst_user', 'manager_user', 'auditor_user');")
-
-        repo.create_user(
+        repo.upsert_user(
             username="analyst_user",
             password_hash=pwd_hash,
             role_id=analyst_role["id"],
             full_name="Alice Analyst",
             email="alice.analyst@bank.local",
         )
-        repo.create_user(
+        repo.upsert_user(
             username="manager_user",
             password_hash=pwd_hash,
             role_id=manager_role["id"],
             full_name="Bob Manager",
             email="bob.manager@bank.local",
         )
-        repo.create_user(
+        repo.upsert_user(
             username="auditor_user",
             password_hash=pwd_hash,
             role_id=auditor_role["id"],

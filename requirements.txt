@@ -12,6 +12,9 @@ python-multipart==0.0.20  # Multipart form parsing for API requests
 pydantic==2.10.4          # Strict data modeling, input validation, and schema generation
 pydantic-settings==2.7.1  # Environment variable parsing from .env with type coercion
 
+# Authentication (Phase 3)
+argon2-cffi==25.1.0       # Argon2id password hashing for synthetic demo users (no bcrypt/JWT dependency added)
+
 # HTTP Client & OpenAI-Compatible Gateway
 httpx==0.28.1             # Async and sync HTTP client with connection pooling and timeouts
 

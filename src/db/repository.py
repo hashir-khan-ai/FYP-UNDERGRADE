@@ -74,6 +74,34 @@ class Repository:
         )
         return cur.fetchone()
 
+    def upsert_user(
+        self,
+        username: str,
+        password_hash: str,
+        role_id: int,
+        full_name: str,
+        email: str,
+    ) -> int:
+        """Create or update a synthetic user without changing its identifier."""
+        cur = self.conn.cursor()
+        cur.execute(
+            """
+            INSERT INTO users (username, password_hash, role_id, full_name, email)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(username) DO UPDATE SET
+                password_hash = excluded.password_hash,
+                role_id = excluded.role_id,
+                full_name = excluded.full_name,
+                email = excluded.email,
+                is_active = 1;
+            """,
+            (username, password_hash, role_id, full_name, email),
+        )
+        cur.execute("SELECT id FROM users WHERE username = ?;", (username,))
+        row = cur.fetchone()
+        return int(row["id"]) if row else int(cur.lastrowid)
+
+
     def get_user_by_id(self, user_id: int) -> sqlite3.Row | None:
         cur = self.conn.cursor()
         cur.execute(
@@ -118,6 +146,15 @@ class Repository:
         cur.execute("SELECT * FROM sessions WHERE id = ?;", (session_id,))
         return cur.fetchone()
 
+    def get_session_for_user(self, session_id: str, user_id: int) -> sqlite3.Row | None:
+        """Return a session only when it belongs to ``user_id`` (IDOR guard)."""
+        cur = self.conn.cursor()
+        cur.execute(
+            "SELECT * FROM sessions WHERE id = ? AND user_id = ?;",
+            (session_id, user_id),
+        )
+        return cur.fetchone()
+
     def list_sessions_by_user(self, user_id: int) -> list[sqlite3.Row]:
         cur = self.conn.cursor()
         cur.execute(
@@ -135,6 +172,16 @@ class Repository:
         cur.execute("DELETE FROM sessions WHERE id = ?;", (session_id,))
         return cur.rowcount > 0
 
+    def delete_session_for_user(self, session_id: str, user_id: int) -> bool:
+        """Delete a session only when it belongs to ``user_id``."""
+        cur = self.conn.cursor()
+        cur.execute(
+            "DELETE FROM sessions WHERE id = ? AND user_id = ?;",
+            (session_id, user_id),
+        )
+        return cur.rowcount > 0
+
+
     # --------------------------------------------------------------------------
     # Messages (Memory Layer)
     # --------------------------------------------------------------------------
@@ -145,14 +192,15 @@ class Repository:
         content: str,
         route_used: str | None = None,
         metadata_json: str | None = None,
+        user_role: str | None = None,
     ) -> int:
         cur = self.conn.cursor()
         cur.execute(
             """
-            INSERT INTO messages (session_id, sender, content, route_used, metadata_json)
-            VALUES (?, ?, ?, ?, ?);
+            INSERT INTO messages (session_id, sender, content, route_used, user_role, metadata_json)
+            VALUES (?, ?, ?, ?, ?, ?);
             """,
-            (session_id, sender, content, route_used, metadata_json),
+            (session_id, sender, content, route_used, user_role, metadata_json),
         )
         # Touch session updated_at
         cur.execute(
@@ -174,6 +222,29 @@ class Repository:
         )
         return cur.fetchall()
 
+    def get_recent_messages(self, session_id: str, limit: int = 10) -> list[sqlite3.Row]:
+        """Return the newest ``limit`` messages, oldest first.
+
+        Callers must resolve the session owner first; this method intentionally
+        takes only ``session_id`` because ownership is enforced by
+        :meth:`get_session_for_user` before it is reached.
+        """
+        cur = self.conn.cursor()
+        cur.execute(
+            """
+            SELECT * FROM (
+                SELECT * FROM messages
+                WHERE session_id = ?
+                ORDER BY id DESC
+                LIMIT ?
+            )
+            ORDER BY id ASC;
+            """,
+            (session_id, limit),
+        )
+        return cur.fetchall()
+
+
     # --------------------------------------------------------------------------
     # Audit Log (XAI Layer)
     # --------------------------------------------------------------------------
@@ -194,6 +265,14 @@ class Repository:
         citations_json: list[dict[str, Any]] | str | None = None,
         tokens_prompt: int = 0,
         tokens_completion: int = 0,
+        llm_profile: str = "mock",
+        llm_calls: int = 0,
+        cached_calls: int = 0,
+        spend_guard_hit: bool = False,
+        prompt_version: str = "v1",
+        llm_model: str | None = None,
+        candidates_retrieved: int = 0,
+        candidates_filtered: int = 0,
     ) -> int:
         # Normalize collections to JSON strings
         chunks_str = json.dumps(retrieved_chunk_ids) if isinstance(retrieved_chunk_ids, list) else retrieved_chunk_ids
@@ -208,8 +287,10 @@ class Repository:
                 session_id, user_id, user_role, query_text, final_route,
                 retrieved_chunk_ids, relevance_scores, retry_count, rewritten_query,
                 response_text, reasoning_trace, citations_json, latency_ms,
-                tokens_prompt, tokens_completion
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                tokens_prompt, tokens_completion, llm_profile, llm_calls,
+                cached_calls, spend_guard_hit, prompt_version, llm_model,
+                candidates_retrieved, candidates_filtered
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
             """,
             (
                 session_id,
@@ -227,32 +308,42 @@ class Repository:
                 latency_ms,
                 tokens_prompt,
                 tokens_completion,
+                llm_profile,
+                llm_calls,
+                cached_calls,
+                1 if spend_guard_hit else 0,
+                prompt_version,
+                llm_model,
+                candidates_retrieved,
+                candidates_filtered,
             ),
         )
         return cur.lastrowid
 
-    def list_audit_logs(self, limit: int = 50, user_id: int | None = None) -> list[sqlite3.Row]:
+    def list_audit_logs(
+        self,
+        limit: int = 50,
+        user_id: int | None = None,
+        start_date: str | None = None,
+    ) -> list[sqlite3.Row]:
+        """Return newest-first audit rows, optionally filtered.
+
+        A single static, fully parameterized statement is used so no user value
+        is ever interpolated into SQL.
+        """
         cur = self.conn.cursor()
-        if user_id is not None:
-            cur.execute(
-                """
-                SELECT * FROM audit_log
-                WHERE user_id = ?
-                ORDER BY created_at DESC
-                LIMIT ?;
-                """,
-                (user_id, limit),
-            )
-        else:
-            cur.execute(
-                """
-                SELECT * FROM audit_log
-                ORDER BY created_at DESC
-                LIMIT ?;
-                """,
-                (limit,),
-            )
+        cur.execute(
+            """
+            SELECT * FROM audit_log
+            WHERE (? IS NULL OR user_id = ?)
+              AND (? IS NULL OR created_at >= ?)
+            ORDER BY created_at DESC
+            LIMIT ?;
+            """,
+            (user_id, user_id, start_date, start_date, limit),
+        )
         return cur.fetchall()
+
 
     # --------------------------------------------------------------------------
     # Document Catalog
@@ -379,6 +470,38 @@ class Repository:
             ),
         )
         return cur.lastrowid
+
+    def get_max_llm_call_id(self) -> int:
+        """Return the highest telemetry row id, or 0 when the table is empty."""
+        cur = self.conn.cursor()
+        cur.execute("SELECT COALESCE(MAX(id), 0) AS max_id FROM llm_calls;")
+        row = cur.fetchone()
+        return int(row["max_id"]) if row else 0
+
+    def get_llm_usage_since(self, after_id: int, session_id: str) -> dict[str, int]:
+        """Aggregate telemetry for one request without storing prompt content."""
+        cur = self.conn.cursor()
+        cur.execute(
+            """
+            SELECT
+                COUNT(*) AS calls,
+                COALESCE(SUM(cached), 0) AS cached_calls,
+                COALESCE(SUM(prompt_tokens), 0) AS prompt_tokens,
+                COALESCE(SUM(completion_tokens), 0) AS completion_tokens
+            FROM llm_calls
+            WHERE id > ? AND session_id = ?;
+            """,
+            (after_id, session_id),
+        )
+        row = cur.fetchone()
+        if row is None:
+            return {"calls": 0, "cached_calls": 0, "prompt_tokens": 0, "completion_tokens": 0}
+        return {
+            "calls": int(row["calls"] or 0),
+            "cached_calls": int(row["cached_calls"] or 0),
+            "prompt_tokens": int(row["prompt_tokens"] or 0),
+            "completion_tokens": int(row["completion_tokens"] or 0),
+        }
 
     def get_spend_totals(self) -> dict[str, int]:
         cur = self.conn.cursor()

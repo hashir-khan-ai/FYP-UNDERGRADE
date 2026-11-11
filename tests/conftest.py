@@ -44,7 +44,10 @@ def _force_mock_llm_profile() -> None:
 @pytest.fixture(autouse=True)
 def _configure_test_pipeline() -> Generator[None, None, None]:
     """Configure fast mock embeddings and reranker for zero-download testing."""
+    from src.core.auth import login_throttle
+
     spend_guard.reset()
+    login_throttle.reset()
     orig_embedder = baseline_pipeline.qdrant.embedder
     orig_reranker = baseline_pipeline.reranker
 
@@ -55,7 +58,58 @@ def _configure_test_pipeline() -> Generator[None, None, None]:
 
     baseline_pipeline.qdrant.embedder = orig_embedder
     baseline_pipeline.reranker = orig_reranker
+    login_throttle.reset()
     spend_guard.reset()
+
+
+TEST_AUTH_PASSWORD = "password123"
+
+_TEST_USER_SPECS = (
+    ("analyst_user", "Alice Analyst", "analyst", "alice.analyst@bank.local", 10),
+    ("manager_user", "Bob Manager", "manager", "bob.manager@bank.local", 20),
+    ("auditor_user", "Carol Auditor", "auditor", "carol.auditor@bank.local", 30),
+)
+
+
+@pytest.fixture(scope="session")
+def seeded_auth_users() -> dict[str, dict[str, Any]]:
+    """Seed the three synthetic users into the file-backed test database once."""
+    from src.core.auth import hash_password
+    from src.db.connection import get_db_connection
+
+    password_hash = hash_password(TEST_AUTH_PASSWORD)
+    with get_db_connection() as conn:
+        repo = Repository(conn)
+        for username, full_name, role, email, level in _TEST_USER_SPECS:
+            repo.insert_role(role, f"{role} role", level)
+        roles = {row["name"]: int(row["id"]) for row in repo.list_roles()}
+
+        users: dict[str, dict[str, Any]] = {}
+        for username, full_name, role, email, _ in _TEST_USER_SPECS:
+            repo.upsert_user(username, password_hash, roles[role], full_name, email)
+            row = repo.get_user_by_username(username)
+            users[role] = {
+                "id": int(row["id"]),
+                "username": username,
+                "full_name": full_name,
+                "email": email,
+                "password": TEST_AUTH_PASSWORD,
+            }
+    return users
+
+
+@pytest.fixture
+def auth_headers(seeded_auth_users: dict[str, dict[str, Any]]):
+    """Return a factory producing a valid bearer header for one role."""
+    from src.core.auth import create_access_token
+
+    def _headers(role: str) -> dict[str, str]:
+        info = seeded_auth_users[role]
+        token = create_access_token(info["id"], info["username"], role)
+        return {"Authorization": f"Bearer {token}"}
+
+    return _headers
+
 
 
 class MockLLMResponse:

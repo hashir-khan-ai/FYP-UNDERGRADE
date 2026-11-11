@@ -77,7 +77,7 @@ def test_hybrid_indexing_and_retrieval_fixture(tmp_path) -> None:
     bm25.build_and_save(chunks)
 
     # Search BM25 for keyword
-    results = bm25.search("15000 euros due diligence", top_k=2)
+    results = bm25.search("15000 euros due diligence", top_k=2, role="analyst").hits
     assert len(results) > 0
     assert results[0]["chunk_id"] == "CH-MLR-01"
 
@@ -86,7 +86,7 @@ def test_hybrid_indexing_and_retrieval_fixture(tmp_path) -> None:
     qdrant = QdrantIndexer(storage_path=str(qdrant_dir), embedder=FakeEmbeddingGenerator())
     qdrant.index_chunks(chunks)
 
-    v_results = qdrant.search("capital adequacy ratio", top_k=2)
+    v_results = qdrant.search("capital adequacy ratio", top_k=2, role="analyst").hits
     assert len(v_results) == 2
 
     # Fusion
@@ -115,7 +115,10 @@ def test_reingestion_is_idempotent(tmp_path) -> None:
     bm25 = BM25Indexer(index_path=str(tmp_path / "bm25.pkl"))
     assert bm25.build_and_save(chunks) == 1
     assert bm25.build_and_save(chunks) == 1
-    assert bm25.search("material breach escalation", top_k=5)[0]["chunk_id"] == "CH-IDEMPOTENT-01"
+    assert (
+        bm25.search("material breach escalation", top_k=5, role="manager").hits[0]["chunk_id"]
+        == "CH-IDEMPOTENT-01"
+    )
 
     qdrant = QdrantIndexer(
         storage_path=str(tmp_path / "qdrant_idempotent"),
@@ -128,7 +131,10 @@ def test_reingestion_is_idempotent(tmp_path) -> None:
 
     assert first_count == 1
     assert second_count == 1
-    assert qdrant.search("breach escalation", top_k=1)[0]["chunk_id"] == "CH-IDEMPOTENT-01"
+    assert (
+        qdrant.search("breach escalation", top_k=1, role="manager").hits[0]["chunk_id"]
+        == "CH-IDEMPOTENT-01"
+    )
     qdrant.close()
 
 

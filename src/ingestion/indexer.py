@@ -1,16 +1,19 @@
 """Idempotent vector and BM25 indexers for regulatory document chunks."""
 
+import atexit
 import logging
 import pickle
 import re
 import shutil
 import uuid
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from rank_bm25 import BM25Plus
 
 from src.config import settings
+from src.core.security import chunk_visible_to_role, get_role_filter, normalize_role
 from src.ingestion.chunker import DocumentChunk
 from src.ingestion.embeddings import EmbeddingGenerator, embeddings
 
@@ -18,9 +21,34 @@ logger = logging.getLogger(__name__)
 COLLECTION_NAME = "compliance_chunks"
 
 
+@dataclass(frozen=True)
+class SearchResult:
+    """Hits returned by one index plus role-filter counters for the audit log.
+
+    ``considered`` is the number of candidates the index examined and
+    ``filtered`` the number dropped by the role rule in this index. Qdrant
+    applies the role filter natively before scoring, so nothing is dropped
+    afterwards and its ``filtered`` value is always zero.
+    """
+
+    hits: list[dict[str, Any]] = field(default_factory=list)
+    considered: int = 0
+    filtered: int = 0
+
+
+
 def tokenize_for_bm25(text: str) -> list[str]:
     """Simple lowercase punctuation-stripped tokenizer for BM25."""
     return re.findall(r"\b[a-zA-Z0-9_\-.]{2,}\b", text.lower())
+
+
+def _close_qdrant_quietly(client: Any) -> None:
+    """Close an embedded Qdrant client without raising during teardown."""
+    try:
+        client.close()
+    except Exception as exc:  # pragma: no cover - interpreter shutdown path
+        logger.debug("Qdrant client close failed (%s).", type(exc).__name__)
+
 
 
 class QdrantIndexer:
@@ -34,6 +62,13 @@ class QdrantIndexer:
         self.storage_path = storage_path or settings.QDRANT_STORAGE_PATH
         self.embedder = embedder or embeddings
         self._client = None
+        self._atexit_registered = False
+
+    def __enter__(self) -> "QdrantIndexer":
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        self.close()
 
     def _get_client(self):
         if self._client is None:
@@ -41,13 +76,18 @@ class QdrantIndexer:
 
             Path(self.storage_path).mkdir(parents=True, exist_ok=True)
             self._client = QdrantClient(path=self.storage_path)
+            if not self._atexit_registered:
+                # Safety net for scripts and tests that forget an explicit close.
+                atexit.register(_close_qdrant_quietly, self._client)
+                self._atexit_registered = True
         return self._client
 
     def close(self) -> None:
         """Release the embedded Qdrant file lock."""
         if self._client is not None:
-            self._client.close()
-            self._client = None
+            client, self._client = self._client, None
+            _close_qdrant_quietly(client)
+
 
     def ensure_collection(self, vector_dim: int = 384) -> None:
         """Create the collection if it does not exist."""
@@ -127,23 +167,39 @@ class QdrantIndexer:
             )
         return len(points)
 
-    def search(self, query: str, top_k: int = 20) -> list[dict[str, Any]]:
-        """Dense similarity search; returns [] when the collection is absent."""
+    def search(self, query: str, top_k: int, role: str | None) -> SearchResult:
+        """Dense similarity search restricted to the caller's role.
+
+        The role filter is passed to Qdrant as a native payload filter, so
+        restricted vectors are excluded before distance scoring and their
+        payloads are never loaded. ``role=None`` is only valid for a labelled
+        baseline ablation and must never be passed by an authenticated route.
+
+        Args:
+            query: User query text.
+            top_k: Maximum number of hits.
+            role: Authenticated user role.
+
+        Raises:
+            InvalidRoleError: if a non-None role is not in the frozen role model.
+        """
+        role_filter = get_role_filter(role) if role is not None else None
         client = self._get_client()
         try:
             if not any(c.name == COLLECTION_NAME for c in client.get_collections().collections):
-                return []
+                return SearchResult()
             query_vector = self.embedder.embed_query(query)
             response = client.query_points(
                 collection_name=COLLECTION_NAME,
                 query=query_vector,
+                query_filter=role_filter,
                 limit=top_k,
                 with_payload=True,
             )
             results = response.points
         except Exception as exc:
             logger.warning("Vector search unavailable (%s); returning no vector hits.", type(exc).__name__)
-            return []
+            return SearchResult()
 
         hits: list[dict[str, Any]] = []
         for result in results:
@@ -162,7 +218,8 @@ class QdrantIndexer:
                     "score": float(result.score),
                 }
             )
-        return hits
+        return SearchResult(hits=hits, considered=len(hits), filtered=0)
+
 
 
 class BM25Indexer:
@@ -219,18 +276,43 @@ class BM25Indexer:
         self.chunks = data.get("chunks", [])
         return self.bm25 is not None
 
-    def search(self, query: str, top_k: int = 20) -> list[dict[str, Any]]:
-        """Return the top-k positively scored chunks for a lexical query."""
+    def search(self, query: str, top_k: int, role: str | None) -> SearchResult:
+        """Return the top-k positively scored chunks visible to ``role``.
+
+        Role filtering happens on candidate metadata before fusion, so a
+        restricted clause can never enter the RRF candidate set. ``role=None``
+        is only valid for a labelled baseline ablation.
+
+        Args:
+            query: User query text.
+            top_k: Maximum number of hits.
+            role: Authenticated user role.
+
+        Raises:
+            InvalidRoleError: if a non-None role is not in the frozen role model.
+        """
+        if role is not None:
+            normalize_role(role)
         if self.bm25 is None and not self.load():
-            return []
+            return SearchResult()
 
         tokenized_query = tokenize_for_bm25(query)
         if not tokenized_query:
-            return []
+            return SearchResult()
 
         scores = self.bm25.get_scores(tokenized_query)
+        positive = [index for index in range(len(scores)) if float(scores[index]) > 0.0]
+        if role is None:
+            eligible = positive
+        else:
+            eligible = [
+                index
+                for index in positive
+                if index < len(self.chunks) and chunk_visible_to_role(self.chunks[index], role)
+            ]
+        filtered = len(positive) - len(eligible)
         ranked = sorted(
-            range(len(scores)),
+            eligible,
             key=lambda index: (-float(scores[index]), index),
         )[:top_k]
 
@@ -242,4 +324,5 @@ class BM25Indexer:
             item = dict(self.chunks[index])
             item["score"] = score
             results.append(item)
-        return results
+        return SearchResult(hits=results, considered=len(positive), filtered=filtered)
+
