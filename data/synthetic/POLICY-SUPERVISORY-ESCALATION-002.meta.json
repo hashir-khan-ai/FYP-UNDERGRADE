@@ -1,0 +1,8 @@
+{
+  "doc_id": "DOC-INT-POL-MGT-002",
+  "title": "Bank Internal Management Policy: Regulatory Incident Escalation & Remediation",
+  "allowed_roles": ["manager", "auditor"],
+  "doc_type": "INTERNAL_MANAGEMENT_POLICY",
+  "jurisdiction": "INTERNAL_SYNTHETIC",
+  "version": "2.1"
+}

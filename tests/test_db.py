@@ -123,6 +123,69 @@ def test_llm_response_cache(repo: Repository) -> None:
     assert cached["prompt_tokens"] == 50
 
 
+def test_llm_call_telemetry_schema_and_insert(repo: Repository, test_db: sqlite3.Connection) -> None:
+    """Verify the documented telemetry columns exist and are populated."""
+    cur = test_db.cursor()
+    cur.execute("PRAGMA table_info(llm_calls);")
+    columns = {row[1] for row in cur.fetchall()}
+    assert {
+        "audit_id",
+        "session_id",
+        "step",
+        "llm_profile",
+        "prompt_version",
+        "cached",
+        "json_repair_attempted",
+        "fallback_used",
+    } <= columns
+
+    repo.log_llm_call(
+        profile="mock",
+        model="mock",
+        prompt_tokens=12,
+        completion_tokens=4,
+        latency_ms=1.5,
+        cache_hit=True,
+        step="answer",
+        prompt_version="v1",
+    )
+    row = test_db.execute("SELECT * FROM llm_calls ORDER BY id DESC LIMIT 1;").fetchone()
+    assert row["step"] == "answer"
+    assert row["llm_profile"] == "mock"
+    assert row["prompt_version"] == "v1"
+    assert row["cached"] == 1
+    assert row["total_tokens"] == 16
+
+
+def test_apply_migrations_upgrades_phase1_llm_calls_table() -> None:
+    """Verify an old Phase 1 llm_calls table gains the documented columns."""
+    from src.db.migrations import apply_migrations
+
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    conn.execute(
+        """
+        CREATE TABLE llm_calls (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            profile TEXT NOT NULL,
+            model TEXT NOT NULL,
+            prompt_tokens INTEGER DEFAULT 0,
+            completion_tokens INTEGER DEFAULT 0,
+            total_tokens INTEGER DEFAULT 0,
+            latency_ms REAL NOT NULL,
+            cache_hit INTEGER DEFAULT 0,
+            call_status TEXT NOT NULL DEFAULT 'success',
+            error_message TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        """
+    )
+    apply_migrations(conn)
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(llm_calls);").fetchall()}
+    assert {"step", "llm_profile", "prompt_version", "cached", "fallback_used"} <= columns
+    conn.close()
+
+
 def test_parameterized_query_sql_injection_safety(repo: Repository) -> None:
     """Verify that malicious SQL payloads in inputs do not execute or compromise data."""
     repo.insert_role("analyst", "Analyst", 10)
@@ -142,3 +205,4 @@ def test_parameterized_query_sql_injection_safety(repo: Repository) -> None:
     user = repo.get_user_by_username(malicious_username)
     assert user is not None
     assert user["username"] == malicious_username
+

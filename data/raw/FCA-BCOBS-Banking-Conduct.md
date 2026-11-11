@@ -31,3 +31,4 @@ Where a firm reduces an interest rate on a deposit account with an account balan
 
 ### Clause BCOBS-4.2.4R (Post-Contract Statements)
 A firm must provide each payment account holder with an account statement at least once per month, without charge, in an accessible electronic or physical format.
+

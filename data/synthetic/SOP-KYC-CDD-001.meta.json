@@ -1,0 +1,8 @@
+{
+  "doc_id": "DOC-INT-SOP-KYC-001",
+  "title": "Bank Internal Standard Operating Procedure: KYC and Customer Due Diligence",
+  "allowed_roles": ["analyst", "manager", "auditor"],
+  "doc_type": "INTERNAL_SOP",
+  "jurisdiction": "INTERNAL_SYNTHETIC",
+  "version": "3.2"
+}

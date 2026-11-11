@@ -25,3 +25,4 @@ Analysts must obtain certificate of incorporation, memorandum and articles of as
 
 ### Clause SOP-KYC-2.4 (Sanctions and Adverse Media Screening)
 Every corporate applicant, its directors, and beneficial owners must be screened against the UK HM Treasury OFSI Consolidated List, UN Sanctions List, and EU Sanctions List prior to account activation. Any potential positive hit requires immediate suspension of the onboarding workflow.
+

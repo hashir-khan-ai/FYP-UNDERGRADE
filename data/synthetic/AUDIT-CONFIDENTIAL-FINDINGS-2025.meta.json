@@ -1,0 +1,8 @@
+{
+  "doc_id": "DOC-INT-AUDIT-CONF-2025",
+  "title": "Bank Internal Audit Committee: 2025 Confidential Liquidity & Governance Review",
+  "allowed_roles": ["auditor"],
+  "doc_type": "CONFIDENTIAL_AUDIT_FINDINGS",
+  "jurisdiction": "INTERNAL_SYNTHETIC",
+  "version": "1.0"
+}

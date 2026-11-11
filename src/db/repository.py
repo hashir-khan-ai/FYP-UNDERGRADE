@@ -295,7 +295,7 @@ class Repository:
         return cur.fetchall()
 
     # --------------------------------------------------------------------------
-    # On-Disk LLM Cache
+    # On-Disk LLM Cache & Telemetry
     # --------------------------------------------------------------------------
     def get_cached_llm(self, cache_key: str) -> sqlite3.Row | None:
         cur = self.conn.cursor()
@@ -328,3 +328,75 @@ class Repository:
                 completion_tokens,
             ),
         )
+
+    def log_llm_call(
+        self,
+        profile: str,
+        model: str,
+        prompt_tokens: int,
+        completion_tokens: int,
+        latency_ms: float,
+        cache_hit: bool,
+        call_status: str = "success",
+        error_message: str | None = None,
+        step: str = "answer",
+        prompt_version: str = "v1",
+        audit_id: int | None = None,
+        session_id: str | None = None,
+        json_repair_attempted: bool = False,
+        fallback_used: bool = False,
+    ) -> int:
+        """Persist one LLM call for token, latency, cache and spend telemetry."""
+        cur = self.conn.cursor()
+        total_tokens = prompt_tokens + completion_tokens
+        cur.execute(
+            """
+            INSERT INTO llm_calls (
+                profile, llm_profile, model, step, prompt_version,
+                prompt_tokens, completion_tokens, total_tokens, latency_ms,
+                cache_hit, cached, call_status, error_message, audit_id,
+                session_id, json_repair_attempted, fallback_used
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+            """,
+            (
+                profile,
+                profile,
+                model,
+                step,
+                prompt_version,
+                prompt_tokens,
+                completion_tokens,
+                total_tokens,
+                latency_ms,
+                1 if cache_hit else 0,
+                1 if cache_hit else 0,
+                call_status,
+                error_message,
+                audit_id,
+                session_id,
+                1 if json_repair_attempted else 0,
+                1 if fallback_used else 0,
+            ),
+        )
+        return cur.lastrowid
+
+    def get_spend_totals(self) -> dict[str, int]:
+        cur = self.conn.cursor()
+        cur.execute(
+            """
+            SELECT 
+                COUNT(*) as total_calls,
+                COALESCE(SUM(total_tokens), 0) as total_tokens,
+                COALESCE(SUM(CASE WHEN cache_hit = 1 THEN 1 ELSE 0 END), 0) as cache_hits
+            FROM llm_calls;
+            """
+        )
+        row = cur.fetchone()
+        if row:
+            return {
+                "total_calls": row["total_calls"],
+                "total_tokens": row["total_tokens"],
+                "cache_hits": row["cache_hits"],
+            }
+        return {"total_calls": 0, "total_tokens": 0, "cache_hits": 0}
+

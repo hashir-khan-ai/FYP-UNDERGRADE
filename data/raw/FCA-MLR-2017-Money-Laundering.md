@@ -28,3 +28,4 @@ A relevant person must apply enhanced customer due diligence measures and enhanc
 
 ### Clause MLR-REG-35(5) (Approval for PEP Relationships)
 A firm must obtain senior management approval before establishing or continuing a business relationship with a Politically Exposed Person (PEP).
+

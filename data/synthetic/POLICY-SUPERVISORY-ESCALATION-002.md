@@ -26,3 +26,4 @@ When an internal or external audit issue is assigned a 'High Severity' rating, t
 
 ### Clause POL-MGT-2.5 (Disciplinary Reporting)
 Compliance Managers must conduct a root-cause investigation within 10 business days for any repeated procedural omission committed by operational staff.
+

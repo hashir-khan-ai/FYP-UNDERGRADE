@@ -28,3 +28,4 @@ Institutions must maintain an unencumbered stock of high-quality liquid assets (
 
 ### Clause BASEL-LIQ-3.4 (Net Stable Funding Ratio - NSFR)
 Institutions must maintain a minimum Net Stable Funding Ratio (NSFR) of 100% over an ongoing annual horizon, ensuring stable funding of assets and off-balance-sheet activities.
+

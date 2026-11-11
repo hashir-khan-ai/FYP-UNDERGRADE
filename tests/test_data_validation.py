@@ -57,3 +57,4 @@ def test_corpus_documents_exist() -> None:
         assert len(content) > 200, f"Document content too short: {doc_path_str}"
         assert "Clause" in content, f"Document missing formal 'Clause' identifiers: {doc_path_str}"
         assert "Permitted Roles:" in content or "Classification:" in content
+

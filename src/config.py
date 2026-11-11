@@ -93,6 +93,10 @@ class Settings(BaseSettings):
         default=3,
         description="Retries with exponential backoff and jitter before failing",
     )
+    LLM_RETRY_BASE_SECONDS: float = Field(
+        default=1.0,
+        description="Base delay for exponential backoff between safe retries",
+    )
     LLM_CACHE_ENABLED: bool = Field(
         default=True,
         description="Serve repeated requests from the on-disk response cache",
@@ -149,22 +153,27 @@ class Settings(BaseSettings):
         default="./data/qdrant",
         description="Directory for local embedded Qdrant vector storage",
     )
+    BM25_INDEX_PATH: str = Field(
+        default="./data/sqlite/bm25_index.pkl",
+        description="Pickled BM25 index built from the same chunks as Qdrant",
+    )
 
-    # Ablation Experiment Flags
+    # Ablation Experiment Flags. Phase 2 is baseline-only, so every later layer is
+    # explicitly disabled until its phase is authorised.
     ENABLE_ADAPTIVE_ROUTER: bool = Field(
-        default=True,
+        default=False,
         description="Layer 1: Adaptive Router (direct reply, single search, split)",
     )
     ENABLE_CORRECTIVE_GRADER: bool = Field(
-        default=True,
+        default=False,
         description="Layer 2: Corrective Grader (passage check, retry rewrite, refusal)",
     )
     ENABLE_RBAC_MEMORY: bool = Field(
-        default=True,
+        default=False,
         description="Layer 3: Session Memory and Server-side RBAC retrieval filtering",
     )
     ENABLE_XAI_OUTPUT: bool = Field(
-        default=True,
+        default=False,
         description="Layer 4: Clause-level citations, reasoning trace, audit log",
     )
 
@@ -172,6 +181,10 @@ class Settings(BaseSettings):
     RETRIEVAL_TOP_K_HYBRID: int = Field(
         default=20,
         description="Number of candidate passages from BM25 + Vector before re-ranking",
+    )
+    RETRIEVAL_RRF_K: int = Field(
+        default=60,
+        description="Reciprocal Rank Fusion smoothing constant k",
     )
     RERANKER_TOP_N: int = Field(
         default=5,

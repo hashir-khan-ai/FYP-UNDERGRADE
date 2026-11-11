@@ -10,3 +10,4 @@ pytest-asyncio==0.25.0    # Async test execution support for FastAPI TestClient
 
 # Evaluation Framework
 ragas==0.2.10             # RAG evaluation metrics (faithfulness, answer relevance, context precision)
+

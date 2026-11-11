@@ -26,3 +26,4 @@ Internal audit validated protected disclosure allegations regarding algorithmic 
 
 ### Clause AUDIT-CONF-2.4 (Executive Remediation Oversight)
 All documentation and interview transcripts concerning Case WB-2024-09 are sealed under executive privilege, accessible exclusively by the Group Chief Internal Auditor and external regulatory legal counsel.
+

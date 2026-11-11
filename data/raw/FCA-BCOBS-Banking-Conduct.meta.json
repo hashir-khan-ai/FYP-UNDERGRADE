@@ -1,0 +1,8 @@
+{
+  "doc_id": "DOC-FCA-BCOBS-2024",
+  "title": "Financial Conduct Authority (FCA) - Banking: Conduct of Business Sourcebook (BCOBS)",
+  "allowed_roles": ["analyst", "manager", "auditor"],
+  "doc_type": "PUBLIC_REGULATION",
+  "jurisdiction": "UK_FCA",
+  "version": "2024.1"
+}

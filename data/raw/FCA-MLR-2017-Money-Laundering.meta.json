@@ -1,0 +1,8 @@
+{
+  "doc_id": "DOC-UK-MLR-2017",
+  "title": "The Money Laundering, Terrorist Financing and Transfer of Funds Regulations 2017",
+  "allowed_roles": ["analyst", "manager", "auditor"],
+  "doc_type": "PUBLIC_REGULATION",
+  "jurisdiction": "UK_FCA",
+  "version": "2017.3"
+}

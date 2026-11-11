@@ -31,3 +31,4 @@ streamlit==1.41.1         # Interactive local web UI for multi-role compliance c
 
 # Document Parsing
 pypdf==5.1.0              # Pure-Python PDF extraction for raw regulatory texts
+beautifulsoup4==4.12.3    # Clean HTML document parsing and table extraction

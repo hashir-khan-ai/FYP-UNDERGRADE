@@ -109,13 +109,73 @@ CREATE TABLE IF NOT EXISTS llm_cache (
 );
 
 CREATE INDEX IF NOT EXISTS idx_cache_prompt_hash ON llm_cache(prompt_hash);
+
+-- 8. LLM Calls Telemetry (Spend Guard & Audit)
+-- The first six telemetry columns mirror the Phase 1 table. The remaining
+-- columns implement the DATABASE.md contract and are also added to existing
+-- databases by apply_migrations() below.
+CREATE TABLE IF NOT EXISTS llm_calls (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    profile TEXT NOT NULL,
+    model TEXT NOT NULL,
+    prompt_tokens INTEGER DEFAULT 0,
+    completion_tokens INTEGER DEFAULT 0,
+    total_tokens INTEGER DEFAULT 0,
+    latency_ms REAL NOT NULL,
+    cache_hit INTEGER DEFAULT 0,
+    call_status TEXT NOT NULL DEFAULT 'success',
+    error_message TEXT,
+    audit_id INTEGER,
+    session_id TEXT,
+    step TEXT NOT NULL DEFAULT 'answer',
+    llm_profile TEXT NOT NULL DEFAULT 'mock',
+    prompt_version TEXT NOT NULL DEFAULT 'v1',
+    cached INTEGER NOT NULL DEFAULT 0,
+    json_repair_attempted INTEGER NOT NULL DEFAULT 0,
+    fallback_used INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_llm_calls_created_at ON llm_calls(created_at);
 """
+
+# Additive migrations for databases created by Phase 1. SQLite has no
+# "ADD COLUMN IF NOT EXISTS", so column presence is checked first. Only static
+# identifiers from this module are interpolated here; user data never is.
+_LLM_CALLS_EXTRA_COLUMNS: dict[str, str] = {
+    "audit_id": "INTEGER",
+    "session_id": "TEXT",
+    "step": "TEXT NOT NULL DEFAULT 'answer'",
+    "llm_profile": "TEXT NOT NULL DEFAULT 'mock'",
+    "prompt_version": "TEXT NOT NULL DEFAULT 'v1'",
+    "cached": "INTEGER NOT NULL DEFAULT 0",
+    "json_repair_attempted": "INTEGER NOT NULL DEFAULT 0",
+    "fallback_used": "INTEGER NOT NULL DEFAULT 0",
+}
+
+
+def apply_migrations(conn: sqlite3.Connection) -> None:
+    """Apply additive schema migrations to an existing SQLite database."""
+    cur = conn.cursor()
+    cur.execute("PRAGMA table_info(llm_calls);")
+    existing = {row[1] for row in cur.fetchall()}
+    if not existing:
+        return
+
+    for column, ddl in _LLM_CALLS_EXTRA_COLUMNS.items():
+        if column not in existing:
+            cur.execute(f"ALTER TABLE llm_calls ADD COLUMN {column} {ddl};")
+
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_llm_calls_step ON llm_calls(step);")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_llm_calls_profile ON llm_calls(llm_profile);")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_llm_calls_audit_id ON llm_calls(audit_id);")
 
 
 def init_db(db_path: str | None = None) -> None:
-    """Initialize database schema."""
+    """Initialize database schema and apply additive migrations."""
     with get_db_connection(db_path) as conn:
         conn.executescript(SCHEMA_DDL)
+        apply_migrations(conn)
 
 
 if __name__ == "__main__":

@@ -2,19 +2,36 @@
 
 import os
 import sqlite3
+import tempfile
 from collections.abc import Generator
 from pathlib import Path
 from typing import Any
+
 import pytest
 
 # Force the zero-quota test environment BEFORE importing application settings.
+# A file-backed database is used because every SQLite ``:memory:`` connection is
+# a separate database, which would make the LLM cache tests meaningless.
+_TEST_DB_PATH = Path(tempfile.gettempdir()) / "enterprise_rag_pytest.db"
+for _suffix in ("", "-wal", "-shm"):
+    try:
+        Path(str(_TEST_DB_PATH) + _suffix).unlink()
+    except FileNotFoundError:
+        pass
+
 os.environ["APP_ENV"] = "test"
 os.environ["LLM_PROFILE"] = "mock"
-os.environ["DATABASE_PATH"] = ":memory:"
+os.environ["DATABASE_PATH"] = str(_TEST_DB_PATH)
+os.environ["LLM_MAX_RPM"] = "1000"
 
-from src.db.migrations import SCHEMA_DDL  # noqa: E402
+from src.db.migrations import SCHEMA_DDL, init_db  # noqa: E402
 from src.db.repository import Repository  # noqa: E402
 from src.config import settings  # noqa: E402
+from src.core.spend_guard import spend_guard  # noqa: E402
+from src.ingestion.embeddings import FakeEmbeddingGenerator  # noqa: E402
+from src.rag.baseline import baseline_pipeline, MockCrossEncoderReranker  # noqa: E402
+
+init_db()
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -22,6 +39,23 @@ def _force_mock_llm_profile() -> None:
     """Fail the session immediately if tests could reach a live LLM."""
     assert settings.LLM_PROFILE == "mock"
     assert settings.llm.is_mock is True
+
+
+@pytest.fixture(autouse=True)
+def _configure_test_pipeline() -> Generator[None, None, None]:
+    """Configure fast mock embeddings and reranker for zero-download testing."""
+    spend_guard.reset()
+    orig_embedder = baseline_pipeline.qdrant.embedder
+    orig_reranker = baseline_pipeline.reranker
+
+    baseline_pipeline.qdrant.embedder = FakeEmbeddingGenerator()
+    baseline_pipeline.reranker = MockCrossEncoderReranker()
+
+    yield
+
+    baseline_pipeline.qdrant.embedder = orig_embedder
+    baseline_pipeline.reranker = orig_reranker
+    spend_guard.reset()
 
 
 class MockLLMResponse:
