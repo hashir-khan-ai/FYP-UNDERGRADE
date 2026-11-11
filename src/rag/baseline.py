@@ -3,6 +3,10 @@
 Phase 3 adds server-side role filtering. The role is always supplied by the
 authenticated session, applied to both indexes before fusion, and re-checked
 after re-ranking as defence in depth.
+
+Phase 5 adds the corrective grader (ENABLE_CORRECTIVE_GRADER). When enabled it
+runs after re-ranking on every retrieval path. RBAC is applied before and after
+the grader; the grader never sees or reveals restricted content.
 """
 
 import logging
@@ -94,6 +98,19 @@ class BaselineRAGResponse(BaseModel):
     # Per-step observability for the split route. Empty on the baseline path so
     # router-off behaviour is byte-identical.
     step_timings: list[dict[str, Any]] = Field(default_factory=list)
+    # Phase 5 corrective grader observability. None when grader is disabled so
+    # grader-off behaviour is byte-identical to Phase 4.
+    grader_path: str | None = None
+    grader_relevant_count: int = 0
+    grader_ambiguous_count: int = 0
+    grader_irrelevant_count: int = 0
+    grader_rewrite_used: bool = False
+    grader_rewritten_query: str | None = None
+    grader_refused: bool = False
+    grader_refusal_reason: str = ""
+    grader_calls: int = 0
+    grader_tokens: int = 0
+    grader_latency_ms: float = 0.0
 
 
 @dataclass

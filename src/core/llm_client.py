@@ -617,8 +617,24 @@ class ResilientLLMClient:
             )
         if "route" in lowered or "router" in lowered:
             return '{"route": "SINGLE_SEARCH", "reasoning": "Standard regulatory query"}'
+        # Grader: return a valid GraderOutput JSON for all supplied chunk_ids.
+        if '"grades"' in lowered or ("grade" in lowered and "chunk_id" in lowered):
+            grades = [
+                {"chunk_id": cid, "label": "relevant", "reason": "Mock: passage answers query"}
+                for cid in chunk_ids[:5]
+            ]
+            return '{"grades": ' + json.dumps(grades) + "}"
+        # Rewrite prompt: return a RewriteOutput JSON.
+        if "rewritten_query" in lowered:
+            match = re.search(r"<user_question>\s*(.*?)\s*</user_question>", prompt, re.DOTALL)
+            question = match.group(1).strip() if match else ""
+            return json.dumps({"rewritten_query": question})
         if "relevance" in lowered or "grader" in lowered:
-            return '{"is_relevant": true, "relevance_score": 0.95, "reasoning": "Passage directly answers query"}'
+            grades = [
+                {"chunk_id": cid, "label": "relevant", "reason": "Mock: passage answers query"}
+                for cid in chunk_ids[:5]
+            ]
+            return '{"grades": ' + json.dumps(grades) + "}"
         return "Mock regulatory compliance response strictly generated offline."
 
 

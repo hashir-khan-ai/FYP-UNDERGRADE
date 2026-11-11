@@ -216,6 +216,52 @@ class Settings(BaseSettings):
         description="Hard cap on hybrid retrieval calls per request",
     )
 
+    # Phase 5 corrective grader. Thresholds apply to cross-encoder scores after
+    # sigmoid normalisation when the re-ranker emits raw logits.
+    GRADER_MIN_RELEVANT_PASSAGES: int = Field(
+        default=1,
+        ge=1,
+        description="Relevant passages required before generation; below this the query is retried",
+    )
+    GRADER_MAX_AMBIGUOUS_KEPT: int = Field(
+        default=2,
+        ge=0,
+        description="Ambiguous passages that may be kept alongside relevant ones",
+    )
+    GRADER_MAX_CALLS_PER_REQUEST: int = Field(
+        default=2,
+        ge=1,
+        le=4,
+        description="Hard cap on grader LLM calls per request (first pass + one retry)",
+    )
+    GRADER_SHORTCUT_ENABLED: bool = Field(
+        default=True,
+        description="Skip the grading LLM call when cross-encoder scores are decisive",
+    )
+    GRADER_SHORTCUT_KEEP_SCORE: float = Field(
+        default=0.85,
+        ge=0.0,
+        le=1.0,
+        description="Top score at or above which the shortcut may keep passages ungraded",
+    )
+    GRADER_SHORTCUT_MEDIUM_SCORE: float = Field(
+        default=0.65,
+        ge=0.0,
+        le=1.0,
+        description="Score a passage must reach to count towards the shortcut keep minimum",
+    )
+    GRADER_SHORTCUT_REJECT_SCORE: float = Field(
+        default=0.15,
+        ge=0.0,
+        le=1.0,
+        description="If every passage scores below this, skip grading and go to rewrite/refuse",
+    )
+    GRADER_MAX_REWRITE_CHARS: int = Field(
+        default=300,
+        ge=50,
+        description="Maximum length of a rewritten query accepted by the grader retry",
+    )
+
     # Local demo authentication
     AUTH_TOKEN_TTL_MINUTES: int = Field(
         default=60,
