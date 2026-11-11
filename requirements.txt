@@ -1,0 +1,33 @@
+# ==============================================================================
+# Production Dependencies for Enterprise Banking RAG Assistant
+# Python Version: 3.11+ / 3.12
+# ==============================================================================
+
+# API Framework & Server
+fastapi==0.115.6          # High-performance REST API gateway with Pydantic v2 support
+uvicorn==0.34.0           # Standard ASGI server for FastAPI execution
+python-multipart==0.0.20  # Multipart form parsing for API requests
+
+# Data Validation & Environment Settings
+pydantic==2.10.4          # Strict data modeling, input validation, and schema generation
+pydantic-settings==2.7.1  # Environment variable parsing from .env with type coercion
+
+# HTTP Client & OpenAI-Compatible Gateway
+httpx==0.28.1             # Async and sync HTTP client with connection pooling and timeouts
+
+# Vector Storage & Search
+qdrant-client==1.12.1     # In-process embedded vector database with native role payload filtering
+rank-bm25==0.2.2          # Pure-Python BM25 lexical search implementation for hybrid retrieval
+
+# Local CPU Embeddings & Re-ranking
+sentence-transformers==3.3.1  # In-process CPU inference for BGE-small embeddings and MiniLM re-ranker
+
+# Pipeline Orchestration
+langchain-core==0.3.29    # Core abstractions for prompts, messages, and output parsers
+langgraph==0.2.60         # Directed state graph for cyclical corrective retries and ablation toggles
+
+# Presentation UI
+streamlit==1.41.1         # Interactive local web UI for multi-role compliance chat
+
+# Document Parsing
+pypdf==5.1.0              # Pure-Python PDF extraction for raw regulatory texts

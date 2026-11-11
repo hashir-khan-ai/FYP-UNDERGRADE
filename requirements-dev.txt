@@ -1,0 +1,12 @@
+# ==============================================================================
+# Development, Testing, and Evaluation Dependencies
+# ==============================================================================
+
+-r requirements.txt
+
+# Testing Framework
+pytest==8.3.4             # Robust unit and integration testing runner
+pytest-asyncio==0.25.0    # Async test execution support for FastAPI TestClient
+
+# Evaluation Framework
+ragas==0.2.10             # RAG evaluation metrics (faithfulness, answer relevance, context precision)
