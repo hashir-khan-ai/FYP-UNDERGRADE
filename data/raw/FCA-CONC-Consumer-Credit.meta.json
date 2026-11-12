@@ -1,0 +1,11 @@
+{
+  "doc_id": "DOC-FCA-CONC-2024",
+  "title": "Financial Conduct Authority - Consumer Credit Sourcebook (CONC)",
+  "allowed_roles": ["analyst", "manager", "auditor"],
+  "doc_type": "PUBLIC_REGULATION",
+  "jurisdiction": "UK_FCA",
+  "version": "2024.1",
+  "source": "https://www.handbook.fca.org.uk/handbook/CONC/",
+  "licence": "Open Government Licence v3.0 (UK OGL)"
+}
+

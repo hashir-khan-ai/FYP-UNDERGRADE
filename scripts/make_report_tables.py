@@ -65,6 +65,11 @@ def _fmt_ci(ci_dict: dict[str, Any] | None) -> str:
     return f"[{ci_dict.get('ci_low', 0.0):.3f}, {ci_dict.get('ci_high', 0.0):.3f}]"
 
 
+def _fmt_optional(value: float | None, digits: int = 4) -> str:
+    """Format an optional metric, rendering ``None`` as ``n/a``."""
+    return "n/a" if value is None else f"{float(value):.{digits}f}"
+
+
 def generate_markdown_table(payload: dict[str, Any]) -> str:
     """Format the ablation result payload as a dissertation-ready Markdown report."""
     profile = str(payload.get("llm_profile", "unknown"))
@@ -102,8 +107,13 @@ def generate_markdown_table(payload: dict[str, Any]) -> str:
         [
             "## 1. Main Ablation Matrix",
             "",
-            "| Config | Mode / Status | $n$ | Recall@1 | Recall@3 | Recall@5 (95% CI) | MRR | nDCG@5 (95% CI) | Answer F1 | Cit. Validity | Cit. Support | CRR (Refusal) | FRR | Leakage Rate | Route Acc. | Latency Med / p95 (ms) | Calls / Query | Tokens / Query |",
-            "| :--- | :--- | ---: | ---: | ---: | :--- | ---: | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | :--- | ---: | ---: |",
+            "Routing accuracy is `n/a` where the router is off or no routing labels apply. "
+            "Cost columns separate **live** (uncached, quota-consuming) calls, **cached** calls, and "
+            "refusals that made **no LLM call**; tokens are counted from live calls only. "
+            "Uncached latency uses only queries with zero cache hits.",
+            "",
+            "| Config | Mode / Status | $n$ | Recall@1 | Recall@3 | Recall@5 (95% CI) | MRR | nDCG@5 (95% CI) | Answer F1 | Cit. Validity | Cit. Support | CRR (Refusal) | FRR | Leakage Rate | Route Acc. | Latency Med / p95 (ms) | Uncached Latency Med (ms, n) | Live Calls / Query | Cached Calls / Query | Refusals w/o LLM | Live Tokens / Query |",
+            "| :--- | :--- | ---: | ---: | ---: | :--- | ---: | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | :--- | :--- | ---: | ---: | ---: | ---: |",
         ]
     )
 
@@ -118,6 +128,10 @@ def generate_markdown_table(payload: dict[str, Any]) -> str:
         rec5_str = f"{m['recall@5']:.4f} {_fmt_ci(ci.get('recall@5'))}"
         ndcg5_str = f"{m['ndcg@5']:.4f} {_fmt_ci(ci.get('ndcg@5'))}"
         lat_str = f"{m['latency_median_ms']:.1f} / {m['latency_p95_ms']:.1f}"
+        unc = m.get("latency_uncached_median_ms")
+        unc_str = (
+            f"{unc:.1f} (n={cfg.get('n_uncached_latency', 0)})" if unc is not None else "n/a (n=0)"
+        )
 
         lines.append(
             f"| `{cfg['config_name']}` | {mode_tag} | {cfg['n_total']} | "
@@ -125,8 +139,10 @@ def generate_markdown_table(payload: dict[str, Any]) -> str:
             f"{m['mrr']:.4f} | {ndcg5_str} | {m['answer_correctness']:.4f} | "
             f"{m['citation_validity_rate']:.4f} | {m['citation_support_rate']:.4f} | "
             f"{m['correct_refusal_rate']:.4f} | {m['false_refusal_rate']:.4f} | "
-            f"{m['leakage_rate']:.4f} | {m['routing_accuracy']:.4f} | "
-            f"{lat_str} | {m['llm_calls_per_query']:.2f} | {m['tokens_per_query']:.1f} |"
+            f"{m['leakage_rate']:.4f} | {_fmt_optional(m.get('routing_accuracy'))} | "
+            f"{lat_str} | {unc_str} | {m.get('live_calls_per_query', 0.0):.2f} | "
+            f"{m.get('cached_calls_per_query', 0.0):.2f} | {m.get('refusals_without_llm', 0)} | "
+            f"{m.get('live_tokens_per_query', 0.0):.1f} |"
         )
 
     lines.extend(
@@ -201,8 +217,13 @@ def write_csv_table(payload: dict[str, Any], csv_path: Path) -> None:
         "routing_accuracy",
         "latency_median_ms",
         "latency_p95_ms",
-        "llm_calls_per_query",
-        "tokens_per_query",
+        "latency_uncached_median_ms",
+        "latency_uncached_p95_ms",
+        "live_calls_per_query",
+        "cached_calls_per_query",
+        "refusals_without_llm",
+        "live_tokens_per_query",
+        "cached_tokens_per_query",
     ]
 
     with open(csv_path, "w", encoding="utf-8", newline="") as handle:
@@ -214,6 +235,11 @@ def write_csv_table(payload: dict[str, Any], csv_path: Path) -> None:
             rec5_ci = ci.get("recall@5", {})
             ndcg5_ci = ci.get("ndcg@5", {})
             run_type = "HARNESS_CHECK_ONLY" if profile == "mock" else f"LIVE_{profile.upper()}"
+            route_acc_str = (
+                f"{m['routing_accuracy']:.4f}"
+                if m.get("routing_accuracy") is not None
+                else "n/a"
+            )
             writer.writerow(
                 {
                     "config_name": cfg["config_name"],
@@ -245,13 +271,110 @@ def write_csv_table(payload: dict[str, Any], csv_path: Path) -> None:
                     "correct_refusal_rate": m["correct_refusal_rate"],
                     "false_refusal_rate": m["false_refusal_rate"],
                     "leakage_rate": m["leakage_rate"],
-                    "routing_accuracy": m["routing_accuracy"],
+                    "routing_accuracy": route_acc_str,
                     "latency_median_ms": m["latency_median_ms"],
                     "latency_p95_ms": m["latency_p95_ms"],
-                    "llm_calls_per_query": m["llm_calls_per_query"],
-                    "tokens_per_query": m["tokens_per_query"],
+                    "latency_uncached_median_ms": (
+                        m.get("latency_uncached_median_ms")
+                        if m.get("latency_uncached_median_ms") is not None
+                        else ""
+                    ),
+                    "latency_uncached_p95_ms": (
+                        m.get("latency_uncached_p95_ms")
+                        if m.get("latency_uncached_p95_ms") is not None
+                        else ""
+                    ),
+                    "live_calls_per_query": m.get("live_calls_per_query", 0.0),
+                    "cached_calls_per_query": m.get("cached_calls_per_query", 0.0),
+                    "refusals_without_llm": m.get("refusals_without_llm", 0),
+                    "live_tokens_per_query": m.get("live_tokens_per_query", 0.0),
+                    "cached_tokens_per_query": m.get("cached_tokens_per_query", 0.0),
                 }
             )
+
+
+def generate_latex_table(payload: dict[str, Any]) -> str:
+    """Format the ablation result payload as publication-ready LaTeX tables for the dissertation."""
+    profile = str(payload.get("llm_profile", "unknown"))
+    model = str(payload.get("llm_model", "unknown"))
+    banner = str(payload.get("harness_mode_banner", ""))
+    q_count = int(payload.get("questions_evaluated", 0))
+    corpus = payload.get("corpus", {})
+    docs_cnt = corpus.get("documents_count", 0)
+    chunks_cnt = corpus.get("chunks_count", 0)
+
+    rows = []
+    eff_rows = []
+    for cfg in payload.get("configurations", []):
+        cname = cfg["config_name"]
+        clean_name = cname.replace("_", r"\_")
+        m = cfg["metrics"]
+
+        rec5 = f"{float(m['recall@5']):.3f}"
+        ndcg5 = f"{float(m['ndcg@5']):.3f}"
+        ans = f"{float(m['answer_correctness']):.3f}"
+        crr = f"{float(m['correct_refusal_rate']):.3f}"
+        leak = f"{float(m['leakage_rate']):.3f}"
+        route = "n/a" if m.get("routing_accuracy") is None else f"{float(m['routing_accuracy']):.3f}"
+
+        med_lat = f"{float(m['latency_median_ms']):.1f}"
+        p95_lat = f"{float(m['latency_p95_ms']):.1f}"
+        live_calls = f"{float(m.get('live_calls_per_query', 0.0)):.2f}"
+        cached_calls = f"{float(m.get('cached_calls_per_query', 0.0)):.2f}"
+        live_tok = f"{float(m.get('live_tokens_per_query', 0.0)):.1f}"
+
+        if cfg.get("is_demonstration_only"):
+            clean_name = rf"\textit{{{clean_name}*}}"
+
+        rows.append(
+            f"  {clean_name:<24} & {rec5:>7} & {ndcg5:>7} & {ans:>7} & {crr:>6} & {leak:>7} & {route:>9} & {live_calls:>9} \\\\"
+        )
+        eff_rows.append(
+            f"  {clean_name:<24} & {med_lat:>8} & {p95_lat:>8} & {live_calls:>9} & {cached_calls:>10} & {live_tok:>10} \\\\"
+        )
+
+    table_rows = "\n".join(rows)
+    table_eff_rows = "\n".join(eff_rows)
+
+    latex_code = f"""% Auto-generated by scripts/make_report_tables.py
+% LLM Profile: {profile} ({model}) | Evaluated Questions: {q_count}
+% Corpus: {docs_cnt} documents, {chunks_cnt} chunks
+% Mode: {banner}
+
+\\begin{{table*}}[htbp]
+\\centering
+\\small
+\\caption{{Architecture Layer Ablation Benchmark Results ({profile} profile, $n={q_count}$ reviewed questions)}}
+\\label{{tab:ablation_results}}
+\\begin{{tabular}}{{lcccccccc}}
+\\toprule
+\\textbf{{Configuration}} & \\textbf{{Recall@5}} & \\textbf{{nDCG@5}} & \\textbf{{Ans F1}} & \\textbf{{CRR}} & \\textbf{{Leakage}} & \\textbf{{Route Acc}} & \\textbf{{Live Calls/Q}} \\\\
+\\midrule
+{table_rows}
+\\bottomrule
+\\end{{tabular}}
+\\vspace{{1mm}}
+\\begin{{flushleft}}
+\\footnotesize
+\\textit{{Note:}} CRR = Correct Refusal Rate on unanswerable/restricted queries. Leakage = unauthorized retrieval rate (target strictly 0.000). Route Acc is reported as n/a where the router is inactive. *RBAC\\_OFF\\_DEMO is a demonstration configuration highlighting vulnerability in the absence of server-side filtering.
+\\end{{flushleft}}
+\\end{{table*}}
+
+\\begin{{table}}[htbp]
+\\centering
+\\small
+\\caption{{Latency and Token Efficiency Across Architecture Layers}}
+\\label{{tab:ablation_efficiency}}
+\\begin{{tabular}}{{lccccc}}
+\\toprule
+\\textbf{{Configuration}} & \\textbf{{Med Lat (ms)}} & \\textbf{{p95 Lat (ms)}} & \\textbf{{Live Calls/Q}} & \\textbf{{Cache Calls/Q}} & \\textbf{{Live Tok/Q}} \\\\
+\\midrule
+{table_eff_rows}
+\\bottomrule
+\\end{{tabular}}
+\\end{{table}}
+"""
+    return latex_code
 
 
 def maybe_write_chart(payload: dict[str, Any], chart_path: Path) -> bool:
@@ -304,6 +427,7 @@ def main() -> int:
     payload = load_and_validate_ablation_files(input_paths)
 
     md_text = generate_markdown_table(payload)
+    tex_text = generate_latex_table(payload)
     primary_dir = Path(args.out_dir)
     secondary_dir = Path("evaluation/results")
 
@@ -311,12 +435,16 @@ def main() -> int:
         target_dir.mkdir(parents=True, exist_ok=True)
         md_file = target_dir / "ablation_table.md"
         csv_file = target_dir / "ablation_table.csv"
+        tex_file = target_dir / "dissertation_tables.tex"
+        tex_file_alias = target_dir / "ablation_table.tex"
         md_file.write_text(md_text, encoding="utf-8")
+        tex_file.write_text(tex_text, encoding="utf-8")
+        tex_file_alias.write_text(tex_text, encoding="utf-8")
         write_csv_table(payload, csv_file)
 
     chart_written = maybe_write_chart(payload, primary_dir / "ablation_chart.png")
-    print(f"[REPORT] Wrote {primary_dir / 'ablation_table.md'} and {primary_dir / 'ablation_table.csv'}")
-    print(f"[REPORT] Wrote {secondary_dir / 'ablation_table.md'} and {secondary_dir / 'ablation_table.csv'}")
+    print(f"[REPORT] Wrote {primary_dir / 'ablation_table.md'}, {primary_dir / 'ablation_table.csv'} and {primary_dir / 'dissertation_tables.tex'}")
+    print(f"[REPORT] Wrote {secondary_dir / 'ablation_table.md'}, {secondary_dir / 'ablation_table.csv'} and {secondary_dir / 'dissertation_tables.tex'}")
     if chart_written:
         print(f"[REPORT] Wrote chart {primary_dir / 'ablation_chart.png'}")
     else:

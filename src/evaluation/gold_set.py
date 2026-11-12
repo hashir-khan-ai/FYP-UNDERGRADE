@@ -199,3 +199,39 @@ def validate_gold_set_file(
         type_quota_errors=type_quota_errors,
     )
 
+
+
+DEFAULT_MIN_REVIEWED: int = 40
+
+
+class InsufficientReviewedQuestionsError(RuntimeError):
+    """Raised when a final ablation is requested without enough reviewed questions."""
+
+
+def count_by_status(items: list[GoldQuestionItem]) -> dict[str, int]:
+    """Return ``{"reviewed": n, "draft": m}`` for a list of gold questions."""
+    counts = Counter(item.status for item in items)
+    return {"reviewed": counts.get("reviewed", 0), "draft": counts.get("draft", 0)}
+
+
+def select_reviewed_questions(
+    items: list[GoldQuestionItem],
+    min_reviewed: int = DEFAULT_MIN_REVIEWED,
+) -> list[GoldQuestionItem]:
+    """Return only human-reviewed questions, refusing if fewer than ``min_reviewed``.
+
+    Draft questions (including every LLM- or agent-generated one) are never
+    used in a final ablation run.
+
+    Raises:
+        InsufficientReviewedQuestionsError: if fewer than ``min_reviewed``
+            questions carry ``status == "reviewed"``.
+    """
+    reviewed = [item for item in items if item.status == "reviewed"]
+    if len(reviewed) < min_reviewed:
+        raise InsufficientReviewedQuestionsError(
+            f"Final ablation refused: {len(reviewed)} reviewed question(s) found, "
+            f"at least {min_reviewed} required. Review gold questions by hand and set "
+            f'"status": "reviewed" (draft count: {len(items) - len(reviewed)}).'
+        )
+    return reviewed

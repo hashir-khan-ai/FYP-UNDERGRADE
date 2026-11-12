@@ -1,0 +1,11 @@
+{
+  "doc_id": "DOC-FCA-MAR-2024",
+  "title": "Financial Conduct Authority - Market Conduct Sourcebook (MAR)",
+  "allowed_roles": ["analyst", "manager", "auditor"],
+  "doc_type": "PUBLIC_REGULATION",
+  "jurisdiction": "UK_FCA",
+  "version": "2024.1",
+  "source": "https://www.handbook.fca.org.uk/handbook/MAR/",
+  "licence": "Open Government Licence v3.0 (UK OGL)"
+}
+

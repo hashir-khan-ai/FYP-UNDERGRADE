@@ -362,3 +362,186 @@ def test_ablation_suite_records_profile_and_resumes_cleanly(tmp_path: Path) -> N
     csv_file = out_dir / "ablation_table.csv"
     write_csv_table(payload_2, csv_file)
     assert csv_file.exists()
+
+
+# ==============================================================================
+# 5. Phase 7b: Routing accuracy "n/a", cost separation, and review gates
+# ==============================================================================
+def test_routing_accuracy_na_when_router_off_and_cost_separation() -> None:
+    spec_a0 = ABLATION_MATRIX["A0_baseline"]  # router off
+    spec_a3 = ABLATION_MATRIX["A3_router"]    # router on
+
+    sample_rows = [
+        {
+            "id": "Q1",
+            "type": "single_fact",
+            "expected_behaviour": "answer",
+            "router_enabled": False,
+            "route_used": "SINGLE_SEARCH",
+            "expected_route": "SINGLE_SEARCH",
+            "route_correct": None,
+            "is_refusal": False,
+            "correct_refusal": 0.0,
+            "false_refusal": 0.0,
+            "leaked": 0.0,
+            "recall@1": 1.0,
+            "recall@3": 1.0,
+            "recall@5": 1.0,
+            "mrr": 1.0,
+            "ndcg@5": 1.0,
+            "answer_correctness": 0.9,
+            "citation_validity": 1.0,
+            "citation_support": 1.0,
+            "faithfulness": None,
+            "context_precision": None,
+            "latency_ms": 10.0,
+            "live_calls": 1,
+            "cached_calls": 0,
+            "live_tokens": 120,
+            "cached_tokens": 0,
+            "refused_without_llm": False,
+        },
+        {
+            "id": "Q2",
+            "type": "unanswerable",
+            "expected_behaviour": "refuse",
+            "router_enabled": False,
+            "route_used": "SINGLE_SEARCH",
+            "expected_route": "REFUSE",
+            "route_correct": None,
+            "is_refusal": True,
+            "correct_refusal": 1.0,
+            "false_refusal": 0.0,
+            "leaked": 0.0,
+            "recall@1": 0.0,
+            "recall@3": 0.0,
+            "recall@5": 0.0,
+            "mrr": 0.0,
+            "ndcg@5": 0.0,
+            "answer_correctness": 1.0,
+            "citation_validity": 1.0,
+            "citation_support": 1.0,
+            "faithfulness": None,
+            "context_precision": None,
+            "latency_ms": 2.0,
+            "live_calls": 0,
+            "cached_calls": 0,
+            "live_tokens": 0,
+            "cached_tokens": 0,
+            "refused_without_llm": True,
+        },
+        {
+            "id": "Q3",
+            "type": "single_fact",
+            "expected_behaviour": "answer",
+            "router_enabled": False,
+            "route_used": "SINGLE_SEARCH",
+            "expected_route": "SINGLE_SEARCH",
+            "route_correct": None,
+            "is_refusal": False,
+            "correct_refusal": 0.0,
+            "false_refusal": 0.0,
+            "leaked": 0.0,
+            "recall@1": 1.0,
+            "recall@3": 1.0,
+            "recall@5": 1.0,
+            "mrr": 1.0,
+            "ndcg@5": 1.0,
+            "answer_correctness": 0.95,
+            "citation_validity": 1.0,
+            "citation_support": 1.0,
+            "faithfulness": None,
+            "context_precision": None,
+            "latency_ms": 1.0,
+            "live_calls": 0,
+            "cached_calls": 1,
+            "live_tokens": 0,
+            "cached_tokens": 110,
+            "refused_without_llm": False,
+        },
+    ]
+
+    agg_a0 = aggregate_ablation_rows(spec_a0, sample_rows)
+    assert agg_a0["metrics"]["routing_accuracy"] is None  # Must be None, not 0.6!
+    assert agg_a0["metrics"]["live_calls_per_query"] == pytest.approx(1 / 3, abs=0.01)
+    assert agg_a0["metrics"]["cached_calls_per_query"] == pytest.approx(1 / 3, abs=0.01)
+    assert agg_a0["metrics"]["refusals_without_llm"] == 1
+    assert agg_a0["metrics"]["live_tokens_per_query"] == pytest.approx(40.0)
+
+    # When router is ON and items have route_correct values
+    sample_rows_a3 = [dict(r, router_enabled=True, route_correct=1.0) for r in sample_rows]
+    agg_a3 = aggregate_ablation_rows(spec_a3, sample_rows_a3)
+    assert agg_a3["metrics"]["routing_accuracy"] == 1.0
+
+    # In markdown output, None must render as "n/a"
+    mock_payload = {
+        "llm_profile": "mock",
+        "llm_model": "mock",
+        "harness_mode_banner": "HARNESS CHECK",
+        "date": "2026-11-12",
+        "questions_evaluated": 3,
+        "configurations": [agg_a0, agg_a3],
+    }
+    md_text = generate_markdown_table(mock_payload)
+    assert "| `A0_baseline` |" in md_text
+    assert "n/a" in md_text
+
+
+def test_final_ablation_requires_reviewed_gate(tmp_path: Path) -> None:
+    from scripts.run_ablation import enforce_reviewed_gate
+    from src.evaluation.gold_set import InsufficientReviewedQuestionsError
+
+    draft_items = [
+        GoldQuestionItem(
+            id=f"Q-{i}",
+            question=f"Question {i}?",
+            type="single_fact",
+            role_asking="analyst",
+            gold_chunk_ids=["DOC-BASEL-III-2023_BASEL-CAP-1.1"],
+            gold_doc="DOC-BASEL-III-2023",
+            clause="BASEL-CAP-1.1",
+            gold_answer="Answer.",
+            expected_behaviour="answer",
+            status="draft",
+        )
+        for i in range(10)
+    ]
+
+    p = tmp_path / "gold.jsonl"
+    p.write_text("\n".join(json.dumps(it.model_dump()) for it in draft_items), encoding="utf-8")
+
+    # Refuses when 0 reviewed items exist
+    with pytest.raises(InsufficientReviewedQuestionsError, match="Final ablation refused"):
+        enforce_reviewed_gate(p, draft_items, min_reviewed=5)
+
+    # Passes when >= min_reviewed items are reviewed
+    for it in draft_items[:5]:
+        it.status = "reviewed"
+    p.write_text("\n".join(json.dumps(it.model_dump()) for it in draft_items), encoding="utf-8")
+    reviewed_only = enforce_reviewed_gate(p, draft_items, min_reviewed=5)
+    assert len(reviewed_only) == 5
+    assert all(it.status == "reviewed" for it in reviewed_only)
+
+
+def test_corpus_manifest_validator(tmp_path: Path) -> None:
+    from scripts.corpus_manifest import inspect_document, add_template_sidecar
+    from src.ingestion.chunker import ClauseAwareChunker
+
+    # Document missing sidecar
+    test_doc = tmp_path / "TEST-DOC.md"
+    test_doc.write_text("# Test Document\n\n### Clause 1.1\nSome regulatory content.", encoding="utf-8")
+
+    chunker = ClauseAwareChunker()
+    res = inspect_document(test_doc, chunker)
+    assert res["is_complete"] is False
+    assert "source" in res["missing_fields"]
+
+    # Generate template
+    sidecar_p = add_template_sidecar(test_doc)
+    assert sidecar_p.is_file()
+
+    # Now inspect again
+    res2 = inspect_document(test_doc, chunker)
+    assert res2["is_complete"] is True
+    assert res2["chunk_count"] >= 1
+

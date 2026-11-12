@@ -270,7 +270,10 @@ def main() -> int:
 
     print("==============================================================================")
     print("RETRIEVAL EVALUATION SUMMARY (ZERO LLM CALLS, RBAC=ON)")
-    print(f"Documents: {doc_count} | Chunks: {len(chunks)} | Answerable questions: {len(answerable)}")
+    print(f"Corpus Scope      : {doc_count} documents, {len(chunks)} chunks")
+    print(f"Answerable Queries: {len(answerable)} evaluated across 4 modes")
+    if len(chunks) < 100:
+        print("WARNING           : corpus too small for meaningful retrieval comparison (< 100 chunks)")
     print("==============================================================================")
     for run_key, run_data in runs.items():
         hp_str = "ON" if run_data["enable_heading_path"] else "OFF"

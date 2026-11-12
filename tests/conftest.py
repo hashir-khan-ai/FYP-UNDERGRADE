@@ -28,6 +28,8 @@ os.environ["ENABLE_ADAPTIVE_ROUTER"] = "false"
 os.environ["ENABLE_CORRECTIVE_GRADER"] = "false"
 os.environ["ENABLE_XAI_OUTPUT"] = "false"
 os.environ["ENABLE_HEADING_PATH"] = "true"
+os.environ["HF_HUB_OFFLINE"] = "1"
+os.environ["TRANSFORMERS_OFFLINE"] = "1"
 
 from src.db.migrations import SCHEMA_DDL, init_db  # noqa: E402
 from src.db.repository import Repository  # noqa: E402

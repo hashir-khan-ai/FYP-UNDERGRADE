@@ -1,0 +1,11 @@
+{
+  "doc_id": "DOC-INT-POL-MAR-004",
+  "title": "Bank Internal Management Policy: Market Abuse Surveillance & Personal Account Dealing",
+  "allowed_roles": ["manager", "auditor"],
+  "doc_type": "INTERNAL_MANAGEMENT_POLICY",
+  "jurisdiction": "INTERNAL_SYNTHETIC",
+  "version": "2.2",
+  "source": "SYNTHETIC_DATASET (FYP Market Abuse Policy Fixture)",
+  "licence": "Educational / Academic Final Year Project (BSc COM6301)"
+}
+

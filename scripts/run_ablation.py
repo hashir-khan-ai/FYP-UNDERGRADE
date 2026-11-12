@@ -42,7 +42,14 @@ from src.evaluation.ablation import (
     evaluate_single_question,
     load_checkpoint_rows,
 )
-from src.evaluation.gold_set import GoldQuestionItem, load_gold_set
+from src.evaluation.gold_set import (
+    DEFAULT_MIN_REVIEWED,
+    GoldQuestionItem,
+    InsufficientReviewedQuestionsError,
+    load_gold_set,
+    select_reviewed_questions,
+    validate_gold_set_file,
+)
 from src.ingestion.chunker import ClauseAwareChunker, DocumentChunk
 from src.ingestion.indexer import BM25Indexer, QdrantIndexer
 from src.ingestion.loaders import DocumentLoader
@@ -57,6 +64,30 @@ DEFAULT_CONFIG_NAMES: tuple[str, ...] = (
     "A4_grader",
     "A5_full_xai",
 )
+
+
+def enforce_reviewed_gate(
+    gold_set_path: str | Path,
+    questions: list[GoldQuestionItem],
+    min_reviewed: int = DEFAULT_MIN_REVIEWED,
+) -> list[GoldQuestionItem]:
+    """Final-run gate: validated gold set and at least ``min_reviewed`` reviewed questions.
+
+    Returns only the reviewed questions; draft questions never enter a final run.
+
+    Raises:
+        InsufficientReviewedQuestionsError: when the gold set fails validation
+            (schema or missing chunk IDs) or has too few reviewed questions.
+    """
+    report = validate_gold_set_file(gold_set_path, min_per_type=0)
+    if report.schema_errors or report.missing_chunk_errors:
+        raise InsufficientReviewedQuestionsError(
+            "Final ablation refused: gold set failed validation "
+            f"({len(report.schema_errors)} schema error(s), "
+            f"{len(report.missing_chunk_errors)} missing chunk reference(s)). "
+            "Run scripts/validate_gold_set.py for details."
+        )
+    return select_reviewed_questions(questions, min_reviewed=min_reviewed)
 
 
 def _select_questions(questions: list[GoldQuestionItem], limit: int | None) -> list[GoldQuestionItem]:
@@ -120,6 +151,7 @@ def run_ablation_suite(
     mock_reranker: bool = False,
     cache_dir: Path = Path("evaluation/cache"),
     out_dir: Path = Path("evaluation/results"),
+    reviewed_only: bool = False,
 ) -> dict[str, Any]:
     """Execute the configured ablation rows and write checkpointed JSON results."""
     original_profile = settings.LLM_PROFILE
@@ -254,6 +286,12 @@ def run_ablation_suite(
                 if any(q.status == "draft" for q in questions)
                 else "reviewed"
             ),
+            "reviewed_only": reviewed_only,
+            "cost_note": (
+                "Cost figures separate live (uncached) calls, cached calls and refusals "
+                "without an LLM call. Configurations share one response cache, so later "
+                "rows may hit prompts cached by earlier rows; compare cost on live calls only."
+            ),
             "questions_evaluated": len(questions),
             "corpus": {
                 "documents_count": doc_count,
@@ -333,9 +371,29 @@ def main() -> int:
         default="evaluation/results",
         help="Output directory for ablation JSON artifacts.",
     )
+    parser.add_argument(
+        "--require-reviewed",
+        action="store_true",
+        help=(
+            "Final-run gate: evaluate ONLY questions with status 'reviewed' and refuse "
+            "to run unless at least --min-reviewed of them exist and the gold set validates."
+        ),
+    )
+    parser.add_argument(
+        "--min-reviewed",
+        type=int,
+        default=DEFAULT_MIN_REVIEWED,
+        help=f"Minimum reviewed questions for --require-reviewed (default: {DEFAULT_MIN_REVIEWED}).",
+    )
     args = parser.parse_args()
 
     questions = load_gold_set(args.gold_set)
+    if args.require_reviewed:
+        try:
+            questions = enforce_reviewed_gate(args.gold_set, questions, args.min_reviewed)
+        except InsufficientReviewedQuestionsError as exc:
+            print(f"[REFUSED] {exc}")
+            return 2
     selected = _select_questions(questions, args.limit)
     config_names = [c.strip() for c in args.configs.split(",") if c.strip()]
 
@@ -348,6 +406,7 @@ def main() -> int:
         run_judge=args.judge,
         mock_reranker=args.mock_reranker,
         out_dir=Path(args.out_dir),
+        reviewed_only=args.require_reviewed,
     )
 
     print("========================================================================================")
@@ -356,14 +415,15 @@ def main() -> int:
     print(f"Questions per config: {payload['questions_evaluated']} ({payload['gold_set_status_note']})")
     print("========================================================================================")
     header = (
-        f"{'Config':<16} {'Rec@5':>7} {'nDCG@5':>7} {'AnsF1':>7} "
-        f"{'CitVal':>7} {'CRR':>7} {'Leak':>7} {'Route':>7} {'MedMs':>7} {'Calls':>6}"
+        f"{'Config':<16} {'Rec@5':>7} {'nDCG@5':>7} {'AnsF1':>7} {'CitVal':>7} {'CRR':>7} "
+        f"{'Leak':>7} {'Route':>7} {'MedMs':>8} {'Live/q':>7} {'Cache/q':>8} {'RefNoLLM':>8} {'LiveTok/q':>10}"
     )
     print(header)
     print("-" * len(header))
     for cfg in payload["configurations"]:
         m = cfg["metrics"]
         tag = " [DEMO ONLY]" if cfg.get("is_demonstration_only") else ""
+        route_str = "n/a" if m["routing_accuracy"] is None else f"{m['routing_accuracy']:.4f}"
         print(
             f"{cfg['config_name']:<16} "
             f"{m['recall@5']:>7.4f} "
@@ -372,13 +432,17 @@ def main() -> int:
             f"{m['citation_validity_rate']:>7.4f} "
             f"{m['correct_refusal_rate']:>7.4f} "
             f"{m['leakage_rate']:>7.4f} "
-            f"{m['routing_accuracy']:>7.4f} "
-            f"{m['latency_median_ms']:>7.1f} "
-            f"{m['llm_calls_per_query']:>6.2f}{tag}"
+            f"{route_str:>7} "
+            f"{m['latency_median_ms']:>8.1f} "
+            f"{m['live_calls_per_query']:>7.2f} "
+            f"{m['cached_calls_per_query']:>8.2f} "
+            f"{m['refusals_without_llm']:>8d} "
+            f"{m['live_tokens_per_query']:>10.1f}{tag}"
         )
         if cfg.get("warning_banner"):
             print(f"  *** {cfg['warning_banner']} ***")
     print("========================================================================================")
+    print("Cost comparisons must use Live/q and LiveTok/q only; cached calls cost no quota.")
     return 0
 
 

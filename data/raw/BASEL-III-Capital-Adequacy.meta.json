@@ -4,5 +4,7 @@
   "allowed_roles": ["analyst", "manager", "auditor"],
   "doc_type": "PUBLIC_REGULATION",
   "jurisdiction": "BASEL_BCBS",
-  "version": "2023.1"
+  "version": "2023.1",
+  "source": "https://www.bis.org/bcbs/basel3.htm",
+  "licence": "Public Domain / BIS Open Academic Research"
 }

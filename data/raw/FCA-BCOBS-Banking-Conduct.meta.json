@@ -4,5 +4,7 @@
   "allowed_roles": ["analyst", "manager", "auditor"],
   "doc_type": "PUBLIC_REGULATION",
   "jurisdiction": "UK_FCA",
-  "version": "2024.1"
+  "version": "2024.1",
+  "source": "https://www.handbook.fca.org.uk/handbook/BCOBS/",
+  "licence": "Open Government Licence v3.0 (UK OGL)"
 }

@@ -37,6 +37,8 @@ from src.core.router import (
 from src.core.security import chunk_visible_to_role, normalize_role
 from src.core.spend_guard import spend_guard
 from src.core.xai import validate_cited_chunks
+from src.db.connection import get_db_connection
+from src.db.repository import Repository
 from src.evaluation.gold_set import GoldQuestionItem
 from src.evaluation.metrics import (
     answer_correctness_score,
@@ -277,6 +279,7 @@ def evaluate_single_question(
     t0 = time.perf_counter()
     calls_before = spend_guard.calls_count
     tokens_before = spend_guard.tokens_count
+    telemetry_floor = _telemetry_floor()
 
     role = normalize_role(item.role_asking)
     query = item.question
@@ -317,18 +320,21 @@ def evaluate_single_question(
         chunk_ids_used = list(result.chunk_ids_used)
 
     elapsed_ms = round((time.perf_counter() - t0) * 1000.0, 2)
-    router_calls = 1 if (decision is not None and decision.tokens_used > 0) else 0
-    router_tokens = int(decision.tokens_used) if decision is not None else 0
-    res_calls = (int(result.llm_stats.calls) + int(result.grader_calls)) if result is not None else 0
-    res_tokens = (
-        int(result.llm_stats.prompt_tokens)
-        + int(result.llm_stats.completion_tokens)
-        + int(result.grader_tokens)
-        if result is not None
-        else 0
-    )
-    llm_calls = max(0, spend_guard.calls_count - calls_before, router_calls + res_calls)
-    llm_tokens = max(0, spend_guard.tokens_count - tokens_before, router_tokens + res_tokens)
+    # Phase 7b: LLM usage is read from the llm_calls telemetry window, which
+    # records one row per gateway call with an explicit cache_hit flag. Live
+    # (uncached) and cached calls are therefore counted separately and
+    # consistently across configurations. The judge (if any) runs after this
+    # window so it never inflates pipeline cost.
+    usage = _read_usage_window(telemetry_floor)
+    live_calls = int(usage["live_calls"])
+    cached_calls = int(usage["cached_calls"])
+    live_tokens = int(usage["live_tokens"])
+    cached_tokens = int(usage["cached_tokens"])
+    if live_calls == 0 and cached_calls == 0:
+        # Telemetry write failures are swallowed by the gateway; fall back to
+        # the spend guard, which only counts uncached calls.
+        live_calls = max(0, spend_guard.calls_count - calls_before)
+        live_tokens = max(0, spend_guard.tokens_count - tokens_before)
 
     retrieved_ids = [s.chunk_id for s in sources if s.chunk_id]
     gold_ids = item.gold_chunk_ids
@@ -433,10 +439,18 @@ def evaluate_single_question(
         faithfulness_val = round(float(judge_out.faithfulness), 4)
         context_precision_val = round(float(judge_out.context_precision), 4)
 
-    # 7. Routing accuracy
-    expected_route_norm = _normalize_route_label(item.expected_route or "SINGLE_SEARCH")
+    # 7. Routing accuracy: only defined when the router actually ran AND the
+    # question carries a routing label. Otherwise it is None ("n/a"), never a
+    # misleading constant produced by comparing a fixed default route.
     actual_route_norm = _normalize_route_label(route_used)
-    route_correct = 1.0 if actual_route_norm == expected_route_norm else 0.0
+    if settings.ENABLE_ADAPTIVE_ROUTER and item.expected_route:
+        expected_route_norm: str | None = _normalize_route_label(item.expected_route)
+        route_correct: float | None = 1.0 if actual_route_norm == expected_route_norm else 0.0
+    else:
+        expected_route_norm = _normalize_route_label(item.expected_route) if item.expected_route else None
+        route_correct = None
+
+    refused_without_llm = bool(is_refusal and live_calls == 0 and cached_calls == 0)
 
     resolved_llm = settings.llm
     return {
@@ -446,6 +460,7 @@ def evaluate_single_question(
         "expected_behaviour": item.expected_behaviour,
         "llm_profile": resolved_llm.profile,
         "llm_model": resolved_llm.model,
+        "router_enabled": bool(settings.ENABLE_ADAPTIVE_ROUTER),
         "route_used": actual_route_norm,
         "expected_route": expected_route_norm,
         "route_correct": route_correct,
@@ -464,9 +479,30 @@ def evaluate_single_question(
         "faithfulness": faithfulness_val,
         "context_precision": context_precision_val,
         "latency_ms": elapsed_ms,
-        "llm_calls": llm_calls,
-        "llm_tokens": llm_tokens,
+        "live_calls": live_calls,
+        "cached_calls": cached_calls,
+        "live_tokens": live_tokens,
+        "cached_tokens": cached_tokens,
+        "refused_without_llm": refused_without_llm,
     }
+
+
+def _telemetry_floor() -> int:
+    """Return the current max ``llm_calls.id`` (0 if telemetry is unavailable)."""
+    try:
+        with get_db_connection() as conn:
+            return Repository(conn).get_max_llm_call_id()
+    except Exception:
+        return 0
+
+
+def _read_usage_window(after_id: int) -> dict[str, int]:
+    """Read live/cached LLM usage logged after ``after_id`` (zeros on failure)."""
+    try:
+        with get_db_connection() as conn:
+            return Repository(conn).get_llm_usage_after(after_id)
+    except Exception:
+        return {"live_calls": 0, "cached_calls": 0, "live_tokens": 0, "cached_tokens": 0}
 
 
 def aggregate_ablation_rows(
@@ -474,7 +510,13 @@ def aggregate_ablation_rows(
     rows: list[dict[str, Any]],
     baseline_ci: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    """Aggregate per-question ablation rows into configuration summary metrics + 95% CIs."""
+    """Aggregate per-question ablation rows into configuration summary metrics + 95% CIs.
+
+    Cost figures are reported as three separate quantities: live (uncached)
+    calls, cached calls, and refusals that made no LLM call. Token cost is
+    computed from live calls only. Routing accuracy is ``None`` (rendered
+    "n/a") when the router was off or no row carries a routing label.
+    """
     answerable_rows = [r for r in rows if r["expected_behaviour"] == "answer"]
     refusal_rows = [r for r in rows if r["expected_behaviour"] == "refuse"]
     restricted_rows = [
@@ -492,7 +534,14 @@ def aggregate_ablation_rows(
     crr_ci = bootstrap_ci([float(r["correct_refusal"]) for r in refusal_rows])
     frr_ci = bootstrap_ci([float(r["false_refusal"]) for r in answerable_rows])
     leak_ci = bootstrap_ci([float(r["leaked"]) for r in restricted_rows])
-    route_ci = bootstrap_ci([float(r["route_correct"]) for r in rows])
+
+    route_vals = [
+        float(r["route_correct"])
+        for r in rows
+        if r.get("route_correct") is not None and r.get("router_enabled", spec.enable_adaptive_router)
+    ]
+    route_ci: dict[str, Any] | None = bootstrap_ci(route_vals) if route_vals else None
+    routing_accuracy = route_ci["mean"] if route_ci is not None else None
 
     faith_vals = [float(r["faithfulness"]) for r in answerable_rows if r.get("faithfulness") is not None]
     ctx_prec_vals = [
@@ -501,20 +550,28 @@ def aggregate_ablation_rows(
     faith_mean = round(sum(faith_vals) / len(faith_vals), 4) if faith_vals else None
     ctx_prec_mean = round(sum(ctx_prec_vals) / len(ctx_prec_vals), 4) if ctx_prec_vals else None
 
+    n_rows = max(len(rows), 1)
     latencies = sorted(float(r["latency_ms"]) for r in rows)
-    median_ms = _percentile(latencies, 50.0)
-    p95_ms = _percentile(latencies, 95.0)
-    avg_calls = round(sum(int(r["llm_calls"]) for r in rows) / max(len(rows), 1), 2)
-    avg_tokens = round(sum(int(r["llm_tokens"]) for r in rows) / max(len(rows), 1), 1)
+    uncached_latencies = sorted(
+        float(r["latency_ms"])
+        for r in rows
+        if int(r.get("cached_calls", 0)) == 0 and int(r.get("live_calls", 0)) > 0
+    )
+    live_calls_pq = round(sum(int(r.get("live_calls", 0)) for r in rows) / n_rows, 2)
+    cached_calls_pq = round(sum(int(r.get("cached_calls", 0)) for r in rows) / n_rows, 2)
+    live_tokens_pq = round(sum(int(r.get("live_tokens", 0)) for r in rows) / n_rows, 1)
+    cached_tokens_pq = round(sum(int(r.get("cached_tokens", 0)) for r in rows) / n_rows, 1)
+    refusals_without_llm = sum(1 for r in rows if r.get("refused_without_llm"))
 
-    ci_map = {
+    ci_map: dict[str, dict[str, Any]] = {
         "recall@5": rec5_ci,
         "ndcg@5": ndcg5_ci,
         "answer_correctness": ans_ci,
         "correct_refusal_rate": crr_ci,
-        "routing_accuracy": route_ci,
         "leakage_rate": leak_ci,
     }
+    if route_ci is not None:
+        ci_map["routing_accuracy"] = route_ci
 
     overlap_flags: dict[str, dict[str, Any]] = {}
     if baseline_ci:
@@ -536,6 +593,8 @@ def aggregate_ablation_rows(
         "n_total": len(rows),
         "n_answerable": len(answerable_rows),
         "n_refusal": len(refusal_rows),
+        "n_route_labelled": len(route_vals),
+        "n_uncached_latency": len(uncached_latencies),
         "metrics": {
             "recall@1": rec1_ci["mean"],
             "recall@3": rec3_ci["mean"],
@@ -550,11 +609,20 @@ def aggregate_ablation_rows(
             "correct_refusal_rate": crr_ci["mean"],
             "false_refusal_rate": frr_ci["mean"],
             "leakage_rate": leak_ci["mean"],
-            "routing_accuracy": route_ci["mean"],
-            "latency_median_ms": median_ms,
-            "latency_p95_ms": p95_ms,
-            "llm_calls_per_query": avg_calls,
-            "tokens_per_query": avg_tokens,
+            "routing_accuracy": routing_accuracy,
+            "latency_median_ms": _percentile(latencies, 50.0),
+            "latency_p95_ms": _percentile(latencies, 95.0),
+            "latency_uncached_median_ms": (
+                _percentile(uncached_latencies, 50.0) if uncached_latencies else None
+            ),
+            "latency_uncached_p95_ms": (
+                _percentile(uncached_latencies, 95.0) if uncached_latencies else None
+            ),
+            "live_calls_per_query": live_calls_pq,
+            "cached_calls_per_query": cached_calls_pq,
+            "refusals_without_llm": refusals_without_llm,
+            "live_tokens_per_query": live_tokens_pq,
+            "cached_tokens_per_query": cached_tokens_pq,
         },
         "ci_95": ci_map,
         "vs_baseline_A0": overlap_flags,

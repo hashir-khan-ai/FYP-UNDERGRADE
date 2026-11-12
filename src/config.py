@@ -1,7 +1,12 @@
 """Application configuration management using Pydantic Settings."""
 
+import os
 from pathlib import Path
 from typing import Literal
+
+# Ensure local CPU embedding and cross-encoder models default to offline cached mode
+os.environ.setdefault("HF_HUB_OFFLINE", "1")
+os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
 
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict

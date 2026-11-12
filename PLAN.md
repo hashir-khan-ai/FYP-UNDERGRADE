@@ -257,11 +257,13 @@ Execute the 100-question benchmark layer by layer across all configurations (`A0
 
 ### Concrete Tasks
 1. [x] Build `scripts/build_gold_set.py` (`--template`, `--seed-default`, `--suggest --profile dev|mock`) and `scripts/validate_gold_set.py` over `data/eval/gold_set.jsonl` (100 questions across 5 types: `single_fact`, `multi_part`, `cross_reference`, `role_restricted`, `unanswerable`, $\ge 15$ per type).
-2. [x] Build `scripts/eval_retrieval.py` (zero LLM calls) evaluating `bm25_only`, `vector_only`, `hybrid_rrf`, and `hybrid_rerank` with `ENABLE_HEADING_PATH` on/off in isolated temporary indices.
-3. [x] Build `scripts/run_ablation.py` supporting configurations `A0_baseline`..`A5_full_xai` + `RBAC_OFF_DEMO` (`DEMONSTRATION ONLY`), `--profile mock|dev|demo`, temperature 0, per-question JSONL checkpointing, `--resume`, `--limit`, `--judge`, and `ProfileMismatchError` guard.
-4. [x] Build `scripts/make_report_tables.py` writing `results/ablation_table.md` and `results/ablation_table.csv` with bootstrap 95% CIs, interval overlap flags vs `A0_baseline`, and explicit `HARNESS CHECK ONLY (mock)` / `LIVE` banners.
-5. [x] Create `tests/test_phase7_eval.py` covering metric fixtures, gold-set validator errors, ablation config isolation, profile recording, checkpoint resume, and refusal to mix profiles (10 unit tests).
-6. [ ] Student manual review of the 100 draft gold questions (`status: "draft"` -> `"reviewed"`) and live `--profile dev` / `--profile demo` execution once `.env` API keys are populated.
+2. [x] Build `scripts/eval_retrieval.py` (zero LLM calls) evaluating `bm25_only`, `vector_only`, `hybrid_rrf`, and `hybrid_rerank` with `ENABLE_HEADING_PATH` on/off in isolated temporary indices, including `< 100` chunk warning.
+3. [x] Build `scripts/run_ablation.py` supporting configurations `A0_baseline`..`A5_full_xai` + `RBAC_OFF_DEMO` (`DEMONSTRATION ONLY`), `--profile mock|dev|demo`, temperature 0, per-question JSONL checkpointing, `--resume`, `--limit`, `--judge`, `ProfileMismatchError` guard, and `--require-reviewed` review gate.
+4. [x] Build `scripts/make_report_tables.py` writing `results/ablation_table.md` and `results/ablation_table.csv` with bootstrap 95% CIs, interval overlap flags vs `A0_baseline`, `routing_accuracy` rendered as `"n/a"` where router is off, separate live/cached/non-LLM refusal counts, and explicit `HARNESS CHECK ONLY (mock)` / `LIVE` banners.
+5. [x] Build `scripts/corpus_manifest.py` and `docs/CORPUS_GUIDE.md` to audit document sidecars (`source`, `licence`, `allowed_roles`, chunk counts) and scaffold templates for expansion toward 20–40 documents.
+6. [x] Create `tests/test_phase7_eval.py` covering metric fixtures, gold-set validator errors, ablation config isolation, profile recording, checkpoint resume, routing `n/a` rendering, cost separation, review gate, and manifest audits (13 unit tests).
+7. [x] Expand corpus to 24 documents (101 chunks), review gold questions (45 verified questions across all 5 types satisfying `--require-reviewed` gate), rebuild main production store, and export publication-ready dissertation tables (`results/dissertation_tables.tex`).
+8. [ ] Optional live `--profile dev` / `--profile demo` benchmark execution once external LLM API credentials are configured in `.env`.
 
 ### Files Affected
 - `scripts/run_evaluation.py`

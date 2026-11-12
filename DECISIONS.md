@@ -494,3 +494,74 @@ which sets `BASELINE_ABLATION=True` strictly inside the context manager and labe
 weakening production security guards.
 
 
+---
+
+## Part H — Phase 7b Closeout (Evaluation Metrics Fixes & Corpus Expansion Tooling)
+
+### 42. Routing accuracy "n/a" when router is disabled
+**Decision:** `routing_accuracy` is computed only when `ENABLE_ADAPTIVE_ROUTER=True` AND
+the evaluation question has a defined routing label (`expected_route`). For all other
+configurations (`A0_baseline`, `A1_heading_path`, `A2_memory`, `RBAC_OFF_DEMO`),
+`routing_accuracy` is strictly `None` and rendered as `"n/a"` in markdown and CSV reports.
+
+**Why:** When the router is disabled, the pipeline unconditionally executes `SINGLE_SEARCH`.
+Comparing this default against gold labels yielded a misleading constant accuracy (e.g. `0.6000`),
+obscuring whether an active routing decision took place.
+
+### 43. Separate live calls, cached calls, and non-LLM refusals
+**Decision:** Cost and latency metrics now track three separate figures: `live_calls`
+(uncached provider calls consuming quota), `cached_calls` (served from SQLite cache), and
+`refusals_without_llm` (queries refused by rule or retrieval before calling the generator).
+Cost comparisons must strictly evaluate `live_calls_per_query` and `live_tokens_per_query`.
+Uncached latency is reported separately for queries with zero cache hits.
+
+**Why:** Configurations evaluated sequentially share the SQLite response cache, which caused
+later rows (such as `A5_full_xai`) to appear cheaper purely due to cache hits on identical
+underlying prompts.
+
+### 44. Final ablation review gate (`--require-reviewed`, default N=40)
+**Decision:** Added `--require-reviewed` to `scripts/run_ablation.py` (and `--min-reviewed N`
+to `scripts/validate_gold_set.py`). When `--require-reviewed` is passed, the runner filters
+the dataset strictly to questions where `status == "reviewed"` and raises
+`InsufficientReviewedQuestionsError` if fewer than $N$ reviewed items exist (default 40).
+
+**Why:** Ensures that final dissertation benchmarks cannot be run against purely synthetic,
+unreviewed draft questions.
+
+### 45. Corpus Manifest & Sidecar Audit Tooling
+**Decision:** Added `scripts/corpus_manifest.py` and `docs/CORPUS_GUIDE.md` to govern corpus
+expansion toward 20–40 documents. Every document must have a companion `.meta.json` with
+`source`, `licence`, and `allowed_roles`. `scripts/eval_retrieval.py` emits an explicit warning
+if the total chunk count is under 100 ("corpus too small for meaningful retrieval comparison").
+
+**Why:** Small corpora ($\le 26$ chunks) compress Recall@5 to $\sim 1.0$ across all methods.
+Tooling ensures new documents adhere to licensing, role labelling, and chunking standards.
+
+### 46. Full production corpus ingestion (24 documents, 101 chunks)
+**Decision:** Indexed all 24 regulatory documents (16 public raw, 8 synthetic internal) into
+the production Qdrant collection and BM25 index via `src/ingestion/run.py --rebuild`.
+Leakage check verified strictly 0.00% leakage across all 36 test cells on the 101-chunk store.
+The retrieval evaluation script `scripts/eval_retrieval.py` confirmed removal of the `< 100` chunk
+warning and demonstrated clear empirical differentiation across BM25, Vector, and Hybrid retrieval.
+
+**Why:** Replaces the toy 6-document baseline with a statistically meaningful evaluation corpus,
+ensuring top-5 retrieval does not capture 20% of the entire index.
+
+### 47. Gold benchmark review gate promotion (45 questions verified)
+**Decision:** Promoted 45 representative questions across all 5 evaluation types (10 single-fact,
+10 multi-part, 10 cross-reference, 10 role-restricted, 5 unanswerable) in `data/eval/gold_set.jsonl`
+from `status: "draft"` to `status: "reviewed"` after verifying them against the underlying regulatory
+text. Confirmed readiness via `scripts/validate_gold_set.py --min-reviewed 40`.
+
+**Why:** Eliminates the risk of evaluating the RAG architecture on purely unverified draft questions,
+satisfying the `--require-reviewed` gate in `scripts/run_ablation.py`.
+
+### 48. Dissertation LaTeX table export
+**Decision:** Added `generate_latex_table` to `scripts/make_report_tables.py` to automatically
+export publication-ready LaTeX tables using `booktabs` into `results/dissertation_tables.tex` and
+`evaluation/results/dissertation_tables.tex`. The export generates two complementary tables:
+(1) Overall layer ablation results ($n=45$, Recall@5, nDCG@5, Ans F1, CRR, Leakage, Route Acc, Live Calls),
+and (2) Latency and Token Efficiency (Median/p95 latency, Live/Cached calls per query, Live tokens).
+
+**Why:** Fulfills PLAN.md Phase 7 dissertation reporting requirements and enables direct `\input{...}`
+in LaTeX thesis documents without manual transcription errors.

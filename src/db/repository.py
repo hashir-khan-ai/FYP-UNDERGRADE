@@ -548,6 +548,39 @@ class Repository:
             "completion_tokens": int(row["completion_tokens"] or 0),
         }
 
+    def get_llm_usage_after(self, after_id: int) -> dict[str, int]:
+        """Aggregate live vs cached LLM usage logged after ``after_id``.
+
+        Used by the evaluation harness to count cache hits separately from
+        live (uncached) provider calls. Reads only counters, never prompt text.
+        """
+        cur = self.conn.cursor()
+        cur.execute(
+            """
+            SELECT
+                COALESCE(SUM(CASE WHEN cache_hit = 0 THEN 1 ELSE 0 END), 0) AS live_calls,
+                COALESCE(SUM(CASE WHEN cache_hit = 1 THEN 1 ELSE 0 END), 0) AS cached_calls,
+                COALESCE(SUM(CASE WHEN cache_hit = 0
+                    THEN COALESCE(prompt_tokens, 0) + COALESCE(completion_tokens, 0)
+                    ELSE 0 END), 0) AS live_tokens,
+                COALESCE(SUM(CASE WHEN cache_hit = 1
+                    THEN COALESCE(prompt_tokens, 0) + COALESCE(completion_tokens, 0)
+                    ELSE 0 END), 0) AS cached_tokens
+            FROM llm_calls
+            WHERE id > ?;
+            """,
+            (after_id,),
+        )
+        row = cur.fetchone()
+        if row is None:
+            return {"live_calls": 0, "cached_calls": 0, "live_tokens": 0, "cached_tokens": 0}
+        return {
+            "live_calls": int(row["live_calls"] or 0),
+            "cached_calls": int(row["cached_calls"] or 0),
+            "live_tokens": int(row["live_tokens"] or 0),
+            "cached_tokens": int(row["cached_tokens"] or 0),
+        }
+
     def get_spend_totals(self) -> dict[str, int]:
         cur = self.conn.cursor()
         cur.execute(
