@@ -88,6 +88,20 @@ CREATE TABLE IF NOT EXISTS audit_log (
     router_fallback_reason TEXT,
     sub_questions TEXT,
     step_timings_json TEXT,
+    grader_path TEXT,
+    grader_relevant_count INTEGER,
+    grader_ambiguous_count INTEGER,
+    grader_irrelevant_count INTEGER,
+    grader_rewrite_used INTEGER,
+    grader_rewritten_query TEXT,
+    grader_refused INTEGER,
+    grader_refusal_reason TEXT,
+    grader_calls INTEGER,
+    grader_tokens INTEGER,
+    grader_latency_ms REAL,
+    citation_count INTEGER,
+    citations_dropped INTEGER,
+    heading_path_enabled INTEGER,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (session_id) REFERENCES sessions (id) ON DELETE SET NULL,
     FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
@@ -195,6 +209,10 @@ _AUDIT_LOG_EXTRA_COLUMNS: dict[str, str] = {
     "grader_calls": "INTEGER",
     "grader_tokens": "INTEGER",
     "grader_latency_ms": "REAL",
+    # Phase 6A XAI & heading-path columns
+    "citation_count": "INTEGER",
+    "citations_dropped": "INTEGER",
+    "heading_path_enabled": "INTEGER",
 }
 
 # Phase 3 messages column: the role used when each turn was produced.

@@ -289,6 +289,10 @@ class Repository:
         grader_calls: int | None = None,
         grader_tokens: int | None = None,
         grader_latency_ms: float | None = None,
+        # Phase 6A XAI observability (all nullable)
+        citation_count: int | None = None,
+        citations_dropped: int | None = None,
+        heading_path_enabled: bool | None = None,
     ) -> int:
         # Normalize collections to JSON strings
         chunks_str = json.dumps(retrieved_chunk_ids) if isinstance(retrieved_chunk_ids, list) else retrieved_chunk_ids
@@ -312,8 +316,8 @@ class Repository:
                 grader_path, grader_relevant_count, grader_ambiguous_count,
                 grader_irrelevant_count, grader_rewrite_used, grader_rewritten_query,
                 grader_refused, grader_refusal_reason, grader_calls, grader_tokens,
-                grader_latency_ms
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                grader_latency_ms, citation_count, citations_dropped, heading_path_enabled
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
             """,
             (
                 session_id,
@@ -354,6 +358,9 @@ class Repository:
                 grader_calls,
                 grader_tokens,
                 grader_latency_ms,
+                citation_count,
+                citations_dropped,
+                1 if heading_path_enabled else (0 if heading_path_enabled is not None else None),
             ),
         )
         return cur.lastrowid

@@ -432,31 +432,36 @@ def test_prompt_injection_is_data_and_role_filter_still_applies(
 
 def test_api_chat_query_does_not_echo_restricted_markers(
     rbac_pipeline: BaselineRAGPipeline,
-    auth_headers,
+    seeded_auth_users,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """End-to-end API response and error bodies contain no forbidden markers."""
     import src.api.routes as routes
+    from src.api.deps import CurrentUser
+    from src.api.schemas import ChatQueryRequest, SessionCreateRequest
+    from src.api.routes import chat_query, create_session
 
     monkeypatch.setattr(routes, "baseline_pipeline", rbac_pipeline)
-    client = TestClient(app)
-    headers = auth_headers("analyst")
-
-    created = client.post("/api/v1/sessions", json={"title": "Leak probe"}, headers=headers)
-    assert created.status_code == 201
-    session_id = created.json()["id"]
-
-    response = client.post(
-        "/api/v1/chat/query",
-        json={"session_id": session_id, "query": RESTRICTED_QUESTIONS["auditor_only"]},
-        headers=headers,
+    user_info = seeded_auth_users["analyst"]
+    user = CurrentUser(
+        id=user_info["id"],
+        username=user_info["username"],
+        full_name=user_info["full_name"],
+        role="analyst",
+        jti="test-jti",
+        expires_at=9999999999,
     )
-    assert response.status_code == 200
-    body = response.text
+
+    session = create_session(SessionCreateRequest(title="Leak probe"), user)
+    response = chat_query(
+        ChatQueryRequest(session_id=session.id, query=RESTRICTED_QUESTIONS["auditor_only"]),
+        user,
+    )
+    body = response.model_dump_json()
     assert AUDITOR_MARKER not in body
     assert MANAGER_MARKER not in body
-    assert response.json()["role"] == "analyst"
-    assert response.json()["rbac_enabled"] is True
+    assert response.role == "analyst"
+    assert response.rbac_enabled is True
 
 
 def test_disabling_rbac_is_refused_outside_test_or_labelled_ablation(
@@ -486,4 +491,82 @@ def test_leakage_detector_itself_catches_a_labelled_ablation(
     rendered = json.dumps([source.model_dump() for source in response.sources])
     assert AUDITOR_MARKER in rendered, "ablation control should expose the marker"
     assert response.rbac_enabled is False
+
+
+def test_grader_and_xai_retry_leakage_matrix_is_zero(
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Phase 5 & 6A: Grader rewrite-retry and XAI citation/trace fields leak 0.00%."""
+    from src.core.xai import build_safe_reasoning_trace
+
+    monkeypatch.setattr(settings, "ENABLE_CORRECTIVE_GRADER", True)
+    monkeypatch.setattr(settings, "GRADER_SHORTCUT_ENABLED", False)
+    monkeypatch.setattr(settings, "ENABLE_XAI_OUTPUT", True)
+
+    class RetryForcingCapturingLLM(CapturingLLM):
+        def __init__(self) -> None:
+            super().__init__()
+            self.call_idx = 0
+
+        def _generate_mock_response(self, prompt: str) -> str:
+            self.call_idx += 1
+            lowered = prompt.lower()
+            if '"grades"' in lowered or ("grade" in lowered and "chunk_id" in lowered):
+                if self.call_idx == 1:
+                    import re as _re
+                    cids = _re.findall(r'chunk_id="([^"]+)"', prompt)
+                    return json.dumps({
+                        "grades": [
+                            {"chunk_id": c, "label": "irrelevant", "reason": "force retry"}
+                            for c in cids
+                        ]
+                    })
+            if "rewritten_query" in lowered:
+                return json.dumps({"rewritten_query": "audit findings and escalation policy"})
+            return super()._generate_mock_response(prompt)
+
+    chunks = build_fixture_chunks()
+    qdrant = QdrantIndexer(str(tmp_path / "qdrant_retry"), embedder=FakeEmbeddingGenerator())
+    qdrant.index_chunks(chunks)
+    bm25 = BM25Indexer(str(tmp_path / "bm25_retry.pkl"))
+    bm25.build_and_save(chunks)
+    llm = RetryForcingCapturingLLM()
+    pipeline = BaselineRAGPipeline(
+        qdrant_indexer=qdrant,
+        bm25_indexer=bm25,
+        reranker=MockCrossEncoderReranker(),
+        llm=llm,
+    )
+
+    try:
+        for role in ("analyst", "manager", "auditor"):
+            forbidden = FORBIDDEN_MARKERS[role]
+            for q_key in LEAKAGE_QUESTIONS:
+                llm.call_idx = 0
+                llm.prompts.clear()
+                res = pipeline.ask(RESTRICTED_QUESTIONS[q_key], role=role)
+                trace = build_safe_reasoning_trace(
+                    question_rewritten=bool(res.grader_rewrite_used),
+                    route="SINGLE_SEARCH",
+                    passages_retrieved=res.initial_passages_retrieved,
+                    passages_kept=len(res.sources),
+                    grader_path=res.grader_path,
+                    retry_used=bool(res.grader_rewrite_used),
+                    limits_hit=False,
+                )
+                combined = " ".join([
+                    res.answer,
+                    json.dumps([s.model_dump() for s in res.sources]),
+                    " ".join(s.heading_path for s in res.sources),
+                    " ".join(s.quote_snippet for s in res.sources),
+                    " ".join(res.chunk_ids_used),
+                    " ".join(trace),
+                    "\n".join(llm.prompts),
+                ])
+                for marker in forbidden:
+                    assert marker not in combined, f"{role} leaked {marker} on retry {q_key}"
+    finally:
+        qdrant.close()
+
 

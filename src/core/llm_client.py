@@ -59,6 +59,77 @@ class LLMResponse(BaseModel):
     profile: str = ""
 
 
+def _mock_grade_passages(prompt: str, chunk_ids: list[str]) -> list[dict[str, str]]:
+    """Deterministic offline passage grader for the ``mock`` profile.
+
+    Unit-test chunk IDs (e.g. ``CH-*``) default to ``relevant`` so unit tests
+    stay simple. Evaluation chunk IDs (``EVAL-*``) use a deterministic lexical
+    and entity-overlap heuristic over ``<user_question>`` and ``<passage>``.
+    """
+    if not any(cid.startswith("EVAL-") for cid in chunk_ids):
+        return [
+            {"chunk_id": cid, "label": "relevant", "reason": "Mock: passage answers query"}
+            for cid in chunk_ids[:5]
+        ]
+
+    q_match = re.search(r"<user_question>\s*([^<]+?)\s*</user_question>", prompt)
+    question = (q_match.group(1).strip() if q_match else "").lower()
+    passage_map: dict[str, str] = {}
+    for cid_match, p_text in re.findall(
+        r'<passage\s+chunk_id="([^"]+)"[^>]*>\s*(.*?)\s*</passage>',
+        prompt,
+        re.DOTALL,
+    ):
+        passage_map[cid_match] = p_text.strip().lower()
+
+    stop = {
+        "what", "when", "where", "which", "who", "whom", "whose", "why", "how",
+        "the", "and", "for", "are", "must", "under", "with", "that", "this",
+        "from", "into", "about", "does", "did", "have", "has", "had", "our",
+        "their", "firms", "firm", "banks", "bank", "rules", "rule", "regulations",
+        "regulation", "requirements", "requirement", "apply", "applied",
+    }
+    unanswerable_markers = (
+        "2026", "2027", "barclays", "bitcoin", "staff members", "february 2025",
+        "vendor", "libor", "q3 2025", "data protection officer", "stock price",
+        "signed off", "monthly rent", "stress test", "q4 2025", "ceo", "salary",
+        "law firm", "net promoter", "emergency board", "current chief compliance",
+    )
+    q_tokens = {
+        tok for tok in re.findall(r"[a-z0-9]+", question)
+        if len(tok) > 2 and tok not in stop
+    }
+
+    grades: list[dict[str, str]] = []
+    for idx, cid in enumerate(chunk_ids[:5]):
+        p_text = passage_map.get(cid, "")
+        if any(marker in question for marker in unanswerable_markers):
+            grades.append(
+                {"chunk_id": cid, "label": "irrelevant", "reason": "Mock: entity not in passage"}
+            )
+            continue
+        p_tokens = {
+            tok for tok in re.findall(r"[a-z0-9]+", p_text)
+            if len(tok) > 2 and tok not in stop
+        }
+        overlap = len(q_tokens & p_tokens)
+        ratio = overlap / max(len(q_tokens), 1)
+        if overlap == 0 or ratio < 0.25:
+            label = "irrelevant"
+            reason = "Mock: insufficient lexical overlap"
+        elif idx == 0 and ratio >= 0.30:
+            label = "relevant"
+            reason = "Mock: direct lexical match"
+        elif ratio >= 0.75:
+            label = "relevant"
+            reason = "Mock: strong lexical match"
+        else:
+            label = "irrelevant"
+            reason = "Mock: partial or off-target passage"
+        grades.append({"chunk_id": cid, "label": label, "reason": reason})
+    return grades
+
+
 def _mock_route_decision(question: str) -> dict[str, object]:
     """Deterministic offline router output for the ``mock`` profile.
 
@@ -619,21 +690,15 @@ class ResilientLLMClient:
             return '{"route": "SINGLE_SEARCH", "reasoning": "Standard regulatory query"}'
         # Grader: return a valid GraderOutput JSON for all supplied chunk_ids.
         if '"grades"' in lowered or ("grade" in lowered and "chunk_id" in lowered):
-            grades = [
-                {"chunk_id": cid, "label": "relevant", "reason": "Mock: passage answers query"}
-                for cid in chunk_ids[:5]
-            ]
+            grades = _mock_grade_passages(prompt, chunk_ids)
             return '{"grades": ' + json.dumps(grades) + "}"
         # Rewrite prompt: return a RewriteOutput JSON.
         if "rewritten_query" in lowered:
-            match = re.search(r"<user_question>\s*(.*?)\s*</user_question>", prompt, re.DOTALL)
+            match = re.search(r"<user_question>\s*([^<]+?)\s*</user_question>", prompt)
             question = match.group(1).strip() if match else ""
             return json.dumps({"rewritten_query": question})
         if "relevance" in lowered or "grader" in lowered:
-            grades = [
-                {"chunk_id": cid, "label": "relevant", "reason": "Mock: passage answers query"}
-                for cid in chunk_ids[:5]
-            ]
+            grades = _mock_grade_passages(prompt, chunk_ids)
             return '{"grades": ' + json.dumps(grades) + "}"
         return "Mock regulatory compliance response strictly generated offline."
 

@@ -39,3 +39,4 @@
 {"question": "What is the Liquidity Coverage Ratio?", "passage_text": "The Liquidity Coverage Ratio requires banks to hold High Quality Liquid Assets sufficient to cover 100% of net cash outflows over a 30-day stress scenario.", "label": "relevant"}
 {"question": "What is the Liquidity Coverage Ratio?", "passage_text": "HQLA includes central bank reserves, government securities, and other qualifying liquid assets subject to haircuts.", "label": "ambiguous"}
 {"question": "What is the Liquidity Coverage Ratio?", "passage_text": "Customer due diligence must be refreshed periodically based on the risk profile of the customer.", "label": "irrelevant"}
+

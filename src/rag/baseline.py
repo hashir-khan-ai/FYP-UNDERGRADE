@@ -21,6 +21,13 @@ from src.config import settings
 from src.core.llm_client import ResilientLLMClient, llm_client
 from src.core.prompts import load_prompt
 from src.core.security import enforce_role_visibility, normalize_role
+from src.core.xai import (
+    build_heading_path,
+    extract_candidate_chunk_ids,
+    extract_verbatim_snippet,
+    filter_passages_for_citations,
+    validate_cited_chunks,
+)
 from src.ingestion.indexer import BM25Indexer, QdrantIndexer, SearchResult
 
 logger = logging.getLogger(__name__)
@@ -39,10 +46,12 @@ class SourceChunk(BaseModel):
     doc_id: str = ""
     doc_title: str
     section: str
+    heading_path: str = ""
     clause: str | None = None
     page: int | None = None
     score: float
     snippet: str
+    quote_snippet: str = ""
 
 
 
@@ -111,6 +120,9 @@ class BaselineRAGResponse(BaseModel):
     grader_calls: int = 0
     grader_tokens: int = 0
     grader_latency_ms: float = 0.0
+    # Phase 6A XAI observability.
+    citations_dropped: int = 0
+    initial_passages_retrieved: int = 0
 
 
 @dataclass
@@ -164,7 +176,15 @@ class CrossEncoderReranker:
             return [result][:top_n]
 
         model = self._get_model()
-        pairs = [(query, candidate.get("text_content", "")) for candidate in candidates]
+        pairs = [
+            (
+                query,
+                f"{candidate.get('heading_path')}\n{candidate.get('text_content', '')}"
+                if (settings.ENABLE_HEADING_PATH and candidate.get("heading_path"))
+                else candidate.get("text_content", ""),
+            )
+            for candidate in candidates
+        ]
         scores = model.predict(pairs, show_progress_bar=False)
 
         scored = []
@@ -324,11 +344,13 @@ class BaselineRAGPipeline:
     def _format_passages(self, passages: list[dict[str, Any]]) -> str:
         blocks: list[str] = []
         for passage in passages:
+            h_path = build_heading_path(passage)
+            section_attr = h_path if settings.ENABLE_HEADING_PATH else passage.get("section_label", "")
             blocks.append(
                 "<passage "
                 f"chunk_id=\"{passage.get('chunk_id', 'UNKNOWN')}\" "
                 f"doc=\"{passage.get('doc_title', 'Document')}\" "
-                f"section=\"{passage.get('section_label', '')}\">\n"
+                f"section=\"{section_attr}\">\n"
                 f"{passage.get('text_content', '').strip()}\n"
                 "</passage>"
             )
@@ -339,6 +361,7 @@ class BaselineRAGPipeline:
         query: str,
         passages: list[dict[str, Any]],
         session_id: str | None = None,
+        role: str | None = None,
     ) -> tuple[str, list[str], bool, float, dict[str, int]]:
         """Generate an answer strictly from the final, role-permitted passages.
 
@@ -346,6 +369,8 @@ class BaselineRAGPipeline:
             Tuple of (answer, cited chunk IDs, cache hit, milliseconds, usage).
         """
         start = time.perf_counter()
+        if role is not None and settings.rbac_enabled:
+            passages, _ = enforce_role_visibility(passages, normalize_role(role))
         passage_ids = [passage["chunk_id"] for passage in passages if passage.get("chunk_id")]
 
         if not passages:
@@ -354,6 +379,7 @@ class BaselineRAGPipeline:
                 "cached_calls": 0,
                 "prompt_tokens": 0,
                 "completion_tokens": 0,
+                "citations_dropped": 0,
             }
 
         prompt = self._prompt_template.format(
@@ -367,26 +393,17 @@ class BaselineRAGPipeline:
             session_id=session_id,
         )
         generation_ms = (time.perf_counter() - start) * 1000.0
+        raw_text = response.content.strip()
+        candidate_ids = extract_candidate_chunk_ids(raw_text)
+        cited, dropped_count = validate_cited_chunks(candidate_ids, passages, role=role)
+
         usage = {
             "calls": 1,
             "cached_calls": 1 if response.cached else 0,
             "prompt_tokens": response.prompt_tokens,
             "completion_tokens": response.completion_tokens,
+            "citations_dropped": dropped_count,
         }
-
-
-        raw_text = response.content.strip()
-        cited: list[str] = []
-        chunk_line = re.search(
-            r"(?im)^\s*supporting chunks?\s*:\s*(.+?)\s*$",
-            raw_text,
-        )
-        if chunk_line:
-            candidates = re.split(r"[,;\s]+", chunk_line.group(1))
-            for candidate in candidates:
-                cleaned = candidate.strip().strip("[]`\"'")
-                if cleaned in passage_ids and cleaned not in cited:
-                    cited.append(cleaned)
 
         answer = re.sub(
             r"(?ims)^\s*supporting chunks?\s*:.*$",
@@ -397,28 +414,32 @@ class BaselineRAGPipeline:
 
         if not answer or REFUSAL_TEXT.lower() in raw_text.lower():
             return REFUSAL_TEXT, [], response.cached, generation_ms, usage
-        if not cited:
-            # The model saw every final passage; if it omitted labels, cite the
-            # supplied context rather than silently returning an unsourced answer.
-            cited = passage_ids
+        if not cited and not candidate_ids:
+            # The model saw every final passage; if it omitted labels entirely,
+            # cite the supplied permitted context rather than returning unsourced.
+            cited, _ = validate_cited_chunks(passage_ids, passages, role=role)
 
         return answer, cited, response.cached, generation_ms, usage
 
     def _to_sources(self, passages: list[dict[str, Any]]) -> list[SourceChunk]:
-        """Convert final passages into citation objects (identifiers + snippet)."""
+        """Convert final passages into citation objects (identifiers + verbatim snippet)."""
         sources: list[SourceChunk] = []
         for passage in passages:
             text = passage.get("text_content", "")
+            verbatim = extract_verbatim_snippet(text)
+            h_path = build_heading_path(passage)
             sources.append(
                 SourceChunk(
                     chunk_id=passage.get("chunk_id", ""),
                     doc_id=passage.get("doc_id", "") or "",
                     doc_title=passage.get("doc_title", "Document"),
-                    section=passage.get("section_label", ""),
+                    section=passage.get("section_label", "") or h_path,
+                    heading_path=h_path,
                     clause=passage.get("clause_label"),
                     page=passage.get("page"),
                     score=float(passage.get("score", 0.0)),
-                    snippet=text[:200] + ("..." if len(text) > 200 else ""),
+                    snippet=verbatim,
+                    quote_snippet=verbatim,
                 )
             )
         return sources
@@ -528,6 +549,7 @@ class BaselineRAGPipeline:
         # RBAC has already been enforced in prepare_split before the grader sees anything.
         grader_dec = None
         final_passages = context.passages
+        initial_retrieved_count = len(final_passages)
         grader_step_timing: dict[str, Any] = {}
 
         if settings.ENABLE_CORRECTIVE_GRADER:
@@ -606,12 +628,28 @@ class BaselineRAGPipeline:
                     grader_calls=grader_dec.grader_calls,
                     grader_tokens=grader_dec.total_tokens,
                     grader_latency_ms=round(grader_dec.total_latency_ms, 2),
+                    citations_dropped=0,
+                    initial_passages_retrieved=initial_retrieved_count,
                 )
             final_passages = grader_dec.kept_passages
 
         answer, cited_ids, cached, generation_ms, usage = self.generate(
             query, final_passages, session_id=session_id
         )
+        cited_ids, role_dropped = validate_cited_chunks(
+            cited_ids, final_passages, role=normalized_role
+        )
+        citations_dropped_total = int(usage.get("citations_dropped", 0)) + role_dropped
+        if settings.ENABLE_XAI_OUTPUT:
+            source_passages = filter_passages_for_citations(
+                final_passages, cited_ids, role=normalized_role
+            )
+        else:
+            source_passages = (
+                enforce_role_visibility(final_passages, normalized_role)[0]
+                if settings.rbac_enabled
+                else final_passages
+            )
 
         llm = settings.llm
         retrieval_stats = RetrievalStats(
@@ -639,7 +677,7 @@ class BaselineRAGPipeline:
             answer=answer,
             role=normalized_role,
             rbac_enabled=settings.rbac_enabled,
-            sources=self._to_sources(final_passages),
+            sources=self._to_sources(source_passages),
             chunk_ids_used=cited_ids,
             timings=RAGTimings(
                 retrieval_ms=round(context.retrieval_ms, 2),
@@ -673,6 +711,8 @@ class BaselineRAGPipeline:
             grader_calls=grader_dec.grader_calls if grader_dec else 0,
             grader_tokens=grader_dec.total_tokens if grader_dec else 0,
             grader_latency_ms=round(grader_dec.total_latency_ms, 2) if grader_dec else 0.0,
+            citations_dropped=citations_dropped_total,
+            initial_passages_retrieved=initial_retrieved_count,
         )
 
     def ask(
@@ -702,6 +742,7 @@ class BaselineRAGPipeline:
         final_passages, rerank_ms, dropped = self.rerank(
             retrieval_query, candidates, normalized_role
         )
+        initial_retrieved_count = len(final_passages)
 
         # Phase 5: corrective grader — runs after re-ranking, before generation.
         # RBAC has already been enforced in retrieve + rerank before the grader sees anything.
@@ -774,14 +815,30 @@ class BaselineRAGPipeline:
                     grader_calls=grader_dec.grader_calls,
                     grader_tokens=grader_dec.total_tokens,
                     grader_latency_ms=round(grader_dec.total_latency_ms, 2),
+                    citations_dropped=0,
+                    initial_passages_retrieved=initial_retrieved_count,
                 )
             effective_passages = grader_dec.kept_passages
 
         answer, cited_ids, cached, generation_ms, usage = self.generate(
             retrieval_query, effective_passages, session_id=session_id
         )
+        cited_ids, role_dropped = validate_cited_chunks(
+            cited_ids, effective_passages, role=normalized_role
+        )
+        citations_dropped_total = int(usage.get("citations_dropped", 0)) + role_dropped
 
-        sources = self._to_sources(effective_passages)
+        if settings.ENABLE_XAI_OUTPUT:
+            source_passages = filter_passages_for_citations(
+                effective_passages, cited_ids, role=normalized_role
+            )
+        else:
+            source_passages = (
+                enforce_role_visibility(effective_passages, normalized_role)[0]
+                if settings.rbac_enabled
+                else effective_passages
+            )
+        sources = self._to_sources(source_passages)
 
         llm = settings.llm
         retrieval_stats = RetrievalStats(
@@ -834,6 +891,8 @@ class BaselineRAGPipeline:
             grader_calls=grader_dec.grader_calls if grader_dec else 0,
             grader_tokens=grader_dec.total_tokens if grader_dec else 0,
             grader_latency_ms=round(grader_dec.total_latency_ms, 2) if grader_dec else 0.0,
+            citations_dropped=citations_dropped_total,
+            initial_passages_retrieved=initial_retrieved_count,
         )
 
 

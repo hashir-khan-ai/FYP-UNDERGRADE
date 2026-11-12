@@ -23,6 +23,11 @@ os.environ["APP_ENV"] = "test"
 os.environ["LLM_PROFILE"] = "mock"
 os.environ["DATABASE_PATH"] = str(_TEST_DB_PATH)
 os.environ["LLM_MAX_RPM"] = "1000"
+os.environ["ENABLE_MEMORY"] = "false"
+os.environ["ENABLE_ADAPTIVE_ROUTER"] = "false"
+os.environ["ENABLE_CORRECTIVE_GRADER"] = "false"
+os.environ["ENABLE_XAI_OUTPUT"] = "false"
+os.environ["ENABLE_HEADING_PATH"] = "true"
 
 from src.db.migrations import SCHEMA_DDL, init_db  # noqa: E402
 from src.db.repository import Repository  # noqa: E402

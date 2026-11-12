@@ -61,6 +61,7 @@ from src.core.router import (
     router_metadata,
 )
 from src.core.spend_guard import spend_guard
+from src.core.xai import build_safe_reasoning_trace
 from src.db.connection import get_db_connection
 from src.db.repository import Repository
 from src.rag.baseline import BaselineRAGResponse, baseline_pipeline
@@ -400,6 +401,7 @@ def chat_query(
         resolved_llm = settings.llm
 
     latency_ms = (time.perf_counter() - started) * 1000.0
+    citations_dropped = result.citations_dropped if result is not None else 0
 
     citations = [
         Citation(
@@ -409,11 +411,55 @@ def chat_query(
             clause_id=source.clause or "",
             page_number=source.page,
             snippet=source.snippet,
+            chunk_id=source.chunk_id,
+            doc_title=source.doc_title,
+            heading_path=source.heading_path or source.section,
+            clause=source.clause or "",
+            page=source.page,
+            quote_snippet=source.quote_snippet or source.snippet,
         )
         for source in sources
     ]
 
-    if not router_enabled:
+    refusal_category: str | None = None
+    if decision is not None and decision.route == DIRECT:
+        refusal_category = decision.direct_category
+    elif result is not None and result.grader_refused:
+        refusal_category = result.grader_refusal_reason or "insufficient_evidence"
+    elif result is not None and retrieval_total == 0:
+        refusal_category = "no_permitted_passages"
+
+    timings_dict: dict[str, float] = {
+        "retrieval_ms": round(result.timings.retrieval_ms, 2) if result is not None else 0.0,
+        "rerank_ms": round(result.timings.rerank_ms, 2) if result is not None else 0.0,
+        "generation_ms": round(result.timings.generation_ms, 2) if result is not None else 0.0,
+        "total_ms": round(latency_ms, 2),
+    }
+
+    if settings.ENABLE_XAI_OUTPUT:
+        passages_retrieved_count = (
+            result.initial_passages_retrieved
+            if (result is not None and result.initial_passages_retrieved > 0)
+            else retrieval_total
+        )
+        reasoning_trace = build_safe_reasoning_trace(
+            question_rewritten=bool(
+                memory.rewritten or (result is not None and result.grader_rewrite_used)
+            ),
+            route=route,
+            passages_retrieved=passages_retrieved_count,
+            passages_kept=retrieval_total,
+            grader_path=(
+                result.grader_path
+                if (result is not None and settings.ENABLE_CORRECTIVE_GRADER)
+                else None
+            ),
+            retry_used=bool(result is not None and result.grader_rewrite_used),
+            limits_hit=bool(
+                spend_guard.exhausted or (decision is not None and decision.fallback_used)
+            ),
+        )
+    elif not router_enabled:
         # Router-off path: identical trace to the Phase 3 baseline.
         reasoning_trace = [
             f"Step 1: Authenticated as role '{user.role}'.",
@@ -506,6 +552,7 @@ def chat_query(
                     "tokens_prompt": usage["prompt_tokens"],
                     "tokens_completion": usage["completion_tokens"],
                     "router": router_metadata(decision) if decision is not None else None,
+                    "citations_dropped": citations_dropped,
                 }
             ),
         )
@@ -519,6 +566,7 @@ def chat_query(
             relevance_scores=[round(source.score, 6) for source in sources],
             response_text=answer,
             latency_ms=round(latency_ms, 2),
+            retry_count=1 if (result is not None and result.grader_rewrite_used) else 0,
             rewritten_query=rewritten_query,
             reasoning_trace=reasoning_trace,
             citations_json=[citation.model_dump() for citation in citations],
@@ -547,18 +595,22 @@ def chat_query(
             grader_calls=result.grader_calls if result is not None else None,
             grader_tokens=result.grader_tokens if result is not None else None,
             grader_latency_ms=result.grader_latency_ms if result is not None else None,
+            citation_count=len(citations),
+            citations_dropped=citations_dropped,
+            heading_path_enabled=settings.ENABLE_HEADING_PATH,
         )
 
     return ChatQueryResponse(
         session_id=session_id,
         answer=answer,
         route_taken=route,
+        route=route,
         citations=citations,
         reasoning_trace=reasoning_trace,
         retrieval_stats=RetrievalStats(
             total_chunks_retrieved=retrieval_total,
             top_rerank_score=top_rerank_score,
-            retry_count=0,
+            retry_count=1 if (result is not None and result.grader_rewrite_used) else 0,
             rewritten_query=rewritten_query,
         ),
         llm_stats=LLMStats(
@@ -607,6 +659,12 @@ def chat_query(
             tokens_used=result.grader_tokens if result is not None else 0,
             latency_ms=result.grader_latency_ms if result is not None else 0.0,
         ),
+        grader_path=result.grader_path if result is not None else None,
+        refusal=refusal_category,
+        refusal_category=refusal_category,
+        timings=timings_dict,
+        citations_dropped=citations_dropped,
+        heading_path_enabled=settings.ENABLE_HEADING_PATH,
     )
 
 
@@ -655,6 +713,21 @@ def audit_logs(
                 else None
             ),
             router_fallback_reason=row["router_fallback_reason"],
+            citation_count=(
+                int(row["citation_count"])
+                if "citation_count" in row.keys() and row["citation_count"] is not None
+                else None
+            ),
+            citations_dropped=(
+                int(row["citations_dropped"])
+                if "citations_dropped" in row.keys() and row["citations_dropped"] is not None
+                else None
+            ),
+            heading_path_enabled=(
+                bool(row["heading_path_enabled"])
+                if "heading_path_enabled" in row.keys() and row["heading_path_enabled"] is not None
+                else None
+            ),
             created_at=str(row["created_at"]) if row["created_at"] is not None else None,
         )
         for row in rows
@@ -677,6 +750,7 @@ def admin_config(user: CurrentUser = Depends(get_current_user)) -> AdminConfigRe
             "rbac": settings.rbac_enabled,
             "memory": settings.ENABLE_MEMORY,
             "xai_output": settings.ENABLE_XAI_OUTPUT,
+            "heading_path": settings.ENABLE_HEADING_PATH,
         },
         spend_caps={
             "calls_limit": settings.LLM_MAX_CALLS_PER_RUN,

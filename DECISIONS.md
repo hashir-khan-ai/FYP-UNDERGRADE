@@ -334,9 +334,163 @@ non-credential constant so the suite stays deterministic.
 names the variable to set, and `.env.example` documents it. This supersedes decision 11.
 
 ### 27. Live `dev` smoke still skipped
-**Decision:** `.env` does not exist in this workspace, so the live
-`scripts/smoke_demo.py --profile dev` run was skipped again and the `mock` profile was
-reported instead.
+**Decision:** `.env` has no configured live key in this workspace, so live runs
+were skipped and the `mock` profile was reported instead.
 
-**Why:** No key is available, and the `dev` profile correctly refuses to resolve
+**Why:** No live key is configured, and the `dev` profile correctly refuses to resolve
 without one. Nothing is claimed about live-provider latency or token use.
+
+---
+
+## Part E — Phase 5 Closeout (Corrective Grader)
+
+### 28. Prompt formatting with JSON schema examples
+**Decision:** Prompts containing JSON examples (`prompts/grader/v1.md`,
+`prompts/rewrite/v1.md`) use string replacement (`.replace("{question}", ...)`)
+rather than `str.format()` or f-strings.
+
+**Why:** Markdown prompts with JSON schemas contain literal curly braces (`{`, `}`).
+Using `str.format()` treats JSON braces as Python formatting keys, throwing `KeyError`.
+Using `.replace()` preserves literal JSON schemas without fragile double-brace escaping.
+
+### 29. Additive audit schema in `SCHEMA_DDL`
+**Decision:** Grader observability columns are added to both `SCHEMA_DDL` in
+`src/db/migrations.py` and `_AUDIT_LOG_EXTRA_COLUMNS`.
+
+**Why:** Running `ALTER TABLE` during runtime connection pooling on Windows causes
+intermittent SQLite file locks. Placing nullable columns in the initial DDL ensures
+clean initialization on fresh databases while preserving migration safety for upgrades.
+
+### 30. Corrective Grader shortcuts and safe degradation
+**Decision:** Cross-encoder scores above `GRADER_SHORTCUT_HIGH_THRESHOLD` with sufficient
+passages bypass LLM grading (`shortcut_keep`). Unparseable LLM output triggers exactly
+one repair retry before falling back to keeping all passages (`fallback_used=true`).
+
+**Why:** Keeps latency and token spend minimal for obvious relevant matches. Under model
+malfunction or malformed output, evidence is never silently dropped, and RBAC filtering
+remains strictly enforced.
+
+### 31. Retry retrieval preserves strict RBAC filter
+**Decision:** Rewritten queries are re-retrieved using the exact same role-derived payload
+filter and cross-encoder re-ranking threshold.
+
+**Why:** A rewritten query must never broaden retrieval scope or retrieve documents outside
+the authenticated user's permission boundaries. Penetration tests confirm 0.00% leakage.
+
+### 32. In-process route testing for sandboxed Windows environments
+**Decision:** API contract tests invoke FastAPI route functions in-process rather than
+binding external TCP loopback ports with `TestClient`.
+
+**Why:** Prevents Windows Proactor event loop socketpair deadlocks in isolated/sandboxed
+test harnesses while testing the identical endpoint logic, schema validation, and database rows.
+
+---
+
+## Part F — Phase 6A & 6B Closeout (Explainable Output & Streamlit UI)
+
+### 33. Structure-aware `heading_path` (`ENABLE_HEADING_PATH`, default `true`)
+**Decision:** `DocumentChunk` stores a hierarchical `heading_path` (e.g.,
+`"Part 4 Governance > 4.2 Board Voting > 4.2.3 Plurality rule"`) maintained by a
+5-level heading stack in `ClauseAwareChunker`. When `ENABLE_HEADING_PATH=true`,
+`build_indexable_text(chunk)` prepends `heading_path` to the text embedded in Qdrant
+and tokenized by BM25, and evaluation result files record `heading_path_enabled`.
+
+**Why:** Gives dense and sparse retrieval structural context for short sub-clauses
+while allowing clean ablation (`ENABLE_HEADING_PATH=false`) in Phase 7. Re-ingestion
+remains idempotent because deterministic UUIDv5 point IDs derive from `chunk_id`.
+
+### 34. Backward-compatible `Citation` and `ChatQueryResponse` fields (API.md vs Phase 6A)
+**Decision:** `Citation` in `src/api/schemas.py` populates both the Phase 3/API.md keys
+(`doc_id`, `doc_name`, `section_title`, `clause_id`, `page_number`, `snippet`) and the
+Phase 6A keys (`chunk_id`, `doc_title`, `heading_path`, `clause`, `page`,
+`quote_snippet`). `ChatQueryResponse` includes `route`, `grader_path`, `refusal`,
+`refusal_category`, `timings`, `citations_dropped`, and `heading_path_enabled` alongside
+the existing nested stats objects.
+
+**Why:** Satisfies the Phase 6A structured response specification without breaking
+any Phase 3–5 contract tests.
+
+### 35. Verbatim `quote_snippet` without ellipsis suffix
+**Decision:** `extract_verbatim_snippet(text, max_chars=200)` returns `text.strip()[:200]`
+without appending `"..."`.
+
+**Why:** Appending `"..."` to truncated snippets causes a strict verbatim substring check
+(`quote_snippet in passage_text`) to fail on passages longer than 200 characters. Pure
+slicing guarantees 100% verbatim substring fidelity.
+
+### 36. Server-side citation guard & safe 6-step reasoning trace (`ENABLE_XAI_OUTPUT`)
+**Decision:** `validate_cited_chunks` drops any model-cited `chunk_id` that was not in
+the context passages passed to the generator OR is not permitted for the authenticated
+role, recording the count in `citations_dropped`. When `ENABLE_XAI_OUTPUT=true`,
+`sources` / `citations` are filtered to the validated cited passages and
+`reasoning_trace` emits 6 ordered steps (`Question rewritten`, `Route`,
+`Passages retrieved/kept`, `Grader path`, `Retry used`, `Self-limits hit`) without
+prompts, passage text, or restricted document counts (`candidates_filtered` is omitted
+from the user-facing trace). When `ENABLE_XAI_OUTPUT=false`, the Phase 3–5 trace is
+preserved unchanged.
+
+**Why:** Enforces anti-hallucination and zero restricted metadata leakage while keeping
+flag-off parity for ablation runs.
+
+### 37. UI boundary and server-authoritative role in Streamlit (`Phase 6B`)
+**Decision:** `src/ui/app.py` communicates with the backend exclusively through
+`src/ui/api_client.py` (`ComplianceAPIClient`), stores the bearer token only in
+`st.session_state["access_token"]`, and reads the active role from the server's
+`/api/v1/auth/login` and `/api/v1/auth/me` payloads rather than a client-side role
+dropdown.
+
+**Why:** Prevents privilege escalation or client-side role spoofing and keeps the UI
+strictly decoupled from database, Qdrant, and LLM internals.
+
+---
+
+## Part G — Phase 7 Closeout (Gold Set, Retrieval Eval & Ablation Runner)
+
+### 38. Coexistence of legacy `data/gold_set.json` and Phase 7 `data/eval/gold_set.jsonl`
+**Decision:** Phase 1's `data/gold_set.json` (4 categories, clause-ID references, tested by
+`tests/test_data_validation.py`) is kept intact. Phase 7 introduces `data/eval/gold_set.jsonl`
+with 100 structured JSONL rows across all 5 required question types (`20 single_fact`,
+`20 multi_part`, `20 cross_reference`, `20 role_restricted`, `20 unanswerable`), mapped to
+real ingested `chunk_id`s from `/data` and marked `status: "draft"`.
+
+**Why:** Preserves 100% backward compatibility with Phase 1 tests while satisfying the
+Phase 7 JSONL schema (`id`, `question`, `type`, `role_asking`, `gold_chunk_ids`, `gold_doc`,
+`clause`, `gold_answer`, `expected_behaviour`, `status`) and the $\ge 15$-per-type quota.
+
+### 39. Paired role-restricted questions and LLM suggestion status enforcement
+**Decision:** In `data/eval/gold_set.jsonl`, `role_restricted` questions are authored in
+explicit role pairs (`paired_id`): each manager-permitted (`DOC-INT-POL-MGT-002`) or
+auditor-only (`DOC-INT-AUDIT-CONF-2025`) question is tested both as `expected_behaviour="answer"`
+for the authorized role and `expected_behaviour="refuse"` (with `unauthorized_keywords`) for
+the restricted role (`analyst` or `manager`). In `scripts/build_gold_set.py --suggest`,
+LLM-proposed questions are hard-coded to `status="draft"` with `source_chunk_id` attached
+and can never be written as `"reviewed"`.
+
+**Why:** Paired testing proves that the exact same regulatory question is answered for an
+authorized role and refused with 0.00% leakage for a lower-privilege role. Enforcing
+`status="draft"` on LLM-suggested items prevents unreviewed synthetic labels from polluting
+final benchmark claims.
+
+### 40. Temporary isolated indices for retrieval & ablation (`ENABLE_HEADING_PATH` on/off)
+**Decision:** Both `scripts/eval_retrieval.py` and `scripts/run_ablation.py` re-index the
+corpus into `tempfile.TemporaryDirectory` instances for `ENABLE_HEADING_PATH=False` (`A0_baseline`)
+and `ENABLE_HEADING_PATH=True` (`A1_heading_path`..`A5_full_xai`, `RBAC_OFF_DEMO`), never
+modifying `./data/qdrant` or `./data/sqlite/bm25_index.pkl`. Cross-encoder re-ranking also
+prepends `heading_path` when `ENABLE_HEADING_PATH=True`.
+
+**Why:** Guarantees that comparing heading-path off vs on is a clean, isolated index
+comparison and never clobbers the live application index.
+
+### 41. Profile-mixing guard (`ProfileMismatchError`) and `RBAC_OFF_DEMO` isolation
+**Decision:** Every checkpoint row and result JSON records `llm_profile` and `llm_model`.
+`load_checkpoint_rows` and `load_and_validate_ablation_files` raise `ProfileMismatchError`
+if an attempt is made to resume or merge artifacts across different profiles or models.
+The `RBAC_OFF_DEMO` configuration is gated behind `--include-rbac-off` (`allow_rbac_off=True`),
+which sets `BASELINE_ABLATION=True` strictly inside the context manager and labels the row
+`"DEMONSTRATION ONLY — DO NOT USE AS RESULT"`.
+
+**Why:** Prevents accidental contamination of live (`dev`/`demo`) dissertation tables with
+`mock` harness numbers, and demonstrates empirically what server-side RBAC prevents without
+weakening production security guards.
+
+

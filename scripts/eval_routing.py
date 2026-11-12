@@ -194,6 +194,7 @@ def run(profile: str | None, labels_path: Path, output_dir: Path) -> int:
         "profile": active.profile,
         "model": active.model,
         "prompt_version": settings.PROMPT_VERSION,
+        "heading_path_enabled": settings.ENABLE_HEADING_PATH,
         "temperature": settings.LLM_TEMPERATURE,
         "labels_file": str(labels_path),
         "labels_status": meta.get("status", "unlabelled"),

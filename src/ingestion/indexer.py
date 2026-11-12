@@ -42,6 +42,18 @@ def tokenize_for_bm25(text: str) -> list[str]:
     return re.findall(r"\b[a-zA-Z0-9_\-.]{2,}\b", text.lower())
 
 
+def build_indexable_text(chunk: DocumentChunk) -> str:
+    """Return the text used for dense embedding and BM25 tokenization.
+
+    When ``settings.ENABLE_HEADING_PATH`` is enabled, the hierarchical
+    ``heading_path`` is prepended to ``text_content`` so both dense vectors
+    and lexical BM25 benefit from structural section context.
+    """
+    if settings.ENABLE_HEADING_PATH and chunk.heading_path:
+        return f"{chunk.heading_path}\n{chunk.text_content}"
+    return chunk.text_content
+
+
 def _close_qdrant_quietly(client: Any) -> None:
     """Close an embedded Qdrant client without raising during teardown."""
     try:
@@ -136,7 +148,7 @@ class QdrantIndexer:
         from qdrant_client.http import models
 
         client = self._get_client()
-        texts = [chunk.text_content for chunk in chunks]
+        texts = [build_indexable_text(chunk) for chunk in chunks]
         vectors = self.embedder.embed_texts(texts)
         self.ensure_collection(vector_dim=len(vectors[0]))
 
@@ -149,6 +161,7 @@ class QdrantIndexer:
                 "doc_title": chunk.doc_title,
                 "section_label": chunk.section_label,
                 "clause_label": chunk.clause_label,
+                "heading_path": chunk.heading_path,
                 "page": chunk.page,
                 "source_path": chunk.source_path,
                 "allowed_roles": chunk.allowed_roles,
@@ -204,6 +217,9 @@ class QdrantIndexer:
         hits: list[dict[str, Any]] = []
         for result in results:
             payload = result.payload or {}
+            sec = payload.get("section_label") or ""
+            cls = payload.get("clause_label") or ""
+            fallback_path = f"{sec} > {cls}" if (sec and cls and cls != sec) else (sec or cls)
             hits.append(
                 {
                     "chunk_id": payload.get("chunk_id"),
@@ -211,6 +227,7 @@ class QdrantIndexer:
                     "doc_title": payload.get("doc_title"),
                     "section_label": payload.get("section_label"),
                     "clause_label": payload.get("clause_label"),
+                    "heading_path": payload.get("heading_path") or fallback_path,
                     "page": payload.get("page"),
                     "source_path": payload.get("source_path"),
                     "allowed_roles": payload.get("allowed_roles", []),
@@ -232,7 +249,7 @@ class BM25Indexer:
 
     def build_and_save(self, chunks: list[DocumentChunk]) -> int:
         """Fit BM25 over all chunks and atomically replace the persisted index."""
-        tokenized_corpus = [tokenize_for_bm25(chunk.text_content) for chunk in chunks]
+        tokenized_corpus = [tokenize_for_bm25(build_indexable_text(chunk)) for chunk in chunks]
         if not tokenized_corpus:
             self.bm25 = None
             self.chunks = []
@@ -246,6 +263,7 @@ class BM25Indexer:
                     "doc_title": chunk.doc_title,
                     "section_label": chunk.section_label,
                     "clause_label": chunk.clause_label,
+                    "heading_path": chunk.heading_path,
                     "page": chunk.page,
                     "source_path": chunk.source_path,
                     "allowed_roles": chunk.allowed_roles,
@@ -322,6 +340,10 @@ class BM25Indexer:
             if score <= 0.0:
                 continue
             item = dict(self.chunks[index])
+            if not item.get("heading_path"):
+                sec = item.get("section_label") or ""
+                cls = item.get("clause_label") or ""
+                item["heading_path"] = f"{sec} > {cls}" if (sec and cls and cls != sec) else (sec or cls)
             item["score"] = score
             results.append(item)
         return SearchResult(hits=results, considered=len(positive), filtered=filtered)

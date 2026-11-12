@@ -167,7 +167,9 @@ def _grade_passages_via_llm(
     # the <user_question> data block.
     safe_question = re.sub(r"[<>]", " ", question).strip()
     passage_text = _format_passages_for_grader(passages)
-    prompt = prompt_template.format(question=safe_question, passages=passage_text)
+    prompt = (
+        prompt_template.replace("{question}", safe_question).replace("{passages}", passage_text)
+    )
 
     tokens_before = spend_guard.tokens_count
     start = time.perf_counter()
@@ -244,9 +246,10 @@ def _rewrite_query(
     """
     prompt_template = load_prompt("rewrite")
     safe_question = re.sub(r"[<>]", " ", question).strip()
-    prompt = prompt_template.format(
-        question=safe_question,
-        max_chars=settings.GRADER_MAX_REWRITE_CHARS,
+    prompt = (
+        prompt_template.replace("{question}", safe_question).replace(
+            "{max_chars}", str(settings.GRADER_MAX_REWRITE_CHARS)
+        )
     )
 
     tokens_before = spend_guard.tokens_count
@@ -498,3 +501,4 @@ __all__ = [
     "grade",
     "grader_metadata",
 ]
+

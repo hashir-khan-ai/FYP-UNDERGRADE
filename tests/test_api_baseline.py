@@ -2,6 +2,7 @@
 
 import pytest
 from fastapi.testclient import TestClient
+from src.config import settings
 from src.api.main import app
 
 client = TestClient(app)
@@ -15,8 +16,8 @@ def test_health_check_endpoint() -> None:
     assert data["status"] in ("healthy", "degraded")
     assert data["llm"]["profile"] == "mock"
     assert data["llm"]["is_mock"] is True
-    assert data["layers"]["adaptive_router"] is False
-    assert data["layers"]["corrective_grader"] is False
+    assert data["layers"]["adaptive_router"] == settings.ENABLE_ADAPTIVE_ROUTER
+    assert data["layers"]["corrective_grader"] == settings.ENABLE_CORRECTIVE_GRADER
     assert data["layers"]["xai_output"] is False
     assert data["layers"]["rbac"] is True
     assert "vector_store" in data

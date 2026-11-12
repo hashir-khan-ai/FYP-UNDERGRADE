@@ -20,13 +20,17 @@ from pathlib import Path
 _TEMP_ROOT = Path(tempfile.mkdtemp(prefix="leakage_check_"))
 os.environ["APP_ENV"] = "test"
 os.environ["LLM_PROFILE"] = "mock"
+os.environ["LLM_MAX_CALLS_PER_RUN"] = "200"
+os.environ["LLM_MAX_TOKENS_PER_RUN"] = "200000"
 os.environ["DATABASE_PATH"] = str(_TEMP_ROOT / "app.db")
 os.environ["QDRANT_STORAGE_PATH"] = str(_TEMP_ROOT / "qdrant")
 os.environ["BM25_INDEX_PATH"] = str(_TEMP_ROOT / "bm25.pkl")
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from src.config import settings  # noqa: E402
 from src.core.llm_client import LLMResponse, ResilientLLMClient  # noqa: E402
+from src.core.xai import build_safe_reasoning_trace  # noqa: E402
 from src.db.connection import get_db_connection  # noqa: E402
 from src.db.migrations import init_db  # noqa: E402
 from src.ingestion.chunker import DocumentChunk  # noqa: E402
@@ -175,8 +179,37 @@ def run() -> int:
 
     rows: list[tuple[str, str, bool, list[str]]] = []
 
+    class RetryForcingLLM(CapturingLLM):
+        """Forces an initial irrelevant grade + rewrite to exercise the retry path."""
+
+        def __init__(self) -> None:
+            super().__init__()
+            self._call_num = 0
+
+        def _generate_mock_response(self, prompt: str) -> str:
+            self._call_num += 1
+            lowered = prompt.lower()
+            if '"grades"' in lowered or ("grade" in lowered and "chunk_id" in lowered):
+                if self._call_num == 1:
+                    import re as _re
+                    cids = _re.findall(r'chunk_id="([^"]+)"', prompt)
+                    grades = [{"chunk_id": c, "label": "irrelevant", "reason": "force retry"} for c in cids]
+                    return json.dumps({"grades": grades})
+            if "rewritten_query" in lowered:
+                return json.dumps({"rewritten_query": "escalated compliance audit findings and remediation"})
+            return super()._generate_mock_response(prompt)
+
+    retry_llm = RetryForcingLLM()
+    retry_pipeline = BaselineRAGPipeline(
+        qdrant_indexer=qdrant,
+        bm25_indexer=bm25,
+        reranker=MockCrossEncoderReranker(),
+        llm=retry_llm,
+    )
+
     def evaluate(role: str, question_key: str, invoke) -> None:
         llm.prompts.clear()
+        retry_llm.prompts.clear()
         log_buffer.seek(0)
         log_buffer.truncate(0)
         before_cache = _cache_rows()
@@ -186,11 +219,23 @@ def run() -> int:
         new_cache_text = " ".join(
             text for key, text in _cache_rows().items() if key not in before_cache
         )
+        safe_trace = build_safe_reasoning_trace(
+            question_rewritten=bool(response.grader_rewrite_used),
+            route="SINGLE_SEARCH",
+            passages_retrieved=response.initial_passages_retrieved or len(response.sources),
+            passages_kept=len(response.sources),
+            grader_path=response.grader_path,
+            retry_used=bool(response.grader_rewrite_used),
+            limits_hit=False,
+        )
         surfaces = {
             "passages": json.dumps([source.model_dump() for source in response.sources]),
-            "prompt": "\n".join(llm.prompts),
+            "heading_path": " ".join(source.heading_path for source in response.sources),
+            "quote_snippet": " ".join(source.quote_snippet for source in response.sources),
+            "prompt": "\n".join(llm.prompts + retry_llm.prompts),
             "answer": response.answer,
             "citations": " ".join(response.chunk_ids_used),
+            "xai_trace": " ".join(safe_trace),
             "logs": log_buffer.getvalue(),
             "cache": new_cache_text,
         }
@@ -213,6 +258,43 @@ def run() -> int:
                         q, s, role=r
                     ),
                 )
+            # Phase 5 & 6A: Grader + rewrite retry + XAI output enabled scenarios
+            orig_grader = settings.ENABLE_CORRECTIVE_GRADER
+            orig_shortcut = settings.GRADER_SHORTCUT_ENABLED
+            orig_xai = settings.ENABLE_XAI_OUTPUT
+            try:
+                settings.ENABLE_CORRECTIVE_GRADER = True
+                settings.GRADER_SHORTCUT_ENABLED = False
+                settings.ENABLE_XAI_OUTPUT = True
+
+                for g_key in ("manager_only", "auditor_only"):
+                    q = QUESTIONS[g_key]
+                    evaluate(
+                        role,
+                        f"grader_{g_key}",
+                        lambda q=q, r=role: pipeline.ask(q, role=r),
+                    )
+                    retry_llm._call_num = 0
+                    retry_llm.prompts.clear()
+                    evaluate(
+                        role,
+                        f"grader_retry_{g_key.split('_')[0]}",
+                        lambda q=q, r=role: retry_pipeline.ask(q, role=r),
+                    )
+                retry_llm._call_num = 0
+                retry_llm.prompts.clear()
+                q_split, subs_split = SPLIT_QUESTIONS["split_manager_auditor"]
+                evaluate(
+                    role,
+                    "grader_split_retry",
+                    lambda q=q_split, s=subs_split, r=role: retry_pipeline.ask_split(
+                        q, s, role=r
+                    ),
+                )
+            finally:
+                settings.ENABLE_CORRECTIVE_GRADER = orig_grader
+                settings.GRADER_SHORTCUT_ENABLED = orig_shortcut
+                settings.ENABLE_XAI_OUTPUT = orig_xai
     finally:
         qdrant.close()
         logging.getLogger().removeHandler(handler)

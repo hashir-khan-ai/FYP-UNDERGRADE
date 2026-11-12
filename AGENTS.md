@@ -95,3 +95,4 @@ You act as a **Senior Lead Software Engineer and RAG Systems Architect** with de
    - `refactor:` for internal improvements without feature changes
 2. **No Dirty Workspace State:** Before concluding any working session, verify that temporary test artifacts or cache files are cleaned up and no uncommitted broken states remain.
 3. **Stop & Ask Protocol:** If any instruction is ambiguous, if an upstream model fails to adhere to JSON schemas, or if an architectural roadblock appears, **stop immediately and ask the student for clarification** rather than making silent assumptions.
+4. **Phase Closeout Discipline:** At the end of every phase, update STATUS.md and PLAN.md, and add any new decision or deviation to DECISIONS.md. Never write secrets, passwords, tokens or personal data into any of these files.

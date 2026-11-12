@@ -51,6 +51,13 @@ class Citation(BaseModel):
     clause_id: str
     page_number: int | None = None
     snippet: str
+    # Phase 6A structured citation fields (kept alongside Phase 3 fields for backward compatibility)
+    chunk_id: str = ""
+    doc_title: str = ""
+    heading_path: str = ""
+    clause: str = ""
+    page: int | None = None
+    quote_snippet: str = ""
 
 
 class LLMStats(BaseModel):
@@ -119,6 +126,7 @@ class ChatQueryResponse(BaseModel):
     session_id: str
     answer: str
     route_taken: str
+    route: str = "SINGLE_SEARCH"
     citations: list[Citation]
     reasoning_trace: list[str]
     retrieval_stats: RetrievalStats
@@ -131,6 +139,13 @@ class ChatQueryResponse(BaseModel):
     candidates_filtered_by_role: int
     router: RouterStats = Field(default_factory=RouterStats)
     grader: GraderStats = Field(default_factory=GraderStats)
+    # Phase 6A structured fields
+    grader_path: str | None = None
+    refusal: str | None = None
+    refusal_category: str | None = None
+    timings: dict[str, float] = Field(default_factory=dict)
+    citations_dropped: int = 0
+    heading_path_enabled: bool = True
 
 
 class SessionCreateRequest(BaseModel):
@@ -188,6 +203,9 @@ class AuditLogEntry(BaseModel):
     candidates_filtered: int = 0
     router_confidence: float | None = None
     router_fallback_reason: str | None = None
+    citation_count: int | None = None
+    citations_dropped: int | None = None
+    heading_path_enabled: bool | None = None
     created_at: str | None = None
 
 

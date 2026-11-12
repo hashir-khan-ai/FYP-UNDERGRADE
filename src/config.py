@@ -176,6 +176,10 @@ class Settings(BaseSettings):
         default=False,
         description="Layer 4: Clause-level citations, reasoning trace, audit log",
     )
+    ENABLE_HEADING_PATH: bool = Field(
+        default=True,
+        description="Structure-aware retrieval: include full heading path in chunk embeddings and BM25",
+    )
 
     # Phase 3 security and memory flags. RBAC is on by default and may only be
     # disabled in tests or in an explicitly labelled baseline ablation.

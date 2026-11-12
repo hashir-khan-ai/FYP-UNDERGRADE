@@ -26,6 +26,16 @@ class DocumentChunk:
     allowed_roles: list[str]
     text_content: str
     token_count: int = 0
+    heading_path: str = ""
+
+    def __post_init__(self) -> None:
+        if not self.heading_path:
+            parts: list[str] = []
+            if self.section_label:
+                parts.append(self.section_label)
+            if self.clause_label and self.clause_label != self.section_label:
+                parts.append(self.clause_label)
+            self.heading_path = " > ".join(parts) if parts else self.doc_title
 
 
 _MARKDOWN_HEADING = re.compile(r"^(#{1,6})\s+(.*\S)\s*$")
@@ -122,6 +132,7 @@ class ClauseAwareChunker:
 
         current_section = "General Overview"
         current_clause = ""
+        heading_levels: dict[int, str] = {}
         buffer: list[str] = []
 
         def flush() -> None:
@@ -134,6 +145,13 @@ class ClauseAwareChunker:
                 buffer = []
                 return
             label = current_clause or current_section
+            path_items = [heading_levels[k] for k in sorted(heading_levels)]
+            if path_items:
+                heading_path = " > ".join(path_items)
+            elif current_clause and current_clause != current_section:
+                heading_path = f"{current_section} > {current_clause}"
+            else:
+                heading_path = current_section
             chunks.extend(
                 self._create_chunks(
                     doc=doc,
@@ -143,6 +161,7 @@ class ClauseAwareChunker:
                     text=text,
                     used_ids=used_ids,
                     label=label,
+                    heading_path=heading_path,
                 )
             )
             buffer = []
@@ -174,6 +193,9 @@ class ClauseAwareChunker:
                     # A document title is not a clause boundary.
                     buffer.append(line)
                 else:
+                    for deeper in [k for k in heading_levels if k >= level]:
+                        del heading_levels[deeper]
+                    heading_levels[level] = heading_text
                     kind = _classify_heading(heading_text)
                     if kind == "clause":
                         current_clause = heading_text
@@ -202,7 +224,17 @@ class ClauseAwareChunker:
             return len(md.group(1)), md.group(2).strip()
         legal = _LEGAL_HEADING.match(text)
         if legal:
-            return 3, legal.group("label").strip()
+            label = legal.group("label").strip()
+            lowered = label.lower()
+            if re.match(r"^(part|chapter)\b", lowered):
+                return 2, label
+            if re.match(r"^section\b", lowered):
+                return 3, label
+            num_match = re.match(r"^(\d+(?:\.\d+)*)\.?\s", label)
+            if num_match:
+                dots = num_match.group(1).count(".")
+                return min(2 + dots, 6), label
+            return 4, label
         return None
 
     @staticmethod
@@ -235,6 +267,7 @@ class ClauseAwareChunker:
         text: str,
         used_ids: dict[str, int],
         label: str,
+        heading_path: str = "",
     ) -> list[DocumentChunk]:
         words = text.split()
         if not words:
@@ -262,6 +295,7 @@ class ClauseAwareChunker:
                     allowed_roles=list(doc.allowed_roles),
                     text_content=part.strip(),
                     token_count=len(part_words),
+                    heading_path=heading_path,
                 )
             )
         return chunks

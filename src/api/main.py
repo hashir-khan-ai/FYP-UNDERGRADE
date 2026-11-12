@@ -179,6 +179,7 @@ def _health_payload() -> dict:
             "memory": settings.ENABLE_MEMORY,
             "rbac_memory": settings.rbac_enabled and settings.ENABLE_MEMORY,
             "xai_output": settings.ENABLE_XAI_OUTPUT,
+            "heading_path": settings.ENABLE_HEADING_PATH,
         },
     }
 

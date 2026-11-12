@@ -26,16 +26,16 @@ flowchart LR
 Establish project dependencies, SQLite database with migrations and seeds, synthetic regulatory documents, synthetic user directory, `.env.example`, `.gitignore`, and the initial 100-question gold benchmark set.
 
 ### Concrete Tasks
-1. Initialize `.gitignore` (ignoring `.env`, `data/sqlite/*.db`, `data/qdrant/`, `data/cache/`, `.venv/`, `__pycache__/`, `.pytest_cache/`).
-2. Create and verify `requirements.txt` with pinned versions and justification comments, plus `requirements-dev.txt`.
-3. Create `.env.example` containing the `mock` / `dev` / `demo` profile blocks, base URLs, model names, timeout/retry/rate-limit settings, prompt version, spend-guard caps, and ablation flags.
-4. Build `src/config.py` using Pydantic `BaseSettings` to validate environment variables and resolve `LLM_PROFILE` into one `llm` settings object. Unknown or incomplete profiles must fail fast with a sanitized message; `demo` must never borrow `dev` credentials.
-5. Implement `src/db/connection.py` and `src/db/migrations.py` to create SQLite schema (roles, users, sessions, messages, audit_log, llm_calls, documents, plus the `llm_cache` response table).
-6. Generate synthetic internal bank documents in `/data/synthetic/` with explicit role boundaries (`SOP-KYC-001.md`, `POLICY-SUPERVISORY-002.md`, `AUDIT-LIQUIDITY-2025.md`).
-7. Populate public regulatory sample documents in `/data/raw/` (e.g. FCA BCOBS / MLR regulations).
-8. Create `scripts/seed_data.py` to insert synthetic roles, users, and documents into SQLite.
-9. Author the 100-question benchmark set in `data/gold_set.json` (single-fact, multi-part, role-restricted, unanswerable).
-10. Implement mock LLM fixtures in `tests/conftest.py` ensuring all automated tests run under `LLM_PROFILE=mock` with 0 external API calls, and fail fast if a live profile is ever resolved.
+1. [x] Initialize `.gitignore` (ignoring `.env`, `data/sqlite/*.db`, `data/qdrant/`, `data/cache/`, `.venv/`, `__pycache__/`, `.pytest_cache/`).
+2. [x] Create and verify `requirements.txt` with pinned versions and justification comments, plus `requirements-dev.txt`.
+3. [x] Create `.env.example` containing the `mock` / `dev` / `demo` profile blocks, base URLs, model names, timeout/retry/rate-limit settings, prompt version, spend-guard caps, and ablation flags.
+4. [x] Build `src/config.py` using Pydantic `BaseSettings` to validate environment variables and resolve `LLM_PROFILE` into one `llm` settings object. Unknown or incomplete profiles must fail fast with a sanitized message; `demo` must never borrow `dev` credentials.
+5. [x] Implement `src/db/connection.py` and `src/db/migrations.py` to create SQLite schema (roles, users, sessions, messages, audit_log, llm_calls, documents, plus the `llm_cache` response table).
+6. [x] Generate synthetic internal bank documents in `/data/synthetic/` with explicit role boundaries (`SOP-KYC-001.md`, `POLICY-SUPERVISORY-002.md`, `AUDIT-LIQUIDITY-2025.md`).
+7. [x] Populate public regulatory sample documents in `/data/raw/` (e.g. FCA BCOBS / MLR regulations).
+8. [x] Create `scripts/seed_data.py` to insert synthetic roles, users, and documents into SQLite.
+9. [x] Author the 100-question benchmark set in `data/gold_set.json` (single-fact, multi-part, role-restricted, unanswerable).
+10. [x] Implement mock LLM fixtures in `tests/conftest.py` ensuring all automated tests run under `LLM_PROFILE=mock` with 0 external API calls, and fail fast if a live profile is ever resolved.
 
 ### Files Affected
 - `.gitignore`
@@ -74,20 +74,20 @@ Establish project dependencies, SQLite database with migrations and seeds, synth
 Implement clause-aware document chunking, hybrid retrieval (BM25 + Qdrant embedded dense vectors) with Reciprocal Rank Fusion, cross-encoder re-ranking on CPU, and baseline standard RAG generation through the single profile-driven LLM wrapper (profiles, caching, spend guard, token telemetry).
 
 ### Concrete Tasks
-1. Build `src/ingestion/loader.py` for reading markdown and PDF files with header preservation.
-2. Build `src/ingestion/chunker.py` to split documents hierarchically by clause, article, and section, tagging each chunk with `allowed_roles`.
-3. Implement `src/retrieval/bm25.py` for in-memory keyword search.
-4. Implement `src/retrieval/vector_store.py` wrapping Qdrant embedded client with `BAAI/bge-small-en-v1.5` embeddings on CPU.
-5. Implement `src/retrieval/hybrid.py` for Reciprocal Rank Fusion ($k=60$) combining BM25 and vector scores.
-6. Implement `src/retrieval/reranker.py` using `cross-encoder/ms-marco-MiniLM-L-6-v2` on CPU to score top-20 candidates down to top-5.
-7. Build `src/core/llm_client.py` as the **only** LLM entry point: resolves `LLM_PROFILE` (`mock` | `dev` | `demo`), applies 15s timeout, exponential backoff with jitter, token-bucket RPM limiting, and optional dev-only failover.
-8. Build `src/core/llm_cache.py` as a thin wrapper over the repository's `llm_cache` table (key = SHA-256 of model + prompt + parameters, including profile and prompt version) and `src/core/spend_guard.py` (per-run call and token caps with a clear stop message). Implement the `mock` provider returning deterministic canned outputs.
-9. Create the versioned prompt registry: `prompts/answer/v1.md` and `prompts/rewrite/v1.md`, loaded by a small loader that validates `PROMPT_VERSION` and exposes the version for cache keys and audit rows.
-10. Implement per-call token telemetry into the `llm_calls` metrics table (step, profile, model, prompt version, tokens, cached, latency, flags).
-11. Build `src/core/pipeline.py` implementing baseline generation (single LLM prompt with retrieved chunks).
-12. Create `scripts/run_ingestion.py` to parse all raw/synthetic documents and index them into Qdrant and BM25.
-13. Create `scripts/smoke_demo.py` with 10 representative questions (extended with role/refusal cases as later layers land), printing pass/fail, latency, tokens, route and cache status; `--profile` overrides `.env` for the run.
-14. **Measure Baseline Latency and Tokens per Query:** Record prompt tokens, completion tokens, and latency for baseline queries.
+1. [x] Build `src/ingestion/loader.py` for reading markdown and PDF files with header preservation.
+2. [x] Build `src/ingestion/chunker.py` to split documents hierarchically by clause, article, and section, tagging each chunk with `allowed_roles`.
+3. [x] Implement `src/retrieval/bm25.py` for in-memory keyword search.
+4. [x] Implement `src/retrieval/vector_store.py` wrapping Qdrant embedded client with `BAAI/bge-small-en-v1.5` embeddings on CPU.
+5. [x] Implement `src/retrieval/hybrid.py` for Reciprocal Rank Fusion ($k=60$) combining BM25 and vector scores.
+6. [x] Implement `src/retrieval/reranker.py` using `cross-encoder/ms-marco-MiniLM-L-6-v2` on CPU to score top-20 candidates down to top-5.
+7. [x] Build `src/core/llm_client.py` as the **only** LLM entry point: resolves `LLM_PROFILE` (`mock` | `dev` | `demo`), applies 15s timeout, exponential backoff with jitter, token-bucket RPM limiting, and optional dev-only failover.
+8. [x] Build `src/core/llm_cache.py` as a thin wrapper over the repository's `llm_cache` table (key = SHA-256 of model + prompt + parameters, including profile and prompt version) and `src/core/spend_guard.py` (per-run call and token caps with a clear stop message). Implement the `mock` provider returning deterministic canned outputs.
+9. [x] Create the versioned prompt registry: `prompts/answer/v1.md` and `prompts/rewrite/v1.md`, loaded by a small loader that validates `PROMPT_VERSION` and exposes the version for cache keys and audit rows.
+10. [x] Implement per-call token telemetry into the `llm_calls` metrics table (step, profile, model, prompt version, tokens, cached, latency, flags).
+11. [x] Build `src/core/pipeline.py` implementing baseline generation (single LLM prompt with retrieved chunks).
+12. [x] Create `scripts/run_ingestion.py` to parse all raw/synthetic documents and index them into Qdrant and BM25.
+13. [x] Create `scripts/smoke_demo.py` with 10 representative questions (extended with role/refusal cases as later layers land), printing pass/fail, latency, tokens, route and cache status; `--profile` overrides `.env` for the run.
+14. [x] **Measure Baseline Latency and Tokens per Query:** Record prompt tokens, completion tokens, and latency for baseline queries.
 
 ### Files Affected
 - `src/ingestion/loader.py`
@@ -127,12 +127,12 @@ Implement clause-aware document chunking, hybrid retrieval (BM25 + Qdrant embedd
 Enforce server-side role-based access filtering in Qdrant and BM25 at retrieval time, implement session-based conversation memory in SQLite, and track memory-injected token overhead.
 
 ### Concrete Tasks
-1. Build `src/core/security.py` to resolve role permissions (`analyst`, `manager`, `auditor`) into deterministic Qdrant payload filters and BM25 candidate filters.
-2. Integrate security filters directly into `src/retrieval/vector_store.py` and `src/retrieval/bm25.py`.
-3. Implement `src/core/memory.py` to fetch recent turns for active `session_id` and append conversation context.
-4. Add query condensation logic if conversational context contains pronominal references.
-5. Create automated security test suite `tests/test_rbac_security.py` probing unauthorized access boundaries.
-6. **Measure Memory Layer Latency & Tokens:** Quantify the incremental token cost of carrying session history into queries.
+1. [x] Build `src/core/security.py` to resolve role permissions (`analyst`, `manager`, `auditor`) into deterministic Qdrant payload filters and BM25 candidate filters.
+2. [x] Integrate security filters directly into `src/retrieval/vector_store.py` and `src/retrieval/bm25.py`.
+3. [x] Implement `src/core/memory.py` to fetch recent turns for active `session_id` and append conversation context.
+4. [x] Add query condensation logic if conversational context contains pronominal references.
+5. [x] Create automated security test suite `tests/test_rbac_security.py` probing unauthorized access boundaries.
+6. [x] **Measure Memory Layer Latency & Tokens:** Quantify the incremental token cost of carrying session history into queries.
 
 ### Files Affected
 - `src/core/security.py`
@@ -158,11 +158,11 @@ Enforce server-side role-based access filtering in Qdrant and BM25 at retrieval 
 Implement the Adaptive Router to classify queries into direct replies, single searches, or sub-question decompositions, avoiding unnecessary retrieval and handling compound questions.
 
 ### Concrete Tasks
-1. Build `src/core/router.py` with the strict JSON prompt at `prompts/router/v1.md`, defining routes: `DIRECT_REPLY`, `SINGLE_SEARCH`, `MULTI_PART_SPLIT`.
-2. Validate router decisions with a strict Pydantic model (`extra="forbid"`), allowing exactly **one repair retry** that feeds the validation error back to the model; on a second failure, fall back deterministically to `SINGLE_SEARCH` and set `fallback_used=true`.
-3. Implement query decomposition handler for `MULTI_PART_SPLIT`: generates 2–3 sub-questions, executes parallel searches, and deduplicates retrieved chunk sets.
-4. Wire router into `src/core/pipeline.py` behind the `ENABLE_ADAPTIVE_ROUTER` flag.
-5. **Measure Router Latency and Tokens:** Quantify token savings on greetings (direct reply) vs extra tokens consumed during decomposition, including repair-retry overhead.
+1. [x] Build `src/core/router.py` with the strict JSON prompt at `prompts/router/v1.md`, defining routes: `DIRECT_REPLY`, `SINGLE_SEARCH`, `MULTI_PART_SPLIT`.
+2. [x] Validate router decisions with a strict Pydantic model (`extra="forbid"`), allowing exactly **one repair retry** that feeds the validation error back to the model; on a second failure, fall back deterministically to `SINGLE_SEARCH` and set `fallback_used=true`.
+3. [x] Implement query decomposition handler for `MULTI_PART_SPLIT`: generates 2–3 sub-questions, executes parallel searches, and deduplicates retrieved chunk sets.
+4. [x] Wire router into `src/core/pipeline.py` behind the `ENABLE_ADAPTIVE_ROUTER` flag.
+5. [x] **Measure Router Latency and Tokens:** Quantify token savings on greetings (direct reply) vs extra tokens consumed during decomposition, including repair-retry overhead.
 
 ### Files Affected
 - `src/core/router.py`
@@ -181,18 +181,18 @@ Implement the Adaptive Router to classify queries into direct replies, single se
 
 ---
 
-## Phase 5: Layer 2 - Corrective Grader & Single Retry Loop
+## Phase 5: Layer 2 - Corrective Grader & Single Retry Loop [Completed]
 
 ### Goal
 Implement passage relevance grading, automated query rewriting upon poor retrieval, and polite refusal when evidence remains insufficient.
 
 ### Concrete Tasks
-1. Build `src/core/grader.py` with the strict JSON prompt at `prompts/grader/v1.md`, evaluating relevance of retrieved passages against the query.
-2. Validate grader output with a strict Pydantic model, allowing exactly **one repair retry**; if the second attempt is still invalid, fall back to "keep all passages" (no passage dropped) and set `fallback_used=true`.
-3. Implement query rewriter (using `prompts/rewrite/v1.md`) to reformulate ambiguous search queries if initial relevance score $< \text{threshold}$ (default $0.65$).
-4. Implement conditional retry loop in `src/core/pipeline.py` (maximum 1 retry) controlled by `ENABLE_CORRECTIVE_GRADER`.
-5. Implement standard polite refusal generator when second-pass retrieval remains irrelevant.
-6. **Measure Grader Latency and Tokens:** Record extra tokens consumed by grading calls, repair retries, and query rewrites.
+1. [x] Build `src/core/grader.py` with the strict JSON prompt at `prompts/grader/v1.md`, evaluating relevance of retrieved passages against the query.
+2. [x] Validate grader output with a strict Pydantic model, allowing exactly **one repair retry**; if the second attempt is still invalid, fall back to "keep all passages" (no passage dropped) and set `fallback_used=true`.
+3. [x] Implement query rewriter (using `prompts/rewrite/v1.md`) to reformulate ambiguous search queries if initial relevance score $< \text{threshold}$ (default $0.65$).
+4. [x] Implement conditional retry loop in `src/core/pipeline.py` (maximum 1 retry) controlled by `ENABLE_CORRECTIVE_GRADER`.
+5. [x] Implement standard polite refusal generator when second-pass retrieval remains irrelevant.
+6. [x] **Measure Grader Latency and Tokens:** Record extra tokens consumed by grading calls, repair retries, and query rewrites.
 
 ### Files Affected
 - `src/core/grader.py`
@@ -211,23 +211,23 @@ Implement passage relevance grading, automated query rewriting upon poor retriev
 
 ---
 
-## Phase 6: Layer 4 - Explainable Output (XAI) & Streamlit Demo UI
+## Phase 6: Layer 4 - Explainable Output (XAI) & Streamlit Demo UI [Completed]
 
 ### Goal
 Implement clause-level citation extraction, reasoning trace logging, persistent SQLite audit logging, FastAPI REST endpoints, and a multi-role Streamlit demonstration UI.
 
 ### Concrete Tasks
-1. Build `src/core/xai.py` to extract clause citations (`[DocName, ClauseID]`) and compile reasoning traces.
-2. Implement anti-hallucination citation guard ensuring cited clauses exist in retrieved chunks.
-3. Implement audit trail logger inserting interaction metadata into SQLite `audit_log` table.
-4. Build FastAPI endpoints in `src/api/` (`/api/v1/chat/query`, `/api/v1/sessions`, `/api/v1/audit/logs`, `/api/v1/admin/health`).
-5. Build Streamlit web application (`src/ui/app.py`):
-   - Role switcher dropdown (`Analyst`, `Manager`, `Auditor`).
-   - Chat session interface with message history.
-   - Interactive citation drawer displaying cited clause snippets.
-   - Collapsible reasoning trace viewer and Auditor-only audit log dashboard.
-6. **Measure XAI Latency and Token Overhead:** Track formatting token overhead of citation annotations and audit traces.
-7. Extend `scripts/smoke_demo.py` with the final 10 representative questions across all layers (greeting, single-fact, multi-part, role-restricted, unanswerable) and show the active profile plus cache status per row.
+1. [x] Build `src/core/xai.py` to extract clause citations (`[DocName, ClauseID]`), validate cited `chunk_id`s against role-permitted context, and compile safe 6-step reasoning traces.
+2. [x] Implement anti-hallucination citation guard ensuring cited clauses exist in retrieved chunks and are permitted for the user's role (`citations_dropped` counter).
+3. [x] Implement structure-aware `heading_path` in `src/ingestion/chunker.py` and `src/ingestion/indexer.py` behind `ENABLE_HEADING_PATH` (default `true`), plus additive audit columns (`citation_count`, `citations_dropped`, `heading_path_enabled`).
+4. [x] Build FastAPI endpoints in `src/api/` (`/api/v1/chat/query`, `/api/v1/sessions`, `/api/v1/audit/logs`, `/api/v1/admin/health`) and `scripts/eval_citations.py`.
+5. [x] Build Streamlit web application (`DESIGN.md`, `.streamlit/config.toml`, `src/ui/api_client.py`, `src/ui/app.py`):
+   - Login screen with server-verified role badge (`Analyst`, `Manager`, `Auditor`) and `st.session_state`-only token storage.
+   - Chat session interface with message history, new/open/delete session controls, and distinct refusal state.
+   - Interactive citation panel displaying `doc_title`, `heading_path`, `clause`, `page`, `chunk_id`, and verbatim `quote_snippet` ($\le 200$ chars).
+   - Collapsible safe reasoning trace viewer, settings panel (`mock`/`dev`/`demo` badge), and Auditor-only audit log summary view.
+6. [x] **Measure XAI Citations & Support:** Verified 100% citation validity and 100% verbatim snippet support via `scripts/eval_citations.py --profile mock`.
+7. [x] Create `tests/test_xai.py`, `tests/test_ui_client.py`, and `docs/UI_TEST_CHECKLIST.md`.
 
 ### Files Affected
 - `src/core/xai.py`
@@ -250,21 +250,18 @@ Implement clause-level citation extraction, reasoning trace logging, persistent 
 
 ---
 
-## Phase 7: Layer-by-Layer Evaluation, Ablation Benchmark & Write-Up
+## Phase 7: Layer-by-Layer Evaluation, Ablation Benchmark & Write-Up [Completed]
 
 ### Goal
-Execute the 100-question benchmark layer by layer across all 5 configurations with rate-limit handling and result caching, record all metrics (Recall, MRR, RAGAS, CRR, Leakage, Latency, Tokens), hand-check 20% sample, and export publication-ready tables.
+Execute the 100-question benchmark layer by layer across all configurations (`A0_baseline`..`A5_full_xai` + `RBAC_OFF_DEMO`) with rate-limit handling and result caching, record all metrics (Recall, MRR, nDCG@5, Answer F1, Citation Validity/Support, CRR, FRR, Leakage, Routing Accuracy, Latency, Tokens), and export publication-ready tables with bootstrap 95% confidence intervals.
 
 ### Concrete Tasks
-1. Build `scripts/run_evaluation.py` supporting layer-by-layer execution, `--profile mock|dev|demo`, temperature 0, batching (5 items/batch), rate-limit delay, persistent result caching to disk, `--resume`, and spend-guard-aware abort handling.
-2. Write `llm_profile`, `llm_model`, `prompt_version`, `temperature`, `config_hash` and `run_id` into the run manifest and **every** per-question result row/artifact (JSONL, CSV, summary JSON, LaTeX).
-3. Execute Run 0 (Baseline) against 100 gold questions; record baseline metrics.
-4. Execute Run 1 (+ Adaptive Router); record metrics.
-5. Execute Run 2 (+ Corrective Grader); record metrics.
-6. Execute Run 3 (+ Memory & RBAC); record metrics and verify 0.00% leakage rate.
-7. Execute Run 4 (Full System + XAI); record metrics and token overhead.
-8. Perform manual hand-check on 20 randomly sampled queries to validate judge scores.
-9. Generate summary CSV, JSON, and LaTeX formatted tables for COM6301 dissertation.
+1. [x] Build `scripts/build_gold_set.py` (`--template`, `--seed-default`, `--suggest --profile dev|mock`) and `scripts/validate_gold_set.py` over `data/eval/gold_set.jsonl` (100 questions across 5 types: `single_fact`, `multi_part`, `cross_reference`, `role_restricted`, `unanswerable`, $\ge 15$ per type).
+2. [x] Build `scripts/eval_retrieval.py` (zero LLM calls) evaluating `bm25_only`, `vector_only`, `hybrid_rrf`, and `hybrid_rerank` with `ENABLE_HEADING_PATH` on/off in isolated temporary indices.
+3. [x] Build `scripts/run_ablation.py` supporting configurations `A0_baseline`..`A5_full_xai` + `RBAC_OFF_DEMO` (`DEMONSTRATION ONLY`), `--profile mock|dev|demo`, temperature 0, per-question JSONL checkpointing, `--resume`, `--limit`, `--judge`, and `ProfileMismatchError` guard.
+4. [x] Build `scripts/make_report_tables.py` writing `results/ablation_table.md` and `results/ablation_table.csv` with bootstrap 95% CIs, interval overlap flags vs `A0_baseline`, and explicit `HARNESS CHECK ONLY (mock)` / `LIVE` banners.
+5. [x] Create `tests/test_phase7_eval.py` covering metric fixtures, gold-set validator errors, ablation config isolation, profile recording, checkpoint resume, and refusal to mix profiles (10 unit tests).
+6. [ ] Student manual review of the 100 draft gold questions (`status: "draft"` -> `"reviewed"`) and live `--profile dev` / `--profile demo` execution once `.env` API keys are populated.
 
 ### Files Affected
 - `scripts/run_evaluation.py`
