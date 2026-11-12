@@ -203,13 +203,22 @@ class ComplianceAPIClient:
     # ------------------------------------------------------------------
     # Chat (RBAC-scoped RAG)
     # ------------------------------------------------------------------
-    def ask_chat_query(self, token: str, session_id: str, query: str) -> dict[str, Any]:
+    def ask_chat_query(
+        self,
+        token: str,
+        session_id: str,
+        query: str,
+        response_mode: str = "compliance",
+    ) -> dict[str, Any]:
         """Submit a question to the RBAC-scoped RAG pipeline."""
+        body: dict[str, Any] = {"session_id": session_id, "query": query}
+        if response_mode and response_mode != "compliance":
+            body["response_mode"] = response_mode
         return self._request(
             "POST",
             "/api/v1/chat/query",
             token=token,
-            json_body={"session_id": session_id, "query": query},
+            json_body=body,
         )
 
     # ------------------------------------------------------------------

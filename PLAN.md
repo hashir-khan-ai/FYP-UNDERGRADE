@@ -261,8 +261,8 @@ Execute the 100-question benchmark layer by layer across all configurations (`A0
 3. [x] Build `scripts/run_ablation.py` supporting configurations `A0_baseline`..`A5_full_xai` + `RBAC_OFF_DEMO` (`DEMONSTRATION ONLY`), `--profile mock|dev|demo`, temperature 0, per-question JSONL checkpointing, `--resume`, `--limit`, `--judge`, `ProfileMismatchError` guard, and `--require-reviewed` review gate.
 4. [x] Build `scripts/make_report_tables.py` writing `results/ablation_table.md` and `results/ablation_table.csv` with bootstrap 95% CIs, interval overlap flags vs `A0_baseline`, `routing_accuracy` rendered as `"n/a"` where router is off, separate live/cached/non-LLM refusal counts, and explicit `HARNESS CHECK ONLY (mock)` / `LIVE` banners.
 5. [x] Build `scripts/corpus_manifest.py` and `docs/CORPUS_GUIDE.md` to audit document sidecars (`source`, `licence`, `allowed_roles`, chunk counts) and scaffold templates for expansion toward 20–40 documents.
-6. [x] Create `tests/test_phase7_eval.py` covering metric fixtures, gold-set validator errors, ablation config isolation, profile recording, checkpoint resume, routing `n/a` rendering, cost separation, review gate, and manifest audits (13 unit tests).
-7. [x] Expand corpus to 24 documents (101 chunks), review gold questions (45 verified questions across all 5 types satisfying `--require-reviewed` gate), rebuild main production store, and export publication-ready dissertation tables (`results/dissertation_tables.tex`).
+6. [x] Create `tests/test_phase7_eval.py` covering metric fixtures, gold-set validator errors, ablation config isolation, profile recording, checkpoint resume, routing `n/a` rendering, cost separation, review gate, and manifest audits (16 unit tests).
+7. [x] Phase 7b & 7c Integrity Fixes: expanded corpus to 24 documents (101 chunks), added `reviewed_by`/`reviewed_on` to gold-set schema, reset all 100 questions to `draft` for human review, built interactive terminal review tool `scripts/review_gold_set.py`, added mandatory `content_origin` and `licence_url` to all 24 sidecars with provenance audit warnings for condensed excerpts in `scripts/corpus_manifest.py`, and added 95% bootstrap CI columns and baseline overlap notes to dissertation LaTeX export (`results/dissertation_tables.tex`).
 8. [ ] Optional live `--profile dev` / `--profile demo` benchmark execution once external LLM API credentials are configured in `.env`.
 
 ### Files Affected
@@ -282,3 +282,38 @@ Execute the 100-question benchmark layer by layer across all configurations (`A0
 - Zero data leakage confirmed.
 - Hand-check sample completed and documented.
 - LaTeX tables generated and ready for dissertation.
+
+---
+
+## Phase 8: Frontend Hardening & Demo Polish [Completed]
+
+### Goal
+Harden the Streamlit user interface, implement a headless AppTest automated test suite, add a 2-minute role demo preset panel, enforce high-contrast WCAG accessibility, display persistent profile warning badges, and provide a 5-minute presentation script with fallback contingency plans.
+
+### Concrete Tasks
+1. [x] **Headless AppTest Suite (`tests/test_ui_app.py`):** 11 automated tests using `streamlit.testing.v1.AppTest` covering unauthenticated login screen, login failure, login success transition, unauthorized role blocked from auditor view, auditor view access with 0.00% leakage KPI, 401 token expiration redirect, refusal card rendering, long answer multi-citation rendering, backend API down warning, session create/open/delete, and demo preset query triggers.
+2. [x] **2-Minute Demo Presets:** Added `DEMO_PRESETS` in `src/ui/app.py` featuring 6 standardized questions (public CDD query, manager escalation policy, confidential KYC audit findings, multi-part Basel III vs AML split, out-of-corpus Dodd-Frank unanswerable, and adversarial prompt-injection override) executing directly via the API client.
+3. [x] **Persistent LLM Profile Warning Badge:** Conspicuous warning-styled badges (`⚠️ OFFLINE MOCK • model` / `⚠️ DEV PROVIDER • model`) displayed prominently in login header, sidebar, and workspace title bar when not running live paid `demo` mode.
+4. [x] **Accessibility & Contrast Pass:** Enforced `#1C1D20` Matte Black text on `#FF5F00` Safety Orange primary buttons, visible focus outlines, explicit non-empty labels for all text and number inputs, and distinct text role badges (`ROLE: ANALYST`, `ROLE: MANAGER`, `ROLE: AUDITOR`).
+5. [x] **UX Hardening & Citations:** Distinct compliance refusal card with uniform wording and category badge, structured citation cards with `heading_path`, `page`, and verbatim quote snippet, and expandable reasoning trace (*"How this answer was produced — Reasoning Trace & Verification Steps"*).
+6. [x] **Presentation Script & Verification Checklist:** Authored `docs/DEMO_SCRIPT.md` (5-minute timeboxed presentation script with click order, talking points, audience takeaways, and offline fallback contingency procedures) and updated `docs/UI_TEST_CHECKLIST.md`.
+
+### Files Affected
+- `src/ui/app.py`
+- `tests/test_ui_app.py`
+- `docs/DEMO_SCRIPT.md`
+- `docs/UI_TEST_CHECKLIST.md`
+- `DESIGN.md`
+- `STATUS.md`
+- `PLAN.md`
+
+### Automated Tests
+- `tests/test_ui_client.py`: 5 tests covering HTTP client methods and error handling.
+- `tests/test_ui_app.py`: 11 tests verifying Streamlit AppTest execution tree without browser.
+- Full suite: **185 passed** in ~64s.
+
+### Completion Criteria
+- All 185 tests pass without browser dependency.
+- Zero data leakage (0.00% across 36 cells).
+- Demo presets trigger query pipeline and adhere strictly to server-side RBAC.
+- Presentation script documented and verified.

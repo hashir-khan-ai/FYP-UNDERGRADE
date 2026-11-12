@@ -90,6 +90,10 @@ class ChatQueryRequest(BaseModel):
     session_id: UUID4 = Field(..., description="UUIDv4 session identifier")
     query: str = Field(..., min_length=2, max_length=2000)
     config_overrides: ConfigOverrides | None = None
+    response_mode: Literal["compliance", "explain"] = Field(
+        default="compliance",
+        description="Response mode: 'compliance' (strict, concise) or 'explain' (conversational AI overview)",
+    )
 
 
 class RouterStats(BaseModel):
@@ -146,6 +150,7 @@ class ChatQueryResponse(BaseModel):
     timings: dict[str, float] = Field(default_factory=dict)
     citations_dropped: int = 0
     heading_path_enabled: bool = True
+    response_mode: str = "compliance"
 
 
 class SessionCreateRequest(BaseModel):

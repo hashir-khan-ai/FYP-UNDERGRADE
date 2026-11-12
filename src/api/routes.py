@@ -285,6 +285,7 @@ def chat_query(
     started = time.perf_counter()
     session_id = str(payload.session_id)
     query = payload.query.strip()
+    response_mode = getattr(payload, "response_mode", "compliance")
     if len(query) < 2:
         raise ApiError(400, "EMPTY_QUERY", "Query string cannot be empty.")
 
@@ -360,6 +361,8 @@ def chat_query(
                 list(decision.sub_questions),
                 role=user.role,
                 session_id=session_id,
+                response_mode=response_mode,
+                history=turns,
             )
             step_timings.extend(result.step_timings)
         else:
@@ -368,6 +371,8 @@ def chat_query(
                 role=user.role,
                 rewritten_query=memory.standalone_question if memory.rewritten else None,
                 session_id=session_id,
+                response_mode=response_mode,
+                history=turns,
             )
             step_timings.extend(
                 [
@@ -553,6 +558,7 @@ def chat_query(
                     "tokens_completion": usage["completion_tokens"],
                     "router": router_metadata(decision) if decision is not None else None,
                     "citations_dropped": citations_dropped,
+                    "response_mode": response_mode,
                 }
             ),
         )
@@ -665,6 +671,7 @@ def chat_query(
         timings=timings_dict,
         citations_dropped=citations_dropped,
         heading_path_enabled=settings.ENABLE_HEADING_PATH,
+        response_mode=response_mode,
     )
 
 

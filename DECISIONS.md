@@ -565,3 +565,37 @@ and (2) Latency and Token Efficiency (Median/p95 latency, Live/Cached calls per 
 
 **Why:** Fulfills PLAN.md Phase 7 dissertation reporting requirements and enables direct `\input{...}`
 in LaTeX thesis documents without manual transcription errors.
+
+
+---
+
+## Part I — Phase 7c Closeout (Integrity Fixes: Human Review Gate, Corpus Provenance & Result Labelling)
+
+### 49. Gold Set Review Integrity & Reset of Agent-Reviewed Questions
+**Decision:** Added `reviewed_by: str | None = None` and `reviewed_on: str | None = None` to the `GoldQuestionItem` schema (`src/evaluation/gold_set.py`), and extended `ReviewStatus = Literal["draft", "reviewed", "rejected"]`. All 45 questions in `data/eval/gold_set.jsonl` previously marked as `"reviewed"` were explicitly reset back to `status="draft"` with `reviewed_by=None` and `reviewed_on=None`. The review gates in `select_reviewed_questions` and `scripts/run_ablation.py --require-reviewed` now strictly filter for `status == "reviewed"` AND `reviewed_by == "student"`. Created `scripts/review_gold_set.py`: an interactive terminal CLI that presents questions with their full context and referenced chunk text, allowing the student researcher to approve (`a`), edit (`e`), reject (`r`), skip (`s`), or quit (`q`), saving atomically after each decision.
+
+**Why:** An AI agent cannot peer-review or certify its own benchmark answers. Permitting the system builder or agent to mark its own questions as "reviewed" undermines academic integrity. Questions must be examined and certified by the human student researcher before they can satisfy the final ablation review gate.
+
+### 50. Corpus Provenance Audit, Manifest Enforcement & Origin Classifications
+**Decision:** Added mandatory sidecar fields `content_origin` (`original_text`, `excerpt_of_original`, `paraphrase_or_summary`, `synthetic`) and `licence_url` to all 24 document `.meta.json` sidecars and updated `scripts/corpus_manifest.py` to fail if either is missing. All 16 public regulation documents in `data/raw` were audited and tagged as `excerpt_of_original` (averaging 3–6 chunks and ~1.5–2.8KB each, containing verbatim statutory clauses from the FCA Handbook, BCBS frameworks, and UK statutory instruments), while all 8 internal documents were tagged as `synthetic`. `scripts/corpus_manifest.py` prints an origin summary table and emits explicit warnings for public regulations yielding under 10 chunks to document that they represent targeted academic excerpts rather than complete multi-hundred-page legislative codes.
+
+**Why:** Rigorous academic transparency requires distinguishing full statutory text from curated clause excerpts and synthetic internal policies, while providing unambiguous licensing URLs (UK Open Government Licence v3.0, BIS Terms, and EU Public Licence).
+
+### 51. Result Labelling, Profile Mismatch Guards & 95% Confidence Intervals
+**Decision:** Standardized ablation and report outputs in `scripts/run_ablation.py`, `scripts/make_report_tables.py`, and `results/dissertation_tables.tex` around strict profile-based banners: `"HARNESS CHECK (mock)"` for offline test harness checks and `"LIVE (dev/demo)"` for live external LLM benchmarks. The LaTeX exporter carries a visible metadata block (profile, model, execution mode, date) and raises `ProfileMismatchError` if mock results lack the harness banner or if profiles are mixed. Both retrieval (`scripts/eval_retrieval.py`) and ablation tables include 95% bootstrap confidence interval columns for Recall@5 and nDCG@5, and automatically flag overlapping intervals ($\dag$) against the `A0_baseline`.
+
+**Why:** Ensures that offline mock harness checks can never be misrepresented as live LLM evaluations in academic writeups, and provides statistical confidence intervals to prevent overinterpreting minor score differences on small sample sizes.
+
+---
+
+## Part J — Phase 8 Closeout (Frontend Hardening, AppTest Suite & Demo Polish)
+
+### 52. Headless Streamlit AppTest Suite, 2-Minute Demo Presets, Warning Badges & Presentation Script
+**Decision:** Hardened the Streamlit user interface (`src/ui/app.py`) and authored automated and operational artifacts for dissertation presentation without altering the frozen backend API:
+1. Implemented a fully offline headless testing suite (`tests/test_ui_app.py`, 11 tests) using `streamlit.testing.v1.AppTest` verifying login success/failure, role-based view isolation (analyst blocked from auditor summaries), HTTP 401 token expiration clearing state, refusal card rendering, long multi-citation responses, backend unreachable notices, session lifecycle, and demo preset button query execution.
+2. Embedded `DEMO_PRESETS` in the UI sidebar providing 6 pre-configured compliance questions (public CDD, manager escalation policy, confidential KYC audit findings, Basel III vs AML split route, out-of-corpus Dodd-Frank unanswerable, and adversarial prompt-injection override) enabling a rapid 2-minute role differentiation demo.
+3. Enhanced LLM profile badge rendering to conspicuously display a high-contrast warning pill (`⚠️ OFFLINE MOCK • model` / `⚠️ DEV PROVIDER • model`) whenever running non-demo modes, preventing synthetic mock responses from being mistaken for live production outputs.
+4. Enforced strict WCAG AAA / AA compliance per `DESIGN.md`: Matte Black `#1C1D20` button text on Safety Orange `#FF5F00` primary buttons, visible focus outlines, explicit non-empty input labels, and text-differentiated role badges.
+5. Authored `docs/DEMO_SCRIPT.md`: a complete 5-minute timeboxed live demonstration script detailing minute-by-minute physical actions, spoken commentary, audience takeaways, and technical contingency fallback procedures. Updated `docs/UI_TEST_CHECKLIST.md` with headless test commands.
+
+**Why:** Fulfills all Phase 8 requirements under the frozen project scope, providing automated UI test coverage without flaky browser drivers and giving the student a polished, fail-safe script for final viva examinations.

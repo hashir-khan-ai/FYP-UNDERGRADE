@@ -1,11 +1,16 @@
 {
   "doc_id": "DOC-INT-SOP-TXM-002",
   "title": "Bank Internal Standard Operating Procedure: Automated AML Transaction Monitoring & SAR Reporting",
-  "allowed_roles": ["analyst", "manager", "auditor"],
+  "allowed_roles": [
+    "analyst",
+    "manager",
+    "auditor"
+  ],
   "doc_type": "INTERNAL_SOP",
   "jurisdiction": "INTERNAL_SYNTHETIC",
   "version": "2.0",
   "source": "SYNTHETIC_DATASET (FYP Transaction Monitoring SOP Fixture)",
-  "licence": "Educational / Academic Final Year Project (BSc COM6301)"
+  "licence": "Educational / Academic Final Year Project (BSc COM6301)",
+  "content_origin": "synthetic",
+  "licence_url": "https://github.com/hashir-khan/FYP-UNDERGRADE/blob/main/LICENSE"
 }
-

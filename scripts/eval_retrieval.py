@@ -278,16 +278,23 @@ def main() -> int:
     for run_key, run_data in runs.items():
         hp_str = "ON" if run_data["enable_heading_path"] else "OFF"
         print(f"\n--- ENABLE_HEADING_PATH = {hp_str} (temp index build: {run_data['index_build_ms']:.0f} ms) ---")
-        print(f"{'Mode':<16} {'Recall@1':>9} {'Recall@3':>9} {'Recall@5':>9} {'MRR':>9} {'nDCG@5':>9}")
-        print("-" * 66)
+        print(f"{'Mode':<16} {'Recall@1':>9} {'Recall@3':>9} {'Recall@5 (95% CI)':>23} {'MRR':>9} {'nDCG@5 (95% CI)':>23}")
+        print("-" * 92)
         for mode_name in RETRIEVAL_MODES:
             ov = run_data["modes"][mode_name]["overall"]
+            ci = ov.get("ci_95", {})
+            r5_ci = ci.get("recall@5", {})
+            nd5_ci = ci.get("ndcg@5", {})
+            r5_str = f"{ov['recall@5']:.3f} [{r5_ci.get('ci_low', 0.0):.3f}, {r5_ci.get('ci_high', 0.0):.3f}]"
+            nd5_str = f"{ov['ndcg@5']:.3f} [{nd5_ci.get('ci_low', 0.0):.3f}, {nd5_ci.get('ci_high', 0.0):.3f}]"
             print(
                 f"{mode_name:<16} "
                 f"{ov['recall@1']:>9.4f} "
                 f"{ov['recall@3']:>9.4f} "
-                f"{ov['recall@5']:>9.4f} "
+                f"{r5_str:>23} "
                 f"{ov['mrr']:>9.4f} "
+                f"{nd5_str:>23}"
+            )
                 f"{ov['ndcg@5']:>9.4f}"
             )
             for qtype, tmetrics in run_data["modes"][mode_name]["by_question_type"].items():

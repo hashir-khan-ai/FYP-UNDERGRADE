@@ -1,31 +1,32 @@
 # Project Status & Execution Log
 
-**Current Phase:** Phase 7 & 7b (Corpus Expansion, Review Gate & Dissertation Benchmarks) Complete  
-**Verification:** 171/171 tests passing | Leakage rate: strictly 0.00% (36/36 matrix cells) | Corpus: 24 docs, 101 chunks
+**Current Phase:** Phase 8 (Frontend Hardening & Demo Polish) Complete  
+**Verification:** 185/185 tests passing (184 fast, 1 slow) | Leakage rate: strictly 0.00% (36/36 cells) | Corpus: 24 docs, 101 chunks
 
 ## Phase Summary
-- **Phase 1 (Foundations & Data):** Config profiles, SQLite schema/migrations, synthetic docs, seed scripts (18 tests).
-- **Phase 2 (Baseline Hybrid RAG):** BM25Plus + Qdrant BGE-small, RRF, MiniLM re-ranker, mock gateway (15 tests).
-- **Phase 3 (RBAC & Memory):** Server-side payload filtering, HMAC auth, SQLite sessions, audit logging (74 tests, 0.00% leak).
-- **Phase 4 (Adaptive Router):** Intent classification, direct replies, split routes, single-search fallback (19 tests, 0.00% leak).
-- **Phase 5 (Corrective Grader):** Relevance grading, shortcuts, query rewrite retry, uniform refusal (16 tests, 0.00% leak).
-- **Phase 6 (XAI & Streamlit):** Structure-aware `heading_path`, citations, trace, UI client, Streamlit app (16 tests, 0.00% leak).
-- **Phase 7 & 7b (Evaluation & Benchmarks):** 24-doc corpus (101 chunks), 45 hand-reviewed gold questions, `scripts/eval_retrieval.py` (no warnings), `run_ablation.py --require-reviewed`, `make_report_tables.py` exporting LaTeX (`results/dissertation_tables.tex`), Markdown and CSV (13 tests, 0.00% leak).
+- **Phase 1-6:** Ingestion, Hybrid RAG, RBAC/Memory, Adaptive Router, Corrective Grader, XAI & Base UI (158 tests, 0.00% leak).
+- **Phase 7, 7b & 7c (Eval & Integrity):** 24-doc corpus (101 chunks), sidecar audit, student review CLI gate (`review_gold_set.py`), bootstrap 95% CIs on LaTeX tables, harness check banners (16 tests, 0.00% leak).
+- **Phase 8 (Frontend Polish & Demo):** Headless AppTest suite (`tests/test_ui_app.py`, 11 tests), 6 demo presets, non-demo warning badges, accessible contrast, DEMO_SCRIPT.md (185 tests, 0.00% leak).
 
 ## PowerShell Commands (with .venv)
 ```powershell
 $env:HF_HUB_OFFLINE="1"
 
-# Tests, Leakage & Corpus Manifest Audit
-.\.venv\Scripts\python.exe -m pytest -q
+# Tests, Leakage & AppTest Suite
+.\.venv\Scripts\python.exe -m pytest -q -m "not slow" -x
+.\.venv\Scripts\python.exe -m pytest tests/test_ui_app.py -v
 .\.venv\Scripts\python.exe scripts/leakage_check.py
-.\.venv\Scripts\python.exe scripts/corpus_manifest.py
 
-# Gold Set Validation, Retrieval Eval & Ablation
-.\.venv\Scripts\python.exe scripts/validate_gold_set.py --min-reviewed 40
+# Ingestion, Manifest & Evaluation
+.\.venv\Scripts\python.exe scripts/corpus_manifest.py
+.\.venv\Scripts\python.exe scripts/review_gold_set.py
 .\.venv\Scripts\python.exe scripts/eval_retrieval.py
-.\.venv\Scripts\python.exe scripts/run_ablation.py --profile mock --include-rbac-off --require-reviewed
+.\.venv\Scripts\python.exe scripts/run_ablation.py --profile mock --include-rbac-off
 .\.venv\Scripts\python.exe scripts/make_report_tables.py
+
+# Start Backend & Frontend
+.\.venv\Scripts\python.exe -m uvicorn src.api.main:app --host 127.0.0.1 --port 8000
+.\.venv\Scripts\python.exe -m streamlit run src/ui/app.py --server.port 8501
 ```
 
 ## Required .env Variables (Names Only)
@@ -37,12 +38,13 @@ $env:HF_HUB_OFFLINE="1"
 ## File Map
 - Ingestion & Corpus: `src/ingestion/`, `data/raw/`, `data/synthetic/`, `scripts/corpus_manifest.py`, `docs/CORPUS_GUIDE.md`
 - Core RAG & Logic: `src/rag/baseline.py`, `src/core/router.py`, `src/core/grader.py`, `src/core/memory.py`, `src/core/xai.py`, `src/core/llm_client.py`
-- Evaluation: `src/evaluation/`, `scripts/eval_retrieval.py`, `scripts/run_ablation.py`, `scripts/make_report_tables.py`
-- Auth, API & UI: `src/core/auth.py`, `src/api/`, `src/ui/`
+- Evaluation: `src/evaluation/`, `scripts/eval_retrieval.py`, `scripts/run_ablation.py`, `scripts/make_report_tables.py`, `scripts/review_gold_set.py`
+- Auth, API & UI: `src/core/auth.py`, `src/api/`, `src/ui/`, `tests/test_ui_app.py`, `docs/DEMO_SCRIPT.md`
 
 ## Known Gaps & Unverified Items
 - `.env` has an empty `LLM_API_KEY`, so `dev` and `demo` live LLM profiles have NOT been verified against an external live provider.
-- All evaluation tables are generated under `mock` profile (deterministic offline responses, 0 quota spent).
+- Gold set questions are currently `draft` (0/40 student reviewed) pending manual verification via `scripts/review_gold_set.py`.
+- Evaluation tables currently represent `mock` harness checks.
 
 ## Next Single Step
-- Populate `LLM_API_KEY` in `.env` to execute live benchmark verification (`scripts/smoke_demo.py --profile dev` and `scripts/run_ablation.py --profile dev --require-reviewed`).
+- Review $\ge 40$ questions via `scripts/review_gold_set.py`, configure live dev key in `.env`, and run `scripts/smoke_demo.py --profile dev`.

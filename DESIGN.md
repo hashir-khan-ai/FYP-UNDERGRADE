@@ -21,9 +21,10 @@ The interface follows a high-contrast dark institutional compliance aesthetic go
 - **Refusal / Insufficient Evidence Banner:** `#FF5F00` border on `#26292E` card with explicit compliance refusal icon and uniform message.
 - **Error Boundary Banner:** `#E5484D` border on `#2A1C1E` surface with sanitized user-friendly message and retry guidance.
 - **Profile Badge:**
-  - `mock`: Storm Grey pill (`#5A6068`) with Polar White text (`OFFLINE MOCK`)
-  - `dev`: Safety Orange outline pill (`#FF5F00`) (`DEV PROVIDER`)
-  - `demo`: Safety Orange solid pill (`#FF5F00`) with Matte Black text (`DEMO LIVE`)
+  - `mock`: Storm Grey pill with Safety Orange border (`#FF5F00`) and warning icon (`⚠️ OFFLINE MOCK • model`) to conspicuously denote evaluation/synthetic mode.
+  - `dev`: Storm Grey pill with Safety Orange border (`#FF5F00`) and warning icon (`⚠️ DEV PROVIDER • model`) to denote free-tier development mode.
+  - `demo`: Safety Orange solid pill (`#FF5F00`) with Matte Black text (`🟢 DEMO LIVE • model`) to denote live paid demonstration mode.
+- **Security Invariant:** Never display API keys, authorization headers, or user passwords in profile badges or UI telemetry.
 
 ---
 

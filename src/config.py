@@ -54,18 +54,18 @@ class Settings(BaseSettings):
         description="Active LLM profile; tests force 'mock' via tests/conftest.py",
     )
 
-    # dev profile (free-tier OpenAI-compatible provider)
+    # dev profile (free-tier or local $0 Ollama OpenAI-compatible provider)
     LLM_BASE_URL: str = Field(
         default="https://api.groq.com/openai/v1",
-        description="Base URL for the free-tier provider used by the dev profile",
+        description="Base URL for the dev provider (e.g. Groq or local Ollama http://localhost:11434/v1)",
     )
     LLM_API_KEY: str = Field(
         default="",
-        description="API key for the free-tier provider used by the dev profile",
+        description="API key for the dev provider (or 'ollama' when using local Ollama)",
     )
     LLM_MODEL: str = Field(
         default="llama-3.1-8b-instant",
-        description="Model identifier for the dev profile",
+        description="Model identifier for the dev profile (e.g. llama-3.1-8b-instant or local llama3.1:8b / qwen2.5:7b-instruct)",
     )
 
     # demo profile (paid OpenAI-compatible provider; never borrows dev credentials)

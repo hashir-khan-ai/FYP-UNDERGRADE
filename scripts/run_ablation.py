@@ -267,9 +267,9 @@ def run_ablation_suite(
 
         now_utc = datetime.now(timezone.utc)
         harness_banner = (
-            "HARNESS CHECK ONLY (mock profile — deterministic offline responses)"
+            "HARNESS CHECK (mock)"
             if active_profile == "mock"
-            else f"LIVE EVALUATION ({active_profile} profile)"
+            else f"LIVE ({active_profile})"
         )
         payload = {
             "timestamp_utc": now_utc.isoformat(),
@@ -411,23 +411,36 @@ def main() -> int:
 
     print("========================================================================================")
     print(f"ABLATION RUN SUMMARY | Profile: {payload['llm_profile']} ({payload['llm_model']})")
-    print(f"Mode Banner: {payload['harness_mode_banner']}")
+    print(f"Execution Label     : {payload['harness_mode_banner']}")
     print(f"Questions per config: {payload['questions_evaluated']} ({payload['gold_set_status_note']})")
-    print("========================================================================================")
+    print("========================================================================================================================")
     header = (
-        f"{'Config':<16} {'Rec@5':>7} {'nDCG@5':>7} {'AnsF1':>7} {'CitVal':>7} {'CRR':>7} "
-        f"{'Leak':>7} {'Route':>7} {'MedMs':>8} {'Live/q':>7} {'Cache/q':>8} {'RefNoLLM':>8} {'LiveTok/q':>10}"
+        f"{'Config':<16} {'Rec@5 (95% CI)':>20} {'nDCG@5 (95% CI)':>20} {'AnsF1':>7} {'CitVal':>7} {'CRR':>7} "
+        f"{'Leak':>7} {'Route':>7} {'MedMs':>8} {'Live/q':>7} {'LiveTok/q':>10}"
     )
     print(header)
     print("-" * len(header))
+    overlap_notes: list[str] = []
     for cfg in payload["configurations"]:
         m = cfg["metrics"]
+        ci_map = cfg.get("ci_95", {})
+        r5_ci = ci_map.get("recall@5", {})
+        nd5_ci = ci_map.get("ndcg@5", {})
+        r5_str = f"{m['recall@5']:.3f} [{r5_ci.get('ci_low', 0.0):.2f},{r5_ci.get('ci_high', 0.0):.2f}]"
+        nd5_str = f"{m['ndcg@5']:.3f} [{nd5_ci.get('ci_low', 0.0):.2f},{nd5_ci.get('ci_high', 0.0):.2f}]"
+
+        vs_a0 = cfg.get("vs_baseline_A0", {})
+        r5_overlap = vs_a0.get("recall@5", {}).get("ci_overlaps_baseline", False)
+        if r5_overlap and cfg["config_name"] != "A0_baseline":
+            r5_str += "†"
+            overlap_notes.append(f"{cfg['config_name']} Recall@5 95% CI overlaps A0_baseline (no statistical difference)")
+
         tag = " [DEMO ONLY]" if cfg.get("is_demonstration_only") else ""
         route_str = "n/a" if m["routing_accuracy"] is None else f"{m['routing_accuracy']:.4f}"
         print(
             f"{cfg['config_name']:<16} "
-            f"{m['recall@5']:>7.4f} "
-            f"{m['ndcg@5']:>7.4f} "
+            f"{r5_str:>20} "
+            f"{nd5_str:>20} "
             f"{m['answer_correctness']:>7.4f} "
             f"{m['citation_validity_rate']:>7.4f} "
             f"{m['correct_refusal_rate']:>7.4f} "
@@ -435,13 +448,15 @@ def main() -> int:
             f"{route_str:>7} "
             f"{m['latency_median_ms']:>8.1f} "
             f"{m['live_calls_per_query']:>7.2f} "
-            f"{m['cached_calls_per_query']:>8.2f} "
-            f"{m['refusals_without_llm']:>8d} "
             f"{m['live_tokens_per_query']:>10.1f}{tag}"
         )
         if cfg.get("warning_banner"):
             print(f"  *** {cfg['warning_banner']} ***")
-    print("========================================================================================")
+    print("========================================================================================================================")
+    if overlap_notes:
+        print("† Note on confidence intervals:")
+        for note in set(overlap_notes):
+            print(f"  - {note}")
     print("Cost comparisons must use Live/q and LiveTok/q only; cached calls cost no quota.")
     return 0
 

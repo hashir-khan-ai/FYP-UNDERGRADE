@@ -1,10 +1,16 @@
 {
   "doc_id": "DOC-BASEL-III-2023",
   "title": "Basel Committee on Banking Supervision - Basel III Capital & Liquidity Framework",
-  "allowed_roles": ["analyst", "manager", "auditor"],
+  "allowed_roles": [
+    "analyst",
+    "manager",
+    "auditor"
+  ],
   "doc_type": "PUBLIC_REGULATION",
   "jurisdiction": "BASEL_BCBS",
   "version": "2023.1",
   "source": "https://www.bis.org/bcbs/basel3.htm",
-  "licence": "Public Domain / BIS Open Academic Research"
+  "licence": "Public Domain / BIS Open Academic Research",
+  "content_origin": "excerpt_of_original",
+  "licence_url": "https://www.bis.org/terms_conditions.htm"
 }

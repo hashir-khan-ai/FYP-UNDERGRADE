@@ -1,11 +1,16 @@
 {
   "doc_id": "DOC-FCA-COBS-2024",
   "title": "Financial Conduct Authority - Conduct of Business Sourcebook (COBS)",
-  "allowed_roles": ["analyst", "manager", "auditor"],
+  "allowed_roles": [
+    "analyst",
+    "manager",
+    "auditor"
+  ],
   "doc_type": "PUBLIC_REGULATION",
   "jurisdiction": "UK_FCA",
   "version": "2024.1",
   "source": "https://www.handbook.fca.org.uk/handbook/COBS/",
-  "licence": "Open Government Licence v3.0 (UK OGL)"
+  "licence": "Open Government Licence v3.0 (UK OGL)",
+  "content_origin": "excerpt_of_original",
+  "licence_url": "https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/"
 }
-

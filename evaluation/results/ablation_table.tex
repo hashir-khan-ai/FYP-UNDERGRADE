@@ -6,25 +6,26 @@
 \begin{table*}[htbp]
 \centering
 \small
-\caption{Architecture Layer Ablation Benchmark Results (mock profile, $n=45$ reviewed questions)}
+\caption{Architecture Layer Ablation Benchmark Results (mock profile, $n=45$ questions)}
 \label{tab:ablation_results}
 \begin{tabular}{lcccccccc}
 \toprule
-\textbf{Configuration} & \textbf{Recall@5} & \textbf{nDCG@5} & \textbf{Ans F1} & \textbf{CRR} & \textbf{Leakage} & \textbf{Route Acc} & \textbf{Live Calls/Q} \\
+\textbf{Configuration} & \textbf{Recall@5 [95\% CI]} & \textbf{nDCG@5 [95\% CI]} & \textbf{Ans F1} & \textbf{CRR} & \textbf{Leakage} & \textbf{Route Acc} & \textbf{Live Calls/Q} \\
 \midrule
-  A0\_baseline             &   0.943 &   0.948 &   0.376 &  0.000 &   0.000 &       n/a &      0.76 \\
-  A1\_heading\_path        &   0.943 &   0.945 &   0.375 &  0.000 &   0.000 &       n/a &      0.71 \\
-  A2\_memory               &   0.943 &   0.945 &   0.375 &  0.000 &   0.000 &       n/a &      0.00 \\
-  A3\_router               &   0.914 &   0.916 &   0.365 &  0.000 &   0.000 &     0.556 &      0.40 \\
-  A4\_grader               &   0.914 &   0.916 &   0.365 &  0.900 &   0.000 &     0.556 &      0.07 \\
-  A5\_full\_xai            &   0.914 &   0.916 &   0.365 &  0.900 &   0.000 &     0.556 &      0.00 \\
-  \textit{RBAC\_OFF\_DEMO*} &   0.943 &   0.945 &   0.374 &  0.000 &   0.533 &       n/a &      0.09 \\
+  A0\_baseline             & 0.943 [0.89, 0.99] & 0.948 [0.90, 0.98] &   0.376 &  0.000 &   0.000 &       n/a &      0.76 \\
+  A1\_heading\_path        & 0.943 [0.89, 0.99]\dag & 0.945 [0.90, 0.98] &   0.375 &  0.000 &   0.000 &       n/a &      0.71 \\
+  A2\_memory               & 0.943 [0.89, 0.99]\dag & 0.945 [0.90, 0.98] &   0.375 &  0.000 &   0.000 &       n/a &      0.00 \\
+  A3\_router               & 0.914 [0.84, 0.97]\dag & 0.916 [0.84, 0.97] &   0.365 &  0.000 &   0.000 &     0.556 &      0.40 \\
+  A4\_grader               & 0.914 [0.84, 0.97]\dag & 0.916 [0.84, 0.97] &   0.365 &  0.900 &   0.000 &     0.556 &      0.07 \\
+  A5\_full\_xai            & 0.914 [0.84, 0.97]\dag & 0.916 [0.84, 0.97] &   0.365 &  0.900 &   0.000 &     0.556 &      0.00 \\
+  \textit{RBAC\_OFF\_DEMO*} & 0.943 [0.89, 0.99] & 0.945 [0.90, 0.98] &   0.374 &  0.000 &   0.533 &       n/a &      0.09 \\
 \bottomrule
 \end{tabular}
 \vspace{1mm}
 \begin{flushleft}
 \footnotesize
-\textit{Note:} CRR = Correct Refusal Rate on unanswerable/restricted queries. Leakage = unauthorized retrieval rate (target strictly 0.000). Route Acc is reported as n/a where the router is inactive. *RBAC\_OFF\_DEMO is a demonstration configuration highlighting vulnerability in the absence of server-side filtering.
+\textbf{LLM Profile:} \texttt{mock} (\texttt{mock}) \quad \textbf{Execution Mode:} \texttt{HARNESS CHECK ONLY (mock profile — deterministic offline responses)} \quad \textbf{Date:} \texttt{2026-11-12}\\
+\textit{Note:} CRR = Correct Refusal Rate on unanswerable/restricted queries. Leakage = unauthorized retrieval rate (target strictly 0.000). Route Acc is reported as n/a where the router is inactive. *RBAC\_OFF\_DEMO is a demonstration configuration highlighting vulnerability in the absence of server-side filtering. \dag Indicates 95\% bootstrap confidence interval overlaps with baseline A0\_baseline (no statistically significant difference).
 \end{flushleft}
 \end{table*}
 
@@ -46,4 +47,9 @@
   \textit{RBAC\_OFF\_DEMO*} &    843.6 &   1106.7 &      0.09 &       0.91 &       48.0 \\
 \bottomrule
 \end{tabular}
+\vspace{1mm}
+\begin{flushleft}
+\footnotesize
+\textbf{LLM Profile:} \texttt{mock} (\texttt{mock}) \quad \textbf{Execution Mode:} \texttt{HARNESS CHECK ONLY (mock profile — deterministic offline responses)} \quad \textbf{Date:} \texttt{2026-11-12}
+\end{flushleft}
 \end{table}

@@ -123,6 +123,7 @@ class BaselineRAGResponse(BaseModel):
     # Phase 6A XAI observability.
     citations_dropped: int = 0
     initial_passages_retrieved: int = 0
+    response_mode: str = "compliance"
 
 
 @dataclass
@@ -270,6 +271,7 @@ class BaselineRAGPipeline:
         self.reranker = reranker or CrossEncoderReranker()
         self.llm = llm or llm_client
         self._prompt_template = load_prompt("answer")
+        self._explain_prompt_template = load_prompt("explain")
 
     def retrieve(
         self,
@@ -362,8 +364,18 @@ class BaselineRAGPipeline:
         passages: list[dict[str, Any]],
         session_id: str | None = None,
         role: str | None = None,
+        response_mode: str = "compliance",
+        history: list[dict[str, str]] | None = None,
     ) -> tuple[str, list[str], bool, float, dict[str, int]]:
         """Generate an answer strictly from the final, role-permitted passages.
+
+        Args:
+            query: Question to answer or explain.
+            passages: Final role-permitted passages.
+            session_id: Optional session identifier for telemetry.
+            role: Optional role verification guard.
+            response_mode: 'compliance' (concise statutory) or 'explain' (conversational AI overview).
+            history: Optional recent dialogue turns for conversational continuity.
 
         Returns:
             Tuple of (answer, cited chunk IDs, cache hit, milliseconds, usage).
@@ -382,14 +394,33 @@ class BaselineRAGPipeline:
                 "citations_dropped": 0,
             }
 
-        prompt = self._prompt_template.format(
-            passages=self._format_passages(passages),
-            question=query,
-        )
+        if response_mode == "explain":
+            history_str = ""
+            if history:
+                from src.core.memory import format_history
+                history_str = (
+                    "<recent_dialogue_context>\n"
+                    f"{format_history(history)}\n"
+                    "</recent_dialogue_context>\n"
+                )
+            template = getattr(self, "_explain_prompt_template", None) or load_prompt("explain")
+            prompt = template.format(
+                passages=self._format_passages(passages),
+                history_section=history_str,
+                question=query,
+            )
+            step_name = "explain"
+        else:
+            prompt = self._prompt_template.format(
+                passages=self._format_passages(passages),
+                question=query,
+            )
+            step_name = "answer"
+
         response = self.llm.complete(
             prompt=prompt,
             temperature=0.0,
-            step="answer",
+            step=step_name,
             session_id=session_id,
         )
         generation_ms = (time.perf_counter() - start) * 1000.0
@@ -410,7 +441,7 @@ class BaselineRAGPipeline:
             "",
             raw_text,
         ).strip()
-        answer = re.sub(r"(?is)^\s*answer\s*:\s*", "", answer).strip()
+        answer = re.sub(r"(?is)^\s*(answer|explanation)\s*:\s*", "", answer).strip()
 
         if not answer or REFUSAL_TEXT.lower() in raw_text.lower():
             return REFUSAL_TEXT, [], response.cached, generation_ms, usage
@@ -529,6 +560,8 @@ class BaselineRAGPipeline:
         sub_questions: list[str],
         role: str,
         session_id: str | None = None,
+        response_mode: str = "compliance",
+        history: list[dict[str, str]] | None = None,
     ) -> BaselineRAGResponse:
         """Answer a multi-part question with one generation over merged passages.
 
@@ -537,6 +570,8 @@ class BaselineRAGPipeline:
             sub_questions: Decomposed sub-questions from the router.
             role: Authenticated user role; always server-derived.
             session_id: Session identifier for per-call telemetry linkage.
+            response_mode: 'compliance' (concise statutory) or 'explain' (conversational AI overview).
+            history: Optional recent dialogue turns for conversational continuity.
 
         Returns:
             A role-filtered response whose citations come from the merged set.
@@ -630,11 +665,16 @@ class BaselineRAGPipeline:
                     grader_latency_ms=round(grader_dec.total_latency_ms, 2),
                     citations_dropped=0,
                     initial_passages_retrieved=initial_retrieved_count,
+                    response_mode=response_mode,
                 )
             final_passages = grader_dec.kept_passages
 
         answer, cited_ids, cached, generation_ms, usage = self.generate(
-            query, final_passages, session_id=session_id
+            query,
+            final_passages,
+            session_id=session_id,
+            response_mode=response_mode,
+            history=history,
         )
         cited_ids, role_dropped = validate_cited_chunks(
             cited_ids, final_passages, role=normalized_role
@@ -713,6 +753,7 @@ class BaselineRAGPipeline:
             grader_latency_ms=round(grader_dec.total_latency_ms, 2) if grader_dec else 0.0,
             citations_dropped=citations_dropped_total,
             initial_passages_retrieved=initial_retrieved_count,
+            response_mode=response_mode,
         )
 
     def ask(
@@ -721,6 +762,8 @@ class BaselineRAGPipeline:
         role: str,
         rewritten_query: str | None = None,
         session_id: str | None = None,
+        response_mode: str = "compliance",
+        history: list[dict[str, str]] | None = None,
     ) -> BaselineRAGResponse:
         """Execute the complete baseline RAG request for one authenticated role.
 
@@ -729,6 +772,8 @@ class BaselineRAGPipeline:
             role: Authenticated user role; always server-derived.
             rewritten_query: Standalone question produced by the memory layer.
             session_id: Session identifier for per-call telemetry linkage.
+            response_mode: 'compliance' (concise statutory) or 'explain' (conversational AI overview).
+            history: Optional recent dialogue turns for conversational continuity.
 
         Returns:
             A role-filtered baseline response with retrieval and usage stats.
@@ -817,11 +862,16 @@ class BaselineRAGPipeline:
                     grader_latency_ms=round(grader_dec.total_latency_ms, 2),
                     citations_dropped=0,
                     initial_passages_retrieved=initial_retrieved_count,
+                    response_mode=response_mode,
                 )
             effective_passages = grader_dec.kept_passages
 
         answer, cited_ids, cached, generation_ms, usage = self.generate(
-            retrieval_query, effective_passages, session_id=session_id
+            retrieval_query,
+            effective_passages,
+            session_id=session_id,
+            response_mode=response_mode,
+            history=history,
         )
         cited_ids, role_dropped = validate_cited_chunks(
             cited_ids, effective_passages, role=normalized_role
@@ -893,6 +943,7 @@ class BaselineRAGPipeline:
             grader_latency_ms=round(grader_dec.total_latency_ms, 2) if grader_dec else 0.0,
             citations_dropped=citations_dropped_total,
             initial_passages_retrieved=initial_retrieved_count,
+            response_mode=response_mode,
         )
 
 

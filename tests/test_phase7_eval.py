@@ -334,7 +334,7 @@ def test_ablation_suite_records_profile_and_resumes_cleanly(tmp_path: Path) -> N
     )
     assert payload_1["llm_profile"] == "mock"
     assert payload_1["llm_model"] == "mock"
-    assert "HARNESS CHECK ONLY" in payload_1["harness_mode_banner"]
+    assert "HARNESS CHECK" in payload_1["harness_mode_banner"]
 
     # Now resume with both questions: GS-TEST-1 is loaded from checkpoint, GS-TEST-2 is evaluated
     payload_2 = run_ablation_suite(
@@ -356,7 +356,7 @@ def test_ablation_suite_records_profile_and_resumes_cleanly(tmp_path: Path) -> N
     assert cfg_map["RBAC_OFF_DEMO"]["metrics"]["leakage_rate"] > 0.0
 
     md_text = generate_markdown_table(payload_2)
-    assert "HARNESS CHECK ONLY" in md_text
+    assert "HARNESS CHECK" in md_text
     assert DEMO_ONLY_BANNER in md_text
 
     csv_file = out_dir / "ablation_table.csv"
@@ -514,13 +514,198 @@ def test_final_ablation_requires_reviewed_gate(tmp_path: Path) -> None:
     with pytest.raises(InsufficientReviewedQuestionsError, match="Final ablation refused"):
         enforce_reviewed_gate(p, draft_items, min_reviewed=5)
 
-    # Passes when >= min_reviewed items are reviewed
+    # Passes when >= min_reviewed items are reviewed by student
     for it in draft_items[:5]:
         it.status = "reviewed"
+        it.reviewed_by = "student"
     p.write_text("\n".join(json.dumps(it.model_dump()) for it in draft_items), encoding="utf-8")
     reviewed_only = enforce_reviewed_gate(p, draft_items, min_reviewed=5)
     assert len(reviewed_only) == 5
-    assert all(it.status == "reviewed" for it in reviewed_only)
+    assert all(it.status == "reviewed" and it.reviewed_by == "student" for it in reviewed_only)
+
+
+# ==============================================================================
+# 6. Phase 7c: Integrity fixes (student review gate, corpus provenance, LaTeX CI)
+# ==============================================================================
+def test_gold_set_review_integrity_requires_student(tmp_path: Path) -> None:
+    from src.evaluation.gold_set import (
+        DEFAULT_MIN_REVIEWED,
+        InsufficientReviewedQuestionsError,
+        select_reviewed_questions,
+        validate_gold_set_file,
+    )
+
+    # 1. Agent-reviewed questions must be refused
+    item_agent = GoldQuestionItem(
+        id="GS-REV-01",
+        question="What is the capital requirement under Basel III?",
+        type="single_fact",
+        role_asking="analyst",
+        gold_chunk_ids=["DOC-BASEL-III-2023_BASEL-CAP-1.1"],
+        gold_answer="4.5% CET1 ratio.",
+        expected_behaviour="answer",
+        status="reviewed",
+        reviewed_by="agent",  # invalid: agent cannot review own questions
+    )
+    with pytest.raises(InsufficientReviewedQuestionsError, match="student-reviewed question"):
+        select_reviewed_questions([item_agent], min_reviewed=1)
+
+    # 2. Student-reviewed question is accepted
+    item_student = GoldQuestionItem(
+        id="GS-REV-02",
+        question="What is the capital requirement under Basel III?",
+        type="single_fact",
+        role_asking="analyst",
+        gold_chunk_ids=["DOC-BASEL-III-2023_BASEL-CAP-1.1"],
+        gold_answer="4.5% CET1 ratio.",
+        expected_behaviour="answer",
+        status="reviewed",
+        reviewed_by="student",
+        reviewed_on="2026-11-12",
+    )
+    passed = select_reviewed_questions([item_student], min_reviewed=1)
+    assert len(passed) == 1
+    assert passed[0].id == "GS-REV-02"
+
+    # 3. Validation file check flags reviewed items without reviewed_by == 'student'
+    p = tmp_path / "gold_test.jsonl"
+    p.write_text(json.dumps(item_agent.model_dump()) + "\n", encoding="utf-8")
+    report = validate_gold_set_file(p, known_chunk_ids={"DOC-BASEL-III-2023_BASEL-CAP-1.1"}, min_per_type=0)
+    assert report.valid is False
+    assert any("status='reviewed' requires reviewed_by='student'" in err for err in report.schema_errors)
+
+
+def test_sidecar_provenance_validation_and_origin_types(tmp_path: Path) -> None:
+    from scripts.corpus_manifest import inspect_document
+    from src.ingestion.chunker import ClauseAwareChunker
+
+    chunker = ClauseAwareChunker()
+    doc_file = tmp_path / "DOC-PROV.md"
+    doc_file.write_text("# Title\n\n### Clause 1.1\nRegulatory rule text.", encoding="utf-8")
+    sidecar_file = tmp_path / "DOC-PROV.meta.json"
+
+    # Missing content_origin and licence_url
+    sidecar_file.write_text(
+        json.dumps({
+            "source": "https://example.com/source",
+            "licence": "Open Government Licence v3.0",
+            "allowed_roles": ["analyst", "manager", "auditor"],
+        }),
+        encoding="utf-8",
+    )
+    rec1 = inspect_document(doc_file, chunker)
+    assert rec1["is_complete"] is False
+    assert "content_origin" in rec1["missing_fields"]
+    assert "licence_url" in rec1["missing_fields"]
+
+    # Invalid origin
+    sidecar_file.write_text(
+        json.dumps({
+            "source": "https://example.com/source",
+            "licence": "Open Government Licence v3.0",
+            "licence_url": "https://example.com/licence",
+            "content_origin": "made_up_origin",
+            "allowed_roles": ["analyst", "manager", "auditor"],
+        }),
+        encoding="utf-8",
+    )
+    rec2 = inspect_document(doc_file, chunker)
+    assert rec2["is_complete"] is False
+    assert any("invalid_origin" in m for m in rec2["missing_fields"])
+
+    # Valid excerpt_of_original
+    sidecar_file.write_text(
+        json.dumps({
+            "source": "https://example.com/source",
+            "licence": "Open Government Licence v3.0",
+            "licence_url": "https://example.com/licence",
+            "content_origin": "excerpt_of_original",
+            "allowed_roles": ["analyst", "manager", "auditor"],
+        }),
+        encoding="utf-8",
+    )
+    rec3 = inspect_document(doc_file, chunker)
+    assert rec3["is_complete"] is True
+    assert rec3["content_origin"] == "excerpt_of_original"
+
+
+def test_latex_export_refuses_mock_without_banner_and_renders_cis(tmp_path: Path) -> None:
+    from scripts.make_report_tables import generate_latex_table
+
+    base_payload = {
+        "llm_profile": "mock",
+        "llm_model": "mock-deterministic",
+        "date": "2026-11-12",
+        "questions_evaluated": 10,
+        "harness_mode_banner": "UNMARKED MOCK BENCHMARK",
+        "corpus": {"documents_count": 24, "chunks_count": 101},
+        "configurations": [
+            {
+                "config_name": "A0_baseline",
+                "is_demonstration_only": False,
+                "warning_banner": "",
+                "metrics": {
+                    "recall@5": 0.75,
+                    "ndcg@5": 0.65,
+                    "answer_correctness": 0.80,
+                    "correct_refusal_rate": 1.0,
+                    "leakage_rate": 0.0,
+                    "routing_accuracy": None,
+                    "latency_median_ms": 10.0,
+                    "latency_p95_ms": 25.0,
+                    "live_calls_per_query": 0.0,
+                    "cached_calls_per_query": 0.0,
+                    "live_tokens_per_query": 0.0,
+                },
+                "ci_95": {
+                    "recall@5": {"ci_low": 0.70, "ci_high": 0.80},
+                    "ndcg@5": {"ci_low": 0.60, "ci_high": 0.70},
+                },
+                "vs_baseline_A0": {},
+            },
+            {
+                "config_name": "A1_heading_path",
+                "is_demonstration_only": False,
+                "warning_banner": "",
+                "metrics": {
+                    "recall@5": 0.76,
+                    "ndcg@5": 0.66,
+                    "answer_correctness": 0.82,
+                    "correct_refusal_rate": 1.0,
+                    "leakage_rate": 0.0,
+                    "routing_accuracy": None,
+                    "latency_median_ms": 11.0,
+                    "latency_p95_ms": 26.0,
+                    "live_calls_per_query": 0.0,
+                    "cached_calls_per_query": 0.0,
+                    "live_tokens_per_query": 0.0,
+                },
+                "ci_95": {
+                    "recall@5": {"ci_low": 0.71, "ci_high": 0.81},
+                    "ndcg@5": {"ci_low": 0.61, "ci_high": 0.71},
+                },
+                "vs_baseline_A0": {
+                    "recall@5": {"ci_overlaps_baseline": True},
+                    "ndcg@5": {"ci_overlaps_baseline": True},
+                },
+            },
+        ],
+    }
+
+    # 1. Mock export without HARNESS CHECK banner must be refused
+    with pytest.raises(ProfileMismatchError, match="HARNESS CHECK"):
+        generate_latex_table(base_payload)
+
+    # 2. Mock export with HARNESS CHECK banner succeeds and renders CI + overlap note
+    base_payload["harness_mode_banner"] = "HARNESS CHECK (mock)"
+    latex_code = generate_latex_table(base_payload)
+    assert r"\caption{Architecture Layer Ablation Benchmark Results (mock profile" in latex_code
+    assert r"\textbf{Recall@5 [95\% CI]}" in latex_code
+    assert r"\textbf{nDCG@5 [95\% CI]}" in latex_code
+    assert "0.750 [0.70, 0.80]" in latex_code
+    assert r"0.760 [0.71, 0.81]\dag" in latex_code
+    assert r"\dag Indicates 95\% bootstrap confidence interval overlaps with baseline" in latex_code
+    assert r"\textbf{Execution Mode:} \texttt{HARNESS CHECK (mock)}" in latex_code
 
 
 def test_corpus_manifest_validator(tmp_path: Path) -> None:

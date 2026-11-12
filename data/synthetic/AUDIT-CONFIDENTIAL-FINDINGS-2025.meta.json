@@ -1,10 +1,14 @@
 {
   "doc_id": "DOC-INT-AUDIT-CONF-2025",
   "title": "Bank Internal Audit Committee: 2025 Confidential Liquidity & Governance Review",
-  "allowed_roles": ["auditor"],
+  "allowed_roles": [
+    "auditor"
+  ],
   "doc_type": "CONFIDENTIAL_AUDIT_FINDINGS",
   "jurisdiction": "INTERNAL_SYNTHETIC",
   "version": "1.0",
   "source": "SYNTHETIC_DATASET (FYP Internal Audit Fixture)",
-  "licence": "Educational / Academic Final Year Project (BSc COM6301)"
+  "licence": "Educational / Academic Final Year Project (BSc COM6301)",
+  "content_origin": "synthetic",
+  "licence_url": "https://github.com/hashir-khan/FYP-UNDERGRADE/blob/main/LICENSE"
 }

@@ -1,11 +1,15 @@
 {
   "doc_id": "DOC-INT-POL-CYBER-003",
   "title": "Bank Internal Management Policy: Critical Cyber Incident Escalation & Response",
-  "allowed_roles": ["manager", "auditor"],
+  "allowed_roles": [
+    "manager",
+    "auditor"
+  ],
   "doc_type": "INTERNAL_MANAGEMENT_POLICY",
   "jurisdiction": "INTERNAL_SYNTHETIC",
   "version": "3.0",
   "source": "SYNTHETIC_DATASET (FYP Cyber Escalation Policy Fixture)",
-  "licence": "Educational / Academic Final Year Project (BSc COM6301)"
+  "licence": "Educational / Academic Final Year Project (BSc COM6301)",
+  "content_origin": "synthetic",
+  "licence_url": "https://github.com/hashir-khan/FYP-UNDERGRADE/blob/main/LICENSE"
 }
-

@@ -21,7 +21,7 @@ QuestionType = Literal[
 ]
 RoleType = Literal["analyst", "manager", "auditor"]
 ExpectedBehaviour = Literal["answer", "refuse"]
-ReviewStatus = Literal["draft", "reviewed"]
+ReviewStatus = Literal["draft", "reviewed", "rejected"]
 
 REQUIRED_QUESTION_TYPES: tuple[str, ...] = (
     "single_fact",
@@ -45,6 +45,8 @@ class GoldQuestionItem(BaseModel):
     gold_answer: str = Field(..., min_length=2)
     expected_behaviour: ExpectedBehaviour
     status: ReviewStatus = Field(default="draft")
+    reviewed_by: str | None = Field(default=None)
+    reviewed_on: str | None = Field(default=None)
     source_chunk_id: str | None = Field(default=None)
     paired_id: str | None = Field(default=None)
     expected_route: str | None = Field(default=None)
@@ -61,6 +63,7 @@ class GoldSetValidationReport(BaseModel):
 
     valid: bool
     total_count: int
+    student_reviewed_count: int = 0
     counts_by_type: dict[str, int]
     counts_by_status: dict[str, int]
     counts_by_role: dict[str, int]
@@ -178,6 +181,15 @@ def validate_gold_set_file(
     status_counts = Counter(item.status for item in items)
     role_counts = Counter(item.role_asking for item in items)
     behaviour_counts = Counter(item.expected_behaviour for item in items)
+    student_reviewed_n = sum(
+        1 for item in items if item.status == "reviewed" and item.reviewed_by == "student"
+    )
+
+    for item in items:
+        if item.status == "reviewed" and item.reviewed_by != "student":
+            schema_errors.append(
+                f"Question '{item.id}': status='reviewed' requires reviewed_by='student' (found {item.reviewed_by!r})."
+            )
 
     for qtype in REQUIRED_QUESTION_TYPES:
         count = type_counts.get(qtype, 0)
@@ -190,6 +202,7 @@ def validate_gold_set_file(
     return GoldSetValidationReport(
         valid=valid,
         total_count=len(items),
+        student_reviewed_count=student_reviewed_n,
         counts_by_type={k: type_counts.get(k, 0) for k in REQUIRED_QUESTION_TYPES},
         counts_by_status=dict(status_counts),
         counts_by_role=dict(role_counts),
@@ -209,29 +222,40 @@ class InsufficientReviewedQuestionsError(RuntimeError):
 
 
 def count_by_status(items: list[GoldQuestionItem]) -> dict[str, int]:
-    """Return ``{"reviewed": n, "draft": m}`` for a list of gold questions."""
+    """Return counts by status including student-reviewed count."""
     counts = Counter(item.status for item in items)
-    return {"reviewed": counts.get("reviewed", 0), "draft": counts.get("draft", 0)}
+    student_reviewed = sum(
+        1 for item in items if item.status == "reviewed" and item.reviewed_by == "student"
+    )
+    return {
+        "reviewed": counts.get("reviewed", 0),
+        "draft": counts.get("draft", 0),
+        "rejected": counts.get("rejected", 0),
+        "student_reviewed": student_reviewed,
+    }
 
 
 def select_reviewed_questions(
     items: list[GoldQuestionItem],
     min_reviewed: int = DEFAULT_MIN_REVIEWED,
 ) -> list[GoldQuestionItem]:
-    """Return only human-reviewed questions, refusing if fewer than ``min_reviewed``.
+    """Return only student-reviewed questions, refusing if fewer than ``min_reviewed``.
 
-    Draft questions (including every LLM- or agent-generated one) are never
-    used in a final ablation run.
+    Draft questions (including every LLM- or agent-generated one) and questions
+    lacking ``reviewed_by == 'student'`` are never used in a final ablation run.
 
     Raises:
         InsufficientReviewedQuestionsError: if fewer than ``min_reviewed``
-            questions carry ``status == "reviewed"``.
+            questions carry ``status == "reviewed"`` and ``reviewed_by == "student"``.
     """
-    reviewed = [item for item in items if item.status == "reviewed"]
+    reviewed = [
+        item for item in items if item.status == "reviewed" and item.reviewed_by == "student"
+    ]
     if len(reviewed) < min_reviewed:
+        total_marked_reviewed = sum(1 for item in items if item.status == "reviewed")
         raise InsufficientReviewedQuestionsError(
-            f"Final ablation refused: {len(reviewed)} reviewed question(s) found, "
-            f"at least {min_reviewed} required. Review gold questions by hand and set "
-            f'"status": "reviewed" (draft count: {len(items) - len(reviewed)}).'
+            f"Final ablation refused: {len(reviewed)} student-reviewed question(s) found, "
+            f"at least {min_reviewed} required. Review gold questions by hand using scripts/review_gold_set.py "
+            f"(reviewed_by='student') (currently marked reviewed: {total_marked_reviewed}, draft: {len(items) - len(reviewed)})."
         )
     return reviewed

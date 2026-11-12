@@ -42,19 +42,25 @@ def main() -> int:
         gold_set_path=args.path,
         min_per_type=args.min_per_type,
     )
-    reviewed_n = report.counts_by_status.get("reviewed", 0)
+    reviewed_n = report.student_reviewed_count
+    total_marked_reviewed = report.counts_by_status.get("reviewed", 0)
     draft_n = report.counts_by_status.get("draft", 0)
+    rejected_n = report.counts_by_status.get("rejected", 0)
     gate_n = args.min_reviewed if args.min_reviewed > 0 else DEFAULT_MIN_REVIEWED
 
     print("==============================================================================")
     print(f"GOLD SET VALIDATION REPORT ({args.path})")
     print("==============================================================================")
     print(f"Total questions   : {report.total_count}")
-    print(f"Reviewed          : {reviewed_n}")
+    print(f"Student reviewed  : {reviewed_n} (required for final ablation)")
+    if total_marked_reviewed != reviewed_n:
+        print(f"Unverified reviewed: {total_marked_reviewed - reviewed_n} (status=reviewed but reviewed_by != 'student')")
     print(f"Draft             : {draft_n}")
+    if rejected_n:
+        print(f"Rejected          : {rejected_n}")
     print(
         f"Final ablation    : {'READY' if reviewed_n >= gate_n else 'NOT READY'} "
-        f"({reviewed_n}/{gate_n} reviewed required for run_ablation.py --require-reviewed)"
+        f"({reviewed_n}/{gate_n} student-reviewed required for run_ablation.py --require-reviewed)"
     )
     print(f"Counts by role    : {report.counts_by_role}")
     print(f"Counts by action  : {report.counts_by_behaviour}")
