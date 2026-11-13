@@ -15,6 +15,7 @@ import os
 import shutil
 import sys
 import tempfile
+from datetime import datetime, timezone
 from pathlib import Path
 
 _TEMP_ROOT = Path(tempfile.mkdtemp(prefix="leakage_check_"))
@@ -316,6 +317,22 @@ def run() -> int:
     print(f"Leakage rate  : {leakage_rate:.2%}")
     print(f"RBAC enabled  : True")
     print("=" * 78)
+
+    now_utc = datetime.now(timezone.utc)
+    reports_dir = Path(__file__).resolve().parent.parent / "reports"
+    reports_dir.mkdir(parents=True, exist_ok=True)
+    report_path = reports_dir / f"leakage_{now_utc.strftime('%Y%m%dT%H%M%SZ')}.json"
+    report_payload = {
+        "timestamp": now_utc.isoformat(),
+        "cells_checked": len(rows),
+        "leaked_cells": leaked_cells,
+        "leakage_rate": round(leakage_rate, 6),
+        "leakage_rate_pct": round(leakage_rate * 100.0, 4),
+        "rbac_enabled": True,
+        "profile": "mock",
+    }
+    report_path.write_text(json.dumps(report_payload, indent=2), encoding="utf-8")
+    print(f"Report written: {report_path}")
 
     return 0 if leaked_cells == 0 else 1
 

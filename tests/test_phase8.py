@@ -306,3 +306,73 @@ def test_8a3_ui_sidebar_flags_equal_loaded_config_and_hide_xai_when_off(
     assert "Dropped Invalid Citations" not in rendered
     expander_labels = [exp.label for exp in at.expander]
     assert not any("Reasoning Trace" in lbl for lbl in expander_labels)
+
+
+# ==============================================================================
+# Phase 8A.4 — Login Leakage Status & DEMO_MODE Gating
+# ==============================================================================
+def test_8a4_login_leakage_status_reads_report_or_shows_not_yet_measured(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Login page reads reports/leakage_*.json instead of hardcoding '0.00% leakage'."""
+    import json
+    from src.ui.app import get_latest_leakage_status
+    import src.ui.app as ui_app
+
+    assert get_latest_leakage_status(tmp_path) == "not yet measured"
+
+    # When cwd has no reports folder, login shows 'not yet measured'
+    monkeypatch.chdir(tmp_path)
+    client = _make_mock_client("analyst")
+    at = AppTest.from_file(str(Path(ui_app.__file__).resolve()))
+    at.session_state["api_client"] = client
+    at.run()
+    assert not at.exception
+    rendered_no_report = _collect_all_markdowns(at)
+    assert "not yet measured" in rendered_no_report
+    assert "strictly 0.00% leakage" not in rendered_no_report
+
+    # Add a leakage report file and verify rate + timestamp render on login card
+    rep_dir = tmp_path / "reports"
+    rep_dir.mkdir(parents=True, exist_ok=True)
+    (rep_dir / "leakage_20261113T120000Z.json").write_text(
+        json.dumps({"leakage_rate_pct": 0.0, "timestamp": "2026-11-13T12:00:00+00:00"}),
+        encoding="utf-8",
+    )
+    at2 = AppTest.from_file(str(Path(ui_app.__file__).resolve()))
+    at2.session_state["api_client"] = client
+    at2.run()
+    assert not at2.exception
+    rendered_with_report = _collect_all_markdowns(at2)
+    assert "0.00% leakage" in rendered_with_report
+    assert "2026-11-13T12:00:00+00:00" in rendered_with_report
+
+
+def test_8a4_quick_fill_persona_buttons_only_when_demo_mode_true(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Quick-fill persona buttons appear only when DEMO_MODE is True."""
+    from src.config import settings
+
+    client = _make_mock_client("analyst")
+
+    monkeypatch.setattr(settings, "DEMO_MODE", False)
+    at_off = AppTest.from_file("src/ui/app.py")
+    at_off.session_state["api_client"] = client
+    at_off.run()
+    assert not at_off.exception
+    btn_keys_off = {b.key for b in at_off.button}
+    assert "quick_analyst" not in btn_keys_off
+    assert "quick_manager" not in btn_keys_off
+    assert "quick_auditor" not in btn_keys_off
+
+    monkeypatch.setattr(settings, "DEMO_MODE", True)
+    at_on = AppTest.from_file("src/ui/app.py")
+    at_on.session_state["api_client"] = client
+    at_on.run()
+    assert not at_on.exception
+    btn_keys_on = {b.key for b in at_on.button}
+    assert "quick_analyst" in btn_keys_on
+    assert "quick_manager" in btn_keys_on
+    assert "quick_auditor" in btn_keys_on

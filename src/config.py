@@ -284,6 +284,10 @@ class Settings(BaseSettings):
         default=False,
         description="Explicit label allowing ENABLE_RBAC=false for a documented baseline run",
     )
+    DEMO_MODE: bool = Field(
+        default=False,
+        description="Show 1-click quick-fill demo persona buttons on the login screen when true",
+    )
     MEMORY_MAX_TURNS: int = Field(
         default=6,
         description="Number of previous messages loaded into short-term memory",

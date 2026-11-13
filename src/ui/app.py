@@ -9,9 +9,11 @@ Apple Human Interface Guidelines (HIG) aesthetic:
 """
 
 import html
+import json
 import os
 import re
 import textwrap
+from pathlib import Path
 from typing import Any
 
 import streamlit as st
@@ -636,6 +638,30 @@ def _render_profile_badge(profile: str, model: str = "") -> str:
     )
 
 
+def get_latest_leakage_status(reports_dir: str | Path = "reports") -> str:
+    """Read the latest leakage verification report from disk, or return 'not yet measured'."""
+    base = Path(reports_dir)
+    if not base.is_dir():
+        return "not yet measured"
+    candidates = sorted(base.glob("leakage_*.json"), reverse=True)
+    for candidate in candidates:
+        try:
+            payload = json.loads(candidate.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if not isinstance(payload, dict):
+            continue
+        if "leakage_rate_pct" in payload:
+            pct = float(payload["leakage_rate_pct"])
+        elif "leakage_rate" in payload:
+            pct = float(payload["leakage_rate"]) * 100.0
+        else:
+            continue
+        ts = str(payload.get("timestamp") or candidate.stem.replace("leakage_", "")).strip()
+        return f"measured {pct:.2f}% leakage ({ts})"
+    return "not yet measured"
+
+
 def _render_error_banner(err: UIApiError | str) -> None:
     msg = str(err).strip()
     lower = msg.lower()
@@ -773,46 +799,48 @@ def render_login_screen(client: ComplianceAPIClient) -> None:
                         st.session_state["last_error"] = str(exc)
                         st.rerun()
 
-        # Quick-Fill Persona Helper
-        st.markdown(
-            """
-            <div class="apple-card" style="margin-top:14px;margin-bottom:8px;">
-                <div style="font-size:0.8rem;font-weight:700;color:#8E93A0;text-transform:uppercase;letter-spacing:0.04em;">
-                    ⚡ Quick-Fill Synthetic Persona (1-Click Demo)
+        # Quick-Fill Persona Helper (visible only in DEMO_MODE)
+        if bool(getattr(settings, "DEMO_MODE", False)):
+            st.markdown(
+                """
+                <div class="apple-card" style="margin-top:14px;margin-bottom:8px;">
+                    <div style="font-size:0.8rem;font-weight:700;color:#8E93A0;text-transform:uppercase;letter-spacing:0.04em;">
+                        Quick-Fill Synthetic Persona (1-Click Demo)
+                    </div>
                 </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+                """,
+                unsafe_allow_html=True,
+            )
 
-        p1, p2, p3 = st.columns(3)
-        with p1:
-            if st.button("Analyst Tier", key="quick_analyst", help="Alex Analyst: Public regulatory documents only", use_container_width=True):
-                st.session_state["fill_username"] = "analyst_user"
-                st.session_state["fill_password"] = "compliance123"
-                st.rerun()
-        with p2:
-            if st.button("Manager Tier", key="quick_manager", help="Morgan Manager: Public + Internal policies (POL-042)", use_container_width=True):
-                st.session_state["fill_username"] = "manager_user"
-                st.session_state["fill_password"] = "compliance123"
-                st.rerun()
-        with p3:
-            if st.button("Auditor Tier", key="quick_auditor", help="Aubrey Auditor: Complete access + Audit summaries", use_container_width=True):
-                st.session_state["fill_username"] = "auditor_user"
-                st.session_state["fill_password"] = "compliance123"
-                st.rerun()
+            p1, p2, p3 = st.columns(3)
+            with p1:
+                if st.button("Analyst Tier", key="quick_analyst", help="Alex Analyst: Public regulatory documents only", use_container_width=True):
+                    st.session_state["fill_username"] = "analyst_user"
+                    st.session_state["fill_password"] = "compliance123"
+                    st.rerun()
+            with p2:
+                if st.button("Manager Tier", key="quick_manager", help="Morgan Manager: Public + Internal policies (POL-042)", use_container_width=True):
+                    st.session_state["fill_username"] = "manager_user"
+                    st.session_state["fill_password"] = "compliance123"
+                    st.rerun()
+            with p3:
+                if st.button("Auditor Tier", key="quick_auditor", help="Aubrey Auditor: Complete access + Audit summaries", use_container_width=True):
+                    st.session_state["fill_username"] = "auditor_user"
+                    st.session_state["fill_password"] = "compliance123"
+                    st.rerun()
 
+        leakage_status = html.escape(get_latest_leakage_status())
         # Architecture security card
         st.markdown(
-            """
+            f"""
             <div class="apple-card" style="margin-top:16px;">
                 <div style="font-weight:700;font-size:0.92rem;display:flex;align-items:center;gap:6px;margin-bottom:6px;">
-                    🛡️ Server-Side RBAC Enforcement Guarantee
+                    Server-Side RBAC Enforcement
                 </div>
                 <div style="font-size:0.86rem;color:#9EA3AF;line-height:1.5;">
                     Your active role (<code>analyst</code>, <code>manager</code>, or <code>auditor</code>) is verified
                     server-side from a signed bearer token. Restricted documents are filtered inside Qdrant and BM25
-                    payloads at retrieval time. Passages outside your permission tier never enter model context (strictly 0.00% leakage).
+                    payloads at retrieval time. Latest leakage verification: <strong>{leakage_status}</strong>.
                 </div>
             </div>
             """,
