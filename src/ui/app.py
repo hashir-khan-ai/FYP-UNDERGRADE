@@ -1475,6 +1475,63 @@ def format_answer_with_citation_markers(
     return out
 
 
+def _render_stretch_tool_panels(payload: dict[str, Any]) -> None:
+    """Render compact XAI panels for claim_check and AST calculator outputs."""
+    claim_check = payload.get("claim_check")
+    if isinstance(claim_check, dict) and claim_check.get("claims"):
+        sup = int(claim_check.get("supported_count", 0))
+        weak = int(claim_check.get("weak_count", 0))
+        unsup = int(claim_check.get("unsupported_count", 0))
+        rate = float(claim_check.get("unsupported_claim_rate", 0.0)) * 100.0
+        badges = (
+            f"<div style='margin:6px 0 8px 0;display:flex;flex-wrap:wrap;gap:6px;align-items:center;'>"
+            f"<span class='pill-badge' style='color:#34C759;border-color:rgba(52,199,89,0.3);'>Supported: {sup}</span>"
+            f"<span class='pill-badge' style='color:#FBBF24;border-color:rgba(251,191,36,0.3);'>Weak: {weak}</span>"
+            f"<span class='pill-badge' style='color:#FF5F00;border-color:rgba(255,95,0,0.3);'>Unsupported: {unsup} ({rate:.1f}%)</span>"
+            f"</div>"
+        )
+        with st.expander(f"Claim Verification ({sup}/{len(claim_check['claims'])} supported)", expanded=False):
+            st.markdown(badges, unsafe_allow_html=True)
+            for item in claim_check["claims"]:
+                status = str(item.get("status", "unsupported")).lower()
+                color = "#34C759" if status == "supported" else ("#FBBF24" if status == "weak" else "#FF5F00")
+                cids = ", ".join(str(c) for c in (item.get("supporting_chunk_ids") or []))
+                cite_txt = f" · Sources: <code>{html.escape(cids)}</code>" if cids else ""
+                st.markdown(
+                    f"<div style='font-size:0.82rem;margin:4px 0;padding:6px 8px;border-left:2px solid {color};background:rgba(255,255,255,0.02);'>"
+                    f"<strong style='color:{color};text-transform:uppercase;'>{html.escape(status)}</strong>: "
+                    f"{html.escape(str(item.get('claim', '')))}{cite_txt}</div>",
+                    unsafe_allow_html=True,
+                )
+
+    calc = payload.get("calculator")
+    if isinstance(calc, dict) and calc.get("triggered"):
+        if calc.get("refused"):
+            reason = html.escape(str(calc.get("refusal_reason") or "Calculation refused due to missing inputs."))
+            st.markdown(
+                f"<div class='citation-card' style='border-left:3px solid #FF5F00;margin-top:8px;'>"
+                f"<div style='font-weight:700;font-size:0.86rem;color:#FF5F00;'>Compliance Calculator Refused</div>"
+                f"<div style='font-size:0.84rem;color:#F1F3F4;margin-top:4px;'>{reason}</div></div>",
+                unsafe_allow_html=True,
+            )
+        else:
+            formula = html.escape(str(calc.get("formula") or ""))
+            res_txt = html.escape(str(calc.get("formatted_result") or calc.get("result") or ""))
+            inp_chips = []
+            for inp in calc.get("inputs") or []:
+                cid = html.escape(str(inp.get("chunk_id") or "query"))
+                lbl = html.escape(str(inp.get("name") or "input"))
+                val = html.escape(str(inp.get("value") or ""))
+                inp_chips.append(f"<span class='pill-badge'>{lbl}: {val} ({cid})</span>")
+            st.markdown(
+                f"<div class='citation-card' style='border-left:3px solid #34C759;margin-top:8px;'>"
+                f"<div style='font-weight:700;font-size:0.86rem;color:#34C759;'>Verified Compliance Calculation: {res_txt}</div>"
+                f"<div style='font-size:0.82rem;color:#8E93A0;margin:4px 0;'>Formula: <code>{formula}</code></div>"
+                f"<div style='display:flex;flex-wrap:wrap;gap:4px;'>{''.join(inp_chips)}</div></div>",
+                unsafe_allow_html=True,
+            )
+
+
 def _render_citations_and_trace(
     turn_data: dict[str, Any], msg_id: int = 0, role: str = "", query: str = ""
 ) -> None:
@@ -1567,10 +1624,12 @@ def _render_citations_and_trace(
                     st.markdown(card_html, unsafe_allow_html=True)
 
         trace: list[str] = turn_data.get("reasoning_trace") or []
-        if xai_enabled and trace:
-            with st.expander("How this answer was produced — Reasoning Trace & Verification Steps", expanded=False):
-                for step_line in trace:
-                    st.markdown(f"- {step_line}")
+        if xai_enabled:
+            _render_stretch_tool_panels(turn_data)
+            if trace:
+                with st.expander("How this answer was produced — Reasoning Trace & Verification Steps", expanded=False):
+                    for step_line in trace:
+                        st.markdown(f"- {step_line}")
 
     # 3. Suggested Follow-Up Chips
     if follow_ups:
@@ -2141,6 +2200,8 @@ def render_chat_view(client: ComplianceAPIClient, token: str, user: dict[str, An
                         if chunk_ids:
                             with st.expander(f"Sources ({len(chunk_ids)})", expanded=False):
                                 st.markdown(f"**Cited Chunks:** `{', '.join(chunk_ids)}`")
+                        if bool(cfg_layers.get("xai_output", True)):
+                            _render_stretch_tool_panels(meta)
 
                     meta_followups = meta.get("suggested_follow_ups") or []
                     if meta_followups:

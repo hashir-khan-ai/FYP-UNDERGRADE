@@ -308,6 +308,9 @@ class Repository:
         citation_count: int | None = None,
         citations_dropped: int | None = None,
         heading_path_enabled: bool | None = None,
+        # Phase 8C stretch feature observability (all nullable)
+        claim_check_json: dict[str, Any] | str | None = None,
+        calculator_json: dict[str, Any] | str | None = None,
     ) -> int:
         # Normalize collections to JSON strings
         chunks_str = json.dumps(retrieved_chunk_ids) if isinstance(retrieved_chunk_ids, list) else retrieved_chunk_ids
@@ -316,6 +319,8 @@ class Repository:
         cites_str = json.dumps(citations_json) if isinstance(citations_json, list) else citations_json
         subs_str = json.dumps(sub_questions) if isinstance(sub_questions, list) else sub_questions
         timings_str = json.dumps(step_timings) if isinstance(step_timings, list) else step_timings
+        claim_str = json.dumps(claim_check_json) if isinstance(claim_check_json, dict) else claim_check_json
+        calc_str = json.dumps(calculator_json) if isinstance(calculator_json, dict) else calculator_json
 
         cur = self.conn.cursor()
         cur.execute(
@@ -331,8 +336,9 @@ class Repository:
                 grader_path, grader_relevant_count, grader_ambiguous_count,
                 grader_irrelevant_count, grader_rewrite_used, grader_rewritten_query,
                 grader_refused, grader_refusal_reason, grader_calls, grader_tokens,
-                grader_latency_ms, citation_count, citations_dropped, heading_path_enabled
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                grader_latency_ms, citation_count, citations_dropped, heading_path_enabled,
+                claim_check_json, calculator_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
             """,
             (
                 session_id,
@@ -376,6 +382,8 @@ class Repository:
                 citation_count,
                 citations_dropped,
                 1 if heading_path_enabled else (0 if heading_path_enabled is not None else None),
+                claim_str,
+                calc_str,
             ),
         )
         return cur.lastrowid

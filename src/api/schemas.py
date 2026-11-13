@@ -189,6 +189,8 @@ class ChatQueryResponse(BaseModel):
     grounded: bool = True
     suggested_follow_ups: list[str] = Field(default_factory=list)
     active_layers: dict[str, bool] = Field(default_factory=dict)
+    claim_check: dict[str, Any] | None = None
+    calculator: dict[str, Any] | None = None
 
 
 class SessionCreateRequest(BaseModel):

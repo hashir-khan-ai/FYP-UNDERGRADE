@@ -829,6 +829,8 @@ def _execute_chat_turn(
                     "llm_profile": resolved_llm.profile,
                     "llm_model": resolved_llm.model,
                     "timings": timings_dict,
+                    "claim_check": result.claim_check if result is not None else None,
+                    "calculator": result.calculator if result is not None else None,
                 }
             ),
         )
@@ -874,6 +876,8 @@ def _execute_chat_turn(
             citation_count=len(citations),
             citations_dropped=citations_dropped,
             heading_path_enabled=settings.ENABLE_HEADING_PATH,
+            claim_check_json=result.claim_check if result is not None else None,
+            calculator_json=result.calculator if result is not None else None,
         )
         bind_audit_id(audit_id)
 
@@ -951,6 +955,8 @@ def _execute_chat_turn(
             "claim_check": settings.ENABLE_CLAIM_CHECK,
             "calculator": settings.ENABLE_CALCULATOR,
         },
+        claim_check=result.claim_check if result is not None else None,
+        calculator=result.calculator if result is not None else None,
     )
 
 

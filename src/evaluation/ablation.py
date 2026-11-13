@@ -25,6 +25,7 @@ from typing import Any, Iterator
 from pydantic import BaseModel, Field
 
 from src.config import settings
+from src.core.claim_check import verify_answer_claims
 from src.core.memory import MemoryContext, rewrite_follow_up
 from src.core.router import (
     DIRECT,
@@ -45,6 +46,7 @@ from src.evaluation.metrics import (
     bootstrap_ci,
     intervals_overlap,
     ndcg_at_k,
+    numeric_exact_match,
     recall_at_k,
     reciprocal_rank,
 )
@@ -69,6 +71,8 @@ class AblationConfigSpec:
     enable_adaptive_router: bool
     enable_corrective_grader: bool
     enable_xai_output: bool
+    enable_claim_check: bool = False
+    enable_calculator: bool = False
     is_demonstration_only: bool = False
     warning_banner: str = ""
 
@@ -134,6 +138,30 @@ ABLATION_MATRIX: dict[str, AblationConfigSpec] = {
         enable_corrective_grader=True,
         enable_xai_output=True,
     ),
+    "A6_claim_check": AblationConfigSpec(
+        name="A6_claim_check",
+        description="A5 + post-generation atomic claim-level grounding check",
+        enable_heading_path=True,
+        enable_rbac=True,
+        enable_memory=True,
+        enable_adaptive_router=True,
+        enable_corrective_grader=True,
+        enable_xai_output=True,
+        enable_claim_check=True,
+        enable_calculator=False,
+    ),
+    "A7_calculator": AblationConfigSpec(
+        name="A7_calculator",
+        description="A6 + deterministic AST-whitelist compliance calculator",
+        enable_heading_path=True,
+        enable_rbac=True,
+        enable_memory=True,
+        enable_adaptive_router=True,
+        enable_corrective_grader=True,
+        enable_xai_output=True,
+        enable_claim_check=True,
+        enable_calculator=True,
+    ),
     "RBAC_OFF_DEMO": AblationConfigSpec(
         name="RBAC_OFF_DEMO",
         description="Unfiltered retrieval demonstration (RBAC disabled under BASELINE_ABLATION=True)",
@@ -181,6 +209,8 @@ def apply_ablation_config(
         "ENABLE_ADAPTIVE_ROUTER": settings.ENABLE_ADAPTIVE_ROUTER,
         "ENABLE_CORRECTIVE_GRADER": settings.ENABLE_CORRECTIVE_GRADER,
         "ENABLE_XAI_OUTPUT": settings.ENABLE_XAI_OUTPUT,
+        "ENABLE_CLAIM_CHECK": settings.ENABLE_CLAIM_CHECK,
+        "ENABLE_CALCULATOR": settings.ENABLE_CALCULATOR,
     }
     try:
         settings.ENABLE_HEADING_PATH = spec.enable_heading_path
@@ -190,6 +220,8 @@ def apply_ablation_config(
         settings.ENABLE_ADAPTIVE_ROUTER = spec.enable_adaptive_router
         settings.ENABLE_CORRECTIVE_GRADER = spec.enable_corrective_grader
         settings.ENABLE_XAI_OUTPUT = spec.enable_xai_output
+        settings.ENABLE_CLAIM_CHECK = spec.enable_claim_check
+        settings.ENABLE_CALCULATOR = spec.enable_calculator
         yield spec
     finally:
         for key, val in snapshot.items():
@@ -452,6 +484,36 @@ def evaluate_single_question(
 
     refused_without_llm = bool(is_refusal and live_calls == 0 and cached_calls == 0)
 
+    unsupported_claim_rate: float | None = None
+    numeric_em: float | None = None
+    if item.expected_behaviour == "answer":
+        if is_refusal:
+            if numeric_exact_match("", item.gold_answer) is not None:
+                numeric_em = 0.0
+        else:
+            passages_for_check = [
+                chunk_lookup[s.chunk_id]
+                if s.chunk_id in chunk_lookup
+                else {
+                    "chunk_id": s.chunk_id,
+                    "text_content": s.snippet,
+                    "allowed_roles": [role],
+                }
+                for s in sources
+            ]
+            claim_audit = verify_answer_claims(
+                answer,
+                passages_for_check,
+                role,
+                rbac_enabled=settings.rbac_enabled,
+            )
+            unsupported_claim_rate = claim_audit.unsupported_claim_rate
+            numeric_em = numeric_exact_match(
+                answer,
+                item.gold_answer,
+                result.calculator if result is not None else None,
+            )
+
     resolved_llm = settings.llm
     return {
         "id": item.id,
@@ -460,6 +522,7 @@ def evaluate_single_question(
         "expected_behaviour": item.expected_behaviour,
         "llm_profile": resolved_llm.profile,
         "llm_model": resolved_llm.model,
+        "evidence_status": "MOCK, not evidence" if resolved_llm.is_mock else f"LIVE ({resolved_llm.profile})",
         "router_enabled": bool(settings.ENABLE_ADAPTIVE_ROUTER),
         "route_used": actual_route_norm,
         "expected_route": expected_route_norm,
@@ -478,6 +541,8 @@ def evaluate_single_question(
         "citation_support": citation_support,
         "faithfulness": faithfulness_val,
         "context_precision": context_precision_val,
+        "unsupported_claim_rate": unsupported_claim_rate,
+        "numeric_exact_match": numeric_em,
         "latency_ms": elapsed_ms,
         "live_calls": live_calls,
         "cached_calls": cached_calls,
@@ -547,8 +612,25 @@ def aggregate_ablation_rows(
     ctx_prec_vals = [
         float(r["context_precision"]) for r in answerable_rows if r.get("context_precision") is not None
     ]
+    unsup_vals = [
+        float(r["unsupported_claim_rate"])
+        for r in answerable_rows
+        if r.get("unsupported_claim_rate") is not None
+    ]
+    num_em_vals = [
+        float(r["numeric_exact_match"])
+        for r in answerable_rows
+        if r.get("numeric_exact_match") is not None
+    ]
     faith_mean = round(sum(faith_vals) / len(faith_vals), 4) if faith_vals else None
     ctx_prec_mean = round(sum(ctx_prec_vals) / len(ctx_prec_vals), 4) if ctx_prec_vals else None
+    unsup_mean = round(sum(unsup_vals) / len(unsup_vals), 4) if unsup_vals else None
+    num_em_mean = round(sum(num_em_vals) / len(num_em_vals), 4) if num_em_vals else None
+    evidence_status = (
+        "MOCK, not evidence"
+        if any(str(r.get("llm_profile", "")) == "mock" for r in rows)
+        else "LIVE"
+    )
 
     n_rows = max(len(rows), 1)
     latencies = sorted(float(r["latency_ms"]) for r in rows)
@@ -587,6 +669,7 @@ def aggregate_ablation_rows(
     return {
         "config_name": spec.name,
         "description": spec.description,
+        "evidence_status": evidence_status,
         "is_demonstration_only": spec.is_demonstration_only,
         "warning_banner": spec.warning_banner,
         "flags": asdict(spec),
@@ -606,6 +689,8 @@ def aggregate_ablation_rows(
             "context_precision": ctx_prec_mean,
             "citation_validity_rate": cit_val_ci["mean"],
             "citation_support_rate": cit_sup_ci["mean"],
+            "unsupported_claim_rate": unsup_mean,
+            "numeric_exact_match": num_em_mean,
             "correct_refusal_rate": crr_ci["mean"],
             "false_refusal_rate": frr_ci["mean"],
             "leakage_rate": leak_ci["mean"],

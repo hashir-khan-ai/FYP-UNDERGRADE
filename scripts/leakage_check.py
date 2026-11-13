@@ -296,6 +296,32 @@ def run() -> int:
                 settings.ENABLE_CORRECTIVE_GRADER = orig_grader
                 settings.GRADER_SHORTCUT_ENABLED = orig_shortcut
                 settings.ENABLE_XAI_OUTPUT = orig_xai
+
+            # Phase 8C: Claim check and deterministic calculator RBAC isolation probes
+            orig_claim = settings.ENABLE_CLAIM_CHECK
+            orig_calc = settings.ENABLE_CALCULATOR
+            try:
+                settings.ENABLE_CLAIM_CHECK = True
+                settings.ENABLE_CALCULATOR = True
+                for p_key in ("manager_only", "auditor_only"):
+                    q = QUESTIONS[p_key]
+                    evaluate(
+                        role,
+                        f"phase8c_{p_key}",
+                        lambda q=q, r=role: pipeline.ask(q, role=r),
+                    )
+                calc_probe_q = (
+                    "Calculate the excess exposure over the internal unhedged threshold for £750,000 "
+                    "and secondary liquidity deficit impact."
+                )
+                evaluate(
+                    role,
+                    "phase8c_calc_probe",
+                    lambda q=calc_probe_q, r=role: pipeline.ask(q, role=r),
+                )
+            finally:
+                settings.ENABLE_CLAIM_CHECK = orig_claim
+                settings.ENABLE_CALCULATOR = orig_calc
     finally:
         qdrant.close()
         logging.getLogger().removeHandler(handler)

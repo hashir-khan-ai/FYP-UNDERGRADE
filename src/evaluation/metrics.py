@@ -222,3 +222,53 @@ def intervals_overlap(
     high_b = float(ci_b["ci_high"] if isinstance(ci_b, dict) else ci_b[1])
     return max(low_a, low_b) <= min(high_a, high_b)
 
+
+def _extract_eval_numbers(text: str) -> list[float]:
+    """Extract normalized numeric magnitudes from answer text, ignoring citation IDs."""
+    cleaned = re.sub(r"\[(?:\d+(?:\s*,\s*\d+)*|DOC-[^\]]+|CH-[^\]]+|EVAL-[^\]]+|POL-[^\]]+)\]", "", text)
+    nums: list[float] = []
+    for m in re.finditer(r"(?<![A-Za-z0-9-])([£$€]?-?\d+(?:,\d{3})*(?:\.\d+)?)\s*(%?)", cleaned):
+        raw = m.group(1).lstrip("£$€").replace(",", "")
+        try:
+            nums.append(float(raw))
+        except ValueError:
+            continue
+    return nums
+
+
+def numeric_exact_match(
+    predicted_answer: str,
+    gold_answer: str,
+    calculator_payload: dict[str, Any] | None = None,
+) -> float | None:
+    """Return 1.0 if all gold numeric quantities match the prediction/calculator, else 0.0.
+
+    Returns ``None`` when ``gold_answer`` contains no explicit numeric quantities
+    so non-numeric questions are excluded from the denominator.
+    """
+    gold_nums = _extract_eval_numbers(gold_answer)
+    if not gold_nums:
+        return None
+
+    if (
+        isinstance(calculator_payload, dict)
+        and calculator_payload.get("triggered")
+        and not calculator_payload.get("refused")
+        and calculator_payload.get("result") is not None
+    ):
+        calc_val = float(calculator_payload["result"])
+        for g in gold_nums:
+            if abs(calc_val - g) <= max(1e-3, 1e-3 * abs(g)):
+                return 1.0
+
+    pred_nums = _extract_eval_numbers(predicted_answer)
+    if not pred_nums:
+        return 0.0
+
+    matched_all = all(
+        any(abs(p - g) <= max(1e-3, 1e-3 * abs(g)) for p in pred_nums)
+        for g in gold_nums
+    )
+    return 1.0 if matched_all else 0.0
+
+

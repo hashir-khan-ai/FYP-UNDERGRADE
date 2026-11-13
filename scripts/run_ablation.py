@@ -63,6 +63,8 @@ DEFAULT_CONFIG_NAMES: tuple[str, ...] = (
     "A3_router",
     "A4_grader",
     "A5_full_xai",
+    "A6_claim_check",
+    "A7_calculator",
 )
 
 
@@ -152,6 +154,7 @@ def run_ablation_suite(
     cache_dir: Path = Path("evaluation/cache"),
     out_dir: Path = Path("evaluation/results"),
     reviewed_only: bool = False,
+    gold_set_path: str = "data/eval/gold_set.jsonl",
 ) -> dict[str, Any]:
     """Execute the configured ablation rows and write checkpointed JSON results."""
     original_profile = settings.LLM_PROFILE
@@ -267,7 +270,7 @@ def run_ablation_suite(
 
         now_utc = datetime.now(timezone.utc)
         harness_banner = (
-            "HARNESS CHECK (mock)"
+            "MOCK, not evidence"
             if active_profile == "mock"
             else f"LIVE ({active_profile})"
         )
@@ -278,9 +281,10 @@ def run_ablation_suite(
             "llm_model": active_model,
             "temperature": 0.0,
             "harness_mode_banner": harness_banner,
+            "evidence_status": harness_banner,
             "judge_enabled": run_judge,
             "interrupted_by_spend_guard": interrupted_by_spend_guard,
-            "gold_set_path": "data/eval/gold_set.jsonl",
+            "gold_set_path": str(gold_set_path),
             "gold_set_status_note": (
                 "unreviewed_draft"
                 if any(q.status == "draft" for q in questions)
@@ -407,6 +411,7 @@ def main() -> int:
         mock_reranker=args.mock_reranker,
         out_dir=Path(args.out_dir),
         reviewed_only=args.require_reviewed,
+        gold_set_path=args.gold_set,
     )
 
     print("========================================================================================")
@@ -416,7 +421,7 @@ def main() -> int:
     print("========================================================================================================================")
     header = (
         f"{'Config':<16} {'Rec@5 (95% CI)':>20} {'nDCG@5 (95% CI)':>20} {'AnsF1':>7} {'CitVal':>7} {'CRR':>7} "
-        f"{'Leak':>7} {'Route':>7} {'MedMs':>8} {'Live/q':>7} {'LiveTok/q':>10}"
+        f"{'Leak':>7} {'Unsup':>7} {'NumEM':>7} {'Route':>7} {'MedMs':>8} {'Live/q':>7} {'LiveTok/q':>10}"
     )
     print(header)
     print("-" * len(header))
@@ -437,6 +442,8 @@ def main() -> int:
 
         tag = " [DEMO ONLY]" if cfg.get("is_demonstration_only") else ""
         route_str = "n/a" if m["routing_accuracy"] is None else f"{m['routing_accuracy']:.4f}"
+        unsup_str = "n/a" if m.get("unsupported_claim_rate") is None else f"{m['unsupported_claim_rate']:.4f}"
+        num_em_str = "n/a" if m.get("numeric_exact_match") is None else f"{m['numeric_exact_match']:.4f}"
         print(
             f"{cfg['config_name']:<16} "
             f"{r5_str:>20} "
@@ -445,6 +452,8 @@ def main() -> int:
             f"{m['citation_validity_rate']:>7.4f} "
             f"{m['correct_refusal_rate']:>7.4f} "
             f"{m['leakage_rate']:>7.4f} "
+            f"{unsup_str:>7} "
+            f"{num_em_str:>7} "
             f"{route_str:>7} "
             f"{m['latency_median_ms']:>8.1f} "
             f"{m['live_calls_per_query']:>7.2f} "

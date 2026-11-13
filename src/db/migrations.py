@@ -102,6 +102,8 @@ CREATE TABLE IF NOT EXISTS audit_log (
     citation_count INTEGER,
     citations_dropped INTEGER,
     heading_path_enabled INTEGER,
+    claim_check_json TEXT,
+    calculator_json TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (session_id) REFERENCES sessions (id) ON DELETE SET NULL,
     FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
@@ -213,6 +215,9 @@ _AUDIT_LOG_EXTRA_COLUMNS: dict[str, str] = {
     "citation_count": "INTEGER",
     "citations_dropped": "INTEGER",
     "heading_path_enabled": "INTEGER",
+    # Phase 8C stretch feature columns
+    "claim_check_json": "TEXT",
+    "calculator_json": "TEXT",
 }
 
 # Phase 3 messages column: the role used when each turn was produced.

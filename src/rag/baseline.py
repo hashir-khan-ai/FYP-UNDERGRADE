@@ -25,6 +25,8 @@ from pydantic import BaseModel, Field
 from src.config import settings
 from src.core.llm_client import ResilientLLMClient, active_resolved_llm, llm_client
 from src.core.prompts import load_prompt
+from src.core.calculator import run_compliance_calculator
+from src.core.claim_check import verify_answer_claims
 from src.core.security import enforce_role_visibility, normalize_role
 from src.core.xai import (
     build_heading_path,
@@ -139,6 +141,9 @@ class BaselineRAGResponse(BaseModel):
     citations_dropped: int = 0
     initial_passages_retrieved: int = 0
     response_mode: str = "compliance"
+    # Phase 8C optional stretch features (off by default).
+    claim_check: dict[str, Any] | None = None
+    calculator: dict[str, Any] | None = None
 
 
 @dataclass
@@ -910,9 +915,16 @@ class BaselineRAGPipeline:
                 "tokens": usage["prompt_tokens"] + usage["completion_tokens"],
             }
         )
-        return BaselineRAGResponse(
+        final_answer, claim_payload, calc_payload = self._apply_stretch_tools(
             query=query,
             answer=answer,
+            source_passages=source_passages,
+            role=normalized_role,
+            rbac_enabled=settings.rbac_enabled,
+        )
+        return BaselineRAGResponse(
+            query=query,
+            answer=final_answer,
             role=normalized_role,
             rbac_enabled=settings.rbac_enabled,
             sources=self._to_sources(source_passages),
@@ -952,6 +964,8 @@ class BaselineRAGPipeline:
             citations_dropped=citations_dropped_total,
             initial_passages_retrieved=initial_retrieved_count,
             response_mode=response_mode,
+            claim_check=claim_payload,
+            calculator=calc_payload,
         )
 
     def ask(
@@ -1102,9 +1116,16 @@ class BaselineRAGPipeline:
             ),
             rewritten_query=rewritten_query,
         )
-        return BaselineRAGResponse(
+        final_answer, claim_payload, calc_payload = self._apply_stretch_tools(
             query=query,
             answer=answer,
+            source_passages=source_passages,
+            role=normalized_role,
+            rbac_enabled=rbac_enabled,
+        )
+        return BaselineRAGResponse(
+            query=query,
+            answer=final_answer,
             role=normalized_role,
             rbac_enabled=rbac_enabled,
             sources=sources,
@@ -1143,8 +1164,52 @@ class BaselineRAGPipeline:
             citations_dropped=citations_dropped_total,
             initial_passages_retrieved=initial_retrieved_count,
             response_mode=response_mode,
+            claim_check=claim_payload,
+            calculator=calc_payload,
         )
 
+    def _apply_stretch_tools(
+        self,
+        *,
+        query: str,
+        answer: str,
+        source_passages: list[dict[str, Any]],
+        role: str,
+        rbac_enabled: bool,
+    ) -> tuple[str, dict[str, Any] | None, dict[str, Any] | None]:
+        """Execute optional Phase 8C claim_check and calculator on RBAC-filtered passages."""
+        claim_payload: dict[str, Any] | None = None
+        calc_payload: dict[str, Any] | None = None
+        final_answer = answer
+
+        if getattr(settings, "ENABLE_CLAIM_CHECK", False):
+            claim_res = verify_answer_claims(
+                final_answer,
+                source_passages,
+                role,
+                rbac_enabled=rbac_enabled,
+                embedder=getattr(self.qdrant, "embedder", None),
+                reranker=self.reranker,
+                remove_unsupported=True,
+            )
+            final_answer = claim_res.revised_answer
+            claim_payload = claim_res.model_dump()
+
+        if getattr(settings, "ENABLE_CALCULATOR", False):
+            calc_res = run_compliance_calculator(
+                query,
+                source_passages,
+                role,
+                rbac_enabled=rbac_enabled,
+            )
+            calc_payload = calc_res.model_dump()
+            if calc_res.triggered:
+                if calc_res.refused and calc_res.refusal_reason:
+                    final_answer = f"{final_answer}\n\n{calc_res.refusal_reason}".strip()
+                elif calc_res.formatted_summary:
+                    final_answer = f"{final_answer}\n\n{calc_res.formatted_summary}".strip()
+
+        return final_answer, claim_payload, calc_payload
 
     def close(self) -> None:
         """Release the embedded Qdrant file lock."""

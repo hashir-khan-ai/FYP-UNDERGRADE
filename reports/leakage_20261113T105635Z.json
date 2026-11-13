@@ -1,0 +1,9 @@
+{
+  "timestamp": "2026-11-13T10:56:35.230487+00:00",
+  "cells_checked": 45,
+  "leaked_cells": 0,
+  "leakage_rate": 0.0,
+  "leakage_rate_pct": 0.0,
+  "rbac_enabled": true,
+  "profile": "mock"
+}
