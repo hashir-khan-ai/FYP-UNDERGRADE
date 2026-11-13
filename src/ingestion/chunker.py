@@ -11,6 +11,31 @@ from dataclasses import dataclass
 
 from src.ingestion.loaders import LoadedDocument
 
+HTML_TAG_RE = re.compile(r"<!--[\s\S]*?-->|</?[A-Za-z][A-Za-z0-9_-]*(?:\s+[^<>]*)?/?>")
+MD_HEADING_PREFIX_RE = re.compile(r"(?m)^\s*#{1,6}\s+")
+HR_RULE_RE = re.compile(r"(?m)^\s*(?:-{3,}|={3,}|\*{3,})\s*$")
+
+
+def sanitize_heading_label(label: str) -> str:
+    """Strip HTML tags, markdown heading prefixes, and backticks from headings."""
+    if not label:
+        return ""
+    cleaned = HTML_TAG_RE.sub("", str(label))
+    cleaned = re.sub(r"^\s*#{1,6}\s+", "", cleaned)
+    cleaned = cleaned.replace("`", "")
+    return re.sub(r"\s+", " ", cleaned).strip()
+
+
+def sanitize_chunk_text(text: str) -> str:
+    """Strip HTML markup and markdown heading markers from indexed chunk text."""
+    if not text:
+        return ""
+    cleaned = HTML_TAG_RE.sub("", str(text))
+    cleaned = MD_HEADING_PREFIX_RE.sub("", cleaned)
+    cleaned = HR_RULE_RE.sub("", cleaned)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    return cleaned.strip()
+
 
 @dataclass
 class DocumentChunk:
@@ -32,13 +57,19 @@ class DocumentChunk:
     content_origin: str = ""
 
     def __post_init__(self) -> None:
+        self.text_content = sanitize_chunk_text(self.text_content)
+        self.section_label = sanitize_heading_label(self.section_label)
+        self.clause_label = sanitize_heading_label(self.clause_label)
+        self.heading_path = sanitize_heading_label(self.heading_path)
         if not self.heading_path:
             parts: list[str] = []
             if self.section_label:
                 parts.append(self.section_label)
             if self.clause_label and self.clause_label != self.section_label:
                 parts.append(self.clause_label)
-            self.heading_path = " > ".join(parts) if parts else self.doc_title
+            self.heading_path = " > ".join(parts) if parts else sanitize_heading_label(self.doc_title)
+        if self.token_count <= 0 and self.text_content:
+            self.token_count = len(self.text_content.split())
 
 
 _MARKDOWN_HEADING = re.compile(r"^(#{1,6})\s+(.*\S)\s*$")
@@ -279,7 +310,8 @@ class ClauseAwareChunker:
         parts = [text] if len(words) <= self.max_chunk_size else self._split_preserving_tables(text)
         chunks: list[DocumentChunk] = []
         for part in parts:
-            part_words = part.split()
+            cleaned_part = sanitize_chunk_text(part)
+            part_words = cleaned_part.split()
             if not part_words:
                 continue
             slug = _slug(label, len(used_ids) + 1)
@@ -296,7 +328,7 @@ class ClauseAwareChunker:
                     page=page,
                     source_path=doc.file_path,
                     allowed_roles=list(doc.allowed_roles),
-                    text_content=part.strip(),
+                    text_content=cleaned_part,
                     token_count=len(part_words),
                     heading_path=heading_path,
                     source_url=getattr(doc, "source_url", None),
@@ -361,7 +393,8 @@ class ClauseAwareChunker:
     ) -> list[DocumentChunk]:
         """Size-based fallback for documents with no structural headings."""
         chunks: list[DocumentChunk] = []
-        words = text.split()
+        cleaned = sanitize_chunk_text(text)
+        words = cleaned.split()
         start = 0
         part = 1
         while start < len(words):

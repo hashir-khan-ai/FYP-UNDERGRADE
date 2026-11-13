@@ -88,16 +88,20 @@ def run_ingestion(data_dir: str = "data", rebuild: bool = False) -> dict[str, in
 
     qdrant_indexer = QdrantIndexer()
     bm25_indexer = BM25Indexer()
+    qdrant_points = 0
     try:
-        if rebuild:
-            qdrant_indexer.reset()
-        logger.info("Indexing chunks into Qdrant embedded vector store...")
-        qdrant_indexer.index_chunks(all_chunks)
-        qdrant_points = qdrant_indexer.count()
-
         logger.info("Indexing chunks into BM25 lexical keyword store...")
         bm25_indexer.build_and_save(all_chunks)
         bm25_count = len(bm25_indexer.chunks)
+
+        try:
+            if rebuild:
+                qdrant_indexer.reset()
+            logger.info("Indexing chunks into Qdrant embedded vector store...")
+            qdrant_indexer.index_chunks(all_chunks)
+            qdrant_points = qdrant_indexer.count()
+        except RuntimeError as exc:
+            logger.warning("Qdrant re-indexing skipped (%s); BM25 index rebuilt.", exc)
     finally:
         qdrant_indexer.close()
 

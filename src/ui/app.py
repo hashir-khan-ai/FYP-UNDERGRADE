@@ -10,6 +10,8 @@ Apple Human Interface Guidelines (HIG) aesthetic:
 
 import html
 import os
+import re
+import textwrap
 from typing import Any
 
 import streamlit as st
@@ -598,6 +600,21 @@ def _clear_auth_state() -> None:
     st.session_state["staged_query"] = None
 
 
+_RAW_HTML_TAG_RE = re.compile(r"<!--[\s\S]*?-->|</?[A-Za-z][A-Za-z0-9_-]*(?:\s+[^<>]*)?/?>")
+_MD_HEADING_LINE_RE = re.compile(r"(?m)^\s*#{1,6}\s+")
+
+
+def sanitize_quote_for_display(text: str, max_chars: int = 320) -> str:
+    """Strip HTML tags and markdown markers from chunk quote text and escape for safe HTML."""
+    if not text:
+        return ""
+    cleaned = _RAW_HTML_TAG_RE.sub("", str(text))
+    cleaned = _MD_HEADING_LINE_RE.sub("", cleaned)
+    cleaned = cleaned.replace("`", "").replace("**", "")
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    return html.escape(cleaned[:max_chars])
+
+
 def _render_profile_badge(profile: str, model: str = "") -> str:
     """Render profile pill badge; displays warning styling when not demo."""
     meta = profile_badge_meta(profile)
@@ -1111,8 +1128,9 @@ def _render_citations_and_trace(
                     clause = html.escape(str(cite.get("clause") or cite.get("clause_id") or "-"))
                     page = cite.get("page") if cite.get("page") is not None else cite.get("page_number")
                     page_str = f"Page {page}" if page is not None else "Page n/a"
-                    snippet = html.escape(
-                        str(cite.get("quote_snippet") or cite.get("snippet") or "")[:250]
+                    snippet = sanitize_quote_for_display(
+                        str(cite.get("quote_snippet") or cite.get("snippet") or ""),
+                        max_chars=250,
                     )
                     is_internal = bool(cite.get("is_internal", False))
                     source_url = cite.get("source_url")
@@ -1131,58 +1149,58 @@ def _render_citations_and_trace(
                         permitted = ", ".join(
                             role_name.title() for role_name in sorted(set(allowed_roles))
                         )
-                        links_html = f"""
-                        <div class="access-denied-badge" role="status">
-                            <span class="access-denied-dot" aria-hidden="true"></span>
-                            ⛔ Unauthorized access — restricted to {html.escape(permitted)}
-                        </div>
-                        """
+                        links_html = (
+                            '<div class="access-denied-badge" role="status">'
+                            '<span class="access-denied-dot" aria-hidden="true"></span>'
+                            f"Unauthorized access — restricted to {html.escape(permitted)}"
+                            "</div>"
+                        )
                     elif is_internal:
-                        links_html = """
-                        <div class="internal-badge">
-                            🔒 Internal Document — No public verification link (Restricted Institutional Access)
-                        </div>
-                        """
+                        links_html = (
+                            '<div class="internal-badge">'
+                            "Internal Document — No public verification link (Restricted Institutional Access)"
+                            "</div>"
+                        )
                     else:
                         links_parts = []
                         if source_name:
-                            links_parts.append(f'<span class="source-authority-badge">🏛️ {source_name}</span>')
+                            links_parts.append(f'<span class="source-authority-badge">{source_name}</span>')
                         if source_url:
                             safe_src = html.escape(str(source_url), quote=True)
                             links_parts.append(
                                 f'<a href="{safe_src}" target="_blank" rel="noopener noreferrer" class="citation-link-btn primary">'
-                                f'📖 Open Source ↗</a>'
+                                f'Open Source ↗</a>'
                             )
                         if verification_url:
                             safe_vurl = html.escape(str(verification_url), quote=True)
                             links_parts.append(
                                 f'<a href="{safe_vurl}" target="_blank" rel="noopener noreferrer" class="citation-link-btn secondary">'
-                                f'🔍 Verify on Google ↗</a>'
+                                f'Verify on Google ↗</a>'
                             )
                         links_html = f'<div style="margin-top:8px;display:flex;flex-wrap:wrap;align-items:center;gap:6px;">{"".join(links_parts)}</div>'
 
-                    st.markdown(
-                        f"""
-                        <div class="citation-card">
-                            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;">
-                                <div>
-                                    <span class="pill-accent">{chunk_id}</span>
-                                    <strong style="color:#F4F6F9;">{doc_title}</strong>
-                                </div>
-                                <div>
-                                    <span class="pill-badge">{html.escape(page_str)}</span>
-                                    <span class="pill-badge">Clause: {clause}</span>
-                                </div>
-                            </div>
-                            <div style="font-size:0.84rem;color:#9AA0AE;margin-top:6px;">
-                                Heading Path: <code>{heading_path}</code>
-                            </div>
-                            <div class="quote-snippet">"{snippet}"</div>
-                            {links_html}
-                        </div>
-                        """,
-                        unsafe_allow_html=True,
+                    card_html = "".join(
+                        [
+                            '<div class="citation-card">',
+                            '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;">',
+                            "<div>",
+                            f'<span class="pill-accent">{chunk_id}</span> ',
+                            f'<strong style="color:#F4F6F9;">{doc_title}</strong>',
+                            "</div>",
+                            "<div>",
+                            f'<span class="pill-badge">{html.escape(page_str)}</span> ',
+                            f'<span class="pill-badge">Clause: {clause}</span>',
+                            "</div>",
+                            "</div>",
+                            '<div style="font-size:0.84rem;color:#9AA0AE;margin-top:6px;">',
+                            f"Heading Path: <code>{heading_path}</code>",
+                            "</div>",
+                            f'<blockquote class="quote-snippet">"{snippet}"</blockquote>',
+                            links_html,
+                            "</div>",
+                        ]
                     )
+                    st.markdown(card_html, unsafe_allow_html=True)
 
         trace: list[str] = turn_data.get("reasoning_trace") or []
         if trace:
