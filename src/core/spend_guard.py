@@ -109,6 +109,11 @@ class SpendGuardStatus:
     last_latency_ms: float | None = None
     cached_calls: int = 0
     saved_tokens: int = 0
+    session_calls: int = 0
+    session_tokens: int = 0
+    session_calls_limit: int = 0
+    session_tokens_limit: int = 0
+    tokens_estimated: bool = False
 
     def to_dict(self) -> dict[str, object]:
         """Return dictionary representation suitable for API telemetry responses."""
@@ -127,6 +132,11 @@ class SpendGuardStatus:
             "local_tokens": self.local_tokens,
             "cached_calls": self.cached_calls,
             "saved_tokens": self.saved_tokens,
+            "session_calls": self.session_calls,
+            "session_tokens": self.session_tokens,
+            "session_calls_limit": self.session_calls_limit,
+            "session_tokens_limit": self.session_tokens_limit,
+            "tokens_estimated": self.tokens_estimated,
             "limits": dict(self.limits),
             "exhausted": self.exhausted,
             "scope": self.scope,
@@ -143,6 +153,8 @@ class _RunUsage:
 
     paid_calls: int = 0
     paid_tokens: int = 0
+    query_paid_calls: int = 0
+    query_paid_tokens: int = 0
     offline_calls: int = 0
     offline_tokens: int = 0
     local_calls: int = 0
@@ -150,6 +162,7 @@ class _RunUsage:
     cached_calls: int = 0
     saved_tokens: int = 0
     paid_exhausted: bool = False
+    query_paid_exhausted: bool = False
     local_safety_tripped: bool = False
     last_profile: str = "mock"
     last_has_paid_quota: bool = False
@@ -160,7 +173,7 @@ class _RunUsage:
 
 
 class SpendGuard:
-    """Thread-safe, profile-aware LLM spend & runaway-loop guard scoped per run."""
+    """Thread-safe, profile-aware LLM spend & runaway-loop guard scoped per query + session."""
 
     def __init__(
         self,
@@ -168,9 +181,23 @@ class SpendGuard:
         max_tokens: int | None = None,
         safety_max_calls: int | None = None,
         safety_max_tokens: int | None = None,
+        session_max_calls: int | None = None,
+        session_max_tokens: int | None = None,
     ) -> None:
         self.max_calls = max_calls if max_calls is not None else settings.LLM_MAX_CALLS_PER_RUN
         self.max_tokens = max_tokens if max_tokens is not None else settings.LLM_MAX_TOKENS_PER_RUN
+        default_session_calls = getattr(settings, "LLM_MAX_CALLS_PER_SESSION", 150)
+        default_session_tokens = getattr(settings, "LLM_MAX_TOKENS_PER_SESSION", 400_000)
+        self.session_max_calls = (
+            session_max_calls
+            if session_max_calls is not None
+            else max(self.max_calls, default_session_calls)
+        )
+        self.session_max_tokens = (
+            session_max_tokens
+            if session_max_tokens is not None
+            else max(self.max_tokens, default_session_tokens)
+        )
         self.safety_max_calls = (
             safety_max_calls
             if safety_max_calls is not None
@@ -294,30 +321,69 @@ class SpendGuard:
             return "local"
         return "paid"
 
-    def _raise_paid_call_cap(self, state: _RunUsage) -> None:
-        state.paid_exhausted = True
-        detail = (
-            f"Paid quota call limit reached ({state.paid_calls}/{self.max_calls}); "
-            "configure LLM_MAX_CALLS_PER_RUN or start a new session."
-        )
+    def begin_query(self, run_id: str | None = None) -> None:
+        """Reset per-query live quota counters at the start of a new user query.
+
+        Cumulative per-session counters (`paid_calls`, `paid_tokens`) remain untouched so
+        both per-query runaway protection and per-session ceilings apply independently.
+        """
+        rid = self.current_run_id(run_id)
+        with self._lock:
+            state = self._get_or_create_run(rid)
+            state.query_paid_calls = 0
+            state.query_paid_tokens = 0
+            state.query_paid_exhausted = False
+            state.reserved_paid = 0
+
+    def _raise_paid_call_cap(self, state: _RunUsage, *, is_session: bool = False) -> None:
+        if is_session:
+            state.paid_exhausted = True
+            detail = (
+                f"Paid session call limit reached ({state.paid_calls}/{self.session_max_calls}); "
+                "reset budget or start a new session."
+            )
+            msg = "This session reached its LLM budget. Click Reset budget to continue."
+        else:
+            state.query_paid_exhausted = True
+            detail = (
+                f"Paid per-query call limit reached ({state.query_paid_calls}/{self.max_calls}); "
+                "configure LLM_MAX_CALLS_PER_RUN or simplify the query."
+            )
+            msg = "This query reached its step limit. Try a simpler question or click Reset budget."
         logger.warning(detail)
         raise CallCapExceededError(
-            "Spend guard cap exceeded: this run reached its LLM call budget. Start a new session to continue.",
-            user_message="This run reached its LLM call budget. Start a new session to continue.",
+            f"Spend guard cap exceeded: {msg}",
+            user_message=msg,
             internal_detail=detail,
         )
 
-    def _raise_paid_token_cap(self, state: _RunUsage, prospective_tokens: int | None = None) -> None:
-        state.paid_exhausted = True
-        observed = prospective_tokens if prospective_tokens is not None else state.paid_tokens
-        detail = (
-            f"Paid quota token limit reached ({observed}/{self.max_tokens}); "
-            "configure LLM_MAX_TOKENS_PER_RUN or start a new session."
-        )
+    def _raise_paid_token_cap(
+        self,
+        state: _RunUsage,
+        prospective_tokens: int | None = None,
+        *,
+        is_session: bool = False,
+    ) -> None:
+        if is_session:
+            state.paid_exhausted = True
+            observed = prospective_tokens if prospective_tokens is not None else state.paid_tokens
+            detail = (
+                f"Paid session token limit reached ({observed}/{self.session_max_tokens}); "
+                "reset budget or start a new session."
+            )
+            msg = "This session reached its LLM token budget. Click Reset budget to continue."
+        else:
+            state.query_paid_exhausted = True
+            observed = prospective_tokens if prospective_tokens is not None else state.query_paid_tokens
+            detail = (
+                f"Paid per-query token limit reached ({observed}/{self.max_tokens}); "
+                "configure LLM_MAX_TOKENS_PER_RUN or simplify the query."
+            )
+            msg = "This query reached its token limit. Try a simpler question or click Reset budget."
         logger.warning(detail)
         raise TokenCapExceededError(
-            "Spend guard token cap exceeded: this run reached its LLM token budget. Start a new session to continue.",
-            user_message="This run reached its LLM token budget. Start a new session to continue.",
+            f"Spend guard token cap exceeded: {msg}",
+            user_message=msg,
             internal_detail=detail,
         )
 
@@ -362,10 +428,14 @@ class SpendGuard:
                     self._raise_local_safety_cap("tokens", state.local_tokens, self.safety_max_tokens)
                 return
 
-            if state.paid_calls >= self.max_calls:
-                self._raise_paid_call_cap(state)
-            if state.paid_exhausted or state.paid_tokens >= self.max_tokens:
-                self._raise_paid_token_cap(state)
+            if state.paid_calls >= self.session_max_calls:
+                self._raise_paid_call_cap(state, is_session=True)
+            if state.paid_exhausted or state.paid_tokens >= self.session_max_tokens:
+                self._raise_paid_token_cap(state, is_session=True)
+            if state.query_paid_calls >= self.max_calls:
+                self._raise_paid_call_cap(state, is_session=False)
+            if state.query_paid_exhausted or state.query_paid_tokens >= self.max_tokens:
+                self._raise_paid_token_cap(state, is_session=False)
 
     def reserve_call(
         self,
@@ -411,15 +481,22 @@ class SpendGuard:
                 return scope
 
             # Paid quota path: atomic check-then-increment prevents concurrency overshoot.
-            if state.paid_calls >= self.max_calls:
-                self._raise_paid_call_cap(state)
-            if state.paid_exhausted or state.paid_tokens >= self.max_tokens:
-                self._raise_paid_token_cap(state)
+            if state.paid_calls >= self.session_max_calls:
+                self._raise_paid_call_cap(state, is_session=True)
+            if state.paid_exhausted or state.paid_tokens >= self.session_max_tokens:
+                self._raise_paid_token_cap(state, is_session=True)
+            if state.query_paid_calls >= self.max_calls:
+                self._raise_paid_call_cap(state, is_session=False)
+            if state.query_paid_exhausted or state.query_paid_tokens >= self.max_tokens:
+                self._raise_paid_token_cap(state, is_session=False)
 
             state.paid_calls += 1
+            state.query_paid_calls += 1
             state.reserved_paid += 1
-            if state.paid_calls >= self.max_calls:
+            if state.paid_calls >= self.session_max_calls:
                 state.paid_exhausted = True
+            if state.query_paid_calls >= self.max_calls:
+                state.query_paid_exhausted = True
             return scope
 
     def release_call(
@@ -458,9 +535,16 @@ class SpendGuard:
                 return
             if state.reserved_paid > 0 and state.paid_calls > 0:
                 state.paid_calls -= 1
+                if state.query_paid_calls > 0:
+                    state.query_paid_calls -= 1
                 state.reserved_paid -= 1
                 state.paid_exhausted = (
-                    state.paid_calls >= self.max_calls or state.paid_tokens >= self.max_tokens
+                    state.paid_calls >= self.session_max_calls
+                    or state.paid_tokens >= self.session_max_tokens
+                )
+                state.query_paid_exhausted = (
+                    state.query_paid_calls >= self.max_calls
+                    or state.query_paid_tokens >= self.max_tokens
                 )
 
     def commit_usage(
@@ -473,12 +557,7 @@ class SpendGuard:
         is_local: bool | None = None,
         run_id: str | None = None,
     ) -> None:
-        """Commit token usage for a call slot previously acquired via ``reserve_call``.
-
-        Unlike the legacy increment-then-raise pattern, this records actual billed tokens
-        for the already-completed call and marks the budget exhausted for subsequent calls
-        without discarding a valid LLM response.
-        """
+        """Commit token usage for a call slot previously acquired via ``reserve_call``."""
         call_tokens = max(int(prompt_tokens), 0) + max(int(completion_tokens), 0)
         prof, paid, local = self._resolve_mode(
             profile=profile,
@@ -512,9 +591,13 @@ class SpendGuard:
                 state.reserved_paid -= 1
             else:
                 state.paid_calls += 1
+                state.query_paid_calls += 1
             state.paid_tokens += call_tokens
-            if state.paid_calls >= self.max_calls or state.paid_tokens >= self.max_tokens:
+            state.query_paid_tokens += call_tokens
+            if state.paid_calls >= self.session_max_calls or state.paid_tokens >= self.session_max_tokens:
                 state.paid_exhausted = True
+            if state.query_paid_calls >= self.max_calls or state.query_paid_tokens >= self.max_tokens:
+                state.query_paid_exhausted = True
 
     def record_usage(
         self,
@@ -526,11 +609,7 @@ class SpendGuard:
         is_local: bool | None = None,
         run_id: str | None = None,
     ) -> None:
-        """Atomically check budget and record one completed call and its token usage.
-
-        Used by standalone callers and tests; checks limits before mutating counters so
-        blocked calls never overshoot ``max_calls`` or ``max_tokens``.
-        """
+        """Atomically check budget and record one completed call and its token usage."""
         call_tokens = max(int(prompt_tokens), 0) + max(int(completion_tokens), 0)
         prof, paid, local = self._resolve_mode(
             profile=profile,
@@ -565,19 +644,27 @@ class SpendGuard:
                     state.local_safety_tripped = True
                 return
 
-            # Paid quota path: atomic check BEFORE mutation to prevent increment-then-raise overshoot.
-            if state.paid_calls >= self.max_calls:
-                self._raise_paid_call_cap(state)
-            if state.paid_exhausted or state.paid_tokens >= self.max_tokens:
-                self._raise_paid_token_cap(state)
-            prospective_tokens = state.paid_tokens + call_tokens
-            if prospective_tokens > self.max_tokens:
-                self._raise_paid_token_cap(state, prospective_tokens=prospective_tokens)
+            # Paid quota path: enforce both cumulative session cap and per-query cap before mutation.
+            if state.paid_calls >= self.session_max_calls:
+                self._raise_paid_call_cap(state, is_session=True)
+            prospective_session_tokens = state.paid_tokens + call_tokens
+            if state.paid_exhausted or prospective_session_tokens > self.session_max_tokens:
+                self._raise_paid_token_cap(state, prospective_tokens=prospective_session_tokens, is_session=True)
+
+            if state.query_paid_calls >= self.max_calls:
+                self._raise_paid_call_cap(state, is_session=False)
+            prospective_query_tokens = state.query_paid_tokens + call_tokens
+            if state.query_paid_exhausted or prospective_query_tokens > self.max_tokens:
+                self._raise_paid_token_cap(state, prospective_tokens=prospective_query_tokens, is_session=False)
 
             state.paid_calls += 1
-            state.paid_tokens = prospective_tokens
-            if state.paid_calls >= self.max_calls or state.paid_tokens >= self.max_tokens:
+            state.paid_tokens = prospective_session_tokens
+            state.query_paid_calls += 1
+            state.query_paid_tokens = prospective_query_tokens
+            if state.paid_calls >= self.session_max_calls or state.paid_tokens >= self.session_max_tokens:
                 state.paid_exhausted = True
+            if state.query_paid_calls >= self.max_calls or state.query_paid_tokens >= self.max_tokens:
+                state.query_paid_exhausted = True
 
     def record_cache_hit(
         self,
@@ -626,14 +713,20 @@ class SpendGuard:
                     local = state.last_is_local
 
             scope = self._scope_for(prof, paid, local)
+            session_calls = 0
+            session_tokens = 0
+            session_calls_limit = 0
+            session_tokens_limit = 0
+            tokens_estimated = False
             if scope == "offline":
                 active_calls = state.offline_calls
                 active_tokens = state.offline_tokens
-                calls_limit = self.max_calls
-                tokens_limit = self.max_tokens
+                calls_limit = 0
+                tokens_limit = 0
                 exhausted = False
-                calls_remaining = calls_limit
-                tokens_remaining = tokens_limit
+                calls_remaining = 0
+                tokens_remaining = 0
+                tokens_estimated = True
             elif scope == "local":
                 active_calls = state.local_calls
                 active_tokens = state.local_tokens
@@ -647,14 +740,21 @@ class SpendGuard:
                 calls_remaining = max(calls_limit - active_calls, 0) if calls_limit > 0 else 0
                 tokens_remaining = max(tokens_limit - active_tokens, 0) if tokens_limit > 0 else 0
             else:
-                active_calls = state.paid_calls
-                active_tokens = state.paid_tokens
+                active_calls = state.query_paid_calls
+                active_tokens = state.query_paid_tokens
                 calls_limit = self.max_calls
                 tokens_limit = self.max_tokens
+                session_calls = state.paid_calls
+                session_tokens = state.paid_tokens
+                session_calls_limit = self.session_max_calls
+                session_tokens_limit = self.session_max_tokens
                 exhausted = bool(
                     state.paid_exhausted
-                    or state.paid_calls >= self.max_calls
-                    or state.paid_tokens >= self.max_tokens
+                    or state.query_paid_exhausted
+                    or state.query_paid_calls >= self.max_calls
+                    or state.query_paid_tokens >= self.max_tokens
+                    or state.paid_calls >= self.session_max_calls
+                    or state.paid_tokens >= self.session_max_tokens
                 )
                 calls_remaining = max(calls_limit - active_calls, 0) if calls_limit > 0 else 0
                 tokens_remaining = max(tokens_limit - active_tokens, 0) if tokens_limit > 0 else 0
@@ -681,6 +781,11 @@ class SpendGuard:
                 last_latency_ms=state.last_latency_ms,
                 cached_calls=state.cached_calls,
                 saved_tokens=state.saved_tokens,
+                session_calls=session_calls,
+                session_tokens=session_tokens,
+                session_calls_limit=session_calls_limit,
+                session_tokens_limit=session_tokens_limit,
+                tokens_estimated=tokens_estimated,
             )
 
     @property
@@ -704,8 +809,11 @@ class SpendGuard:
                     )
                 return bool(
                     state.paid_exhausted
-                    or state.paid_calls >= self.max_calls
-                    or state.paid_tokens >= self.max_tokens
+                    or state.query_paid_exhausted
+                    or state.query_paid_calls >= self.max_calls
+                    or state.query_paid_tokens >= self.max_tokens
+                    or state.paid_calls >= self.session_max_calls
+                    or state.paid_tokens >= self.session_max_tokens
                 )
 
             # Outside explicit run_scope (e.g. unit tests calling spend_guard.record_usage directly)
@@ -719,8 +827,11 @@ class SpendGuard:
                 )
             return bool(
                 state.paid_exhausted
-                or state.paid_calls >= self.max_calls
-                or state.paid_tokens >= self.max_tokens
+                or state.query_paid_exhausted
+                or state.query_paid_calls >= self.max_calls
+                or state.query_paid_tokens >= self.max_tokens
+                or state.paid_calls >= self.session_max_calls
+                or state.paid_tokens >= self.session_max_tokens
             )
 
     def reset(self, run_id: str | None = None) -> None:

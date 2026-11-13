@@ -153,15 +153,24 @@ class Settings(BaseSettings):
         description="Version folder used under prompts/ and recorded in cache keys/audit rows",
     )
 
-    # Spend guard (per run; evaluation applies one budget per benchmark run)
-    # Adaptive pipeline uses up to 5-7 calls/turn (~8k-12k tokens); 150 calls / 400k tokens supports ~20-25 live turns.
+    # Spend guard (per-query + per-session caps for live/paid quota only; mock & local dev bypass paid limits)
+    # Adaptive pipeline uses up to 5-7 calls/query (~8k-12k tokens); 25 calls / 120k tokens protects single turns,
+    # while 150 calls / 400k tokens caps cumulative live session usage until reset.
     LLM_MAX_CALLS_PER_RUN: int = Field(
-        default=150,
-        description="Hard cap on paid-profile LLM calls per run before stopping",
+        default=25,
+        description="Per-query hard cap on paid-profile LLM calls (reset at each user query)",
     )
     LLM_MAX_TOKENS_PER_RUN: int = Field(
+        default=120_000,
+        description="Per-query hard cap on paid-profile prompt + completion tokens (reset at each user query)",
+    )
+    LLM_MAX_CALLS_PER_SESSION: int = Field(
+        default=150,
+        description="Cumulative per-session hard cap on paid-profile LLM calls before user reset",
+    )
+    LLM_MAX_TOKENS_PER_SESSION: int = Field(
         default=400_000,
-        description="Hard cap on paid-profile prompt + completion tokens per run before stopping",
+        description="Cumulative per-session hard cap on paid-profile tokens before user reset",
     )
     LLM_LOCAL_SAFETY_CALLS: int = Field(
         default=1000,

@@ -637,8 +637,35 @@ def _render_profile_badge(profile: str, model: str = "") -> str:
 
 
 def _render_error_banner(err: UIApiError | str) -> None:
-    msg = str(err)
-    st.error(f"System Notice: {msg}")
+    msg = str(err).strip()
+    lower = msg.lower()
+    is_budget = any(
+        needle in lower
+        for needle in (
+            "budget",
+            "spend",
+            "llm_spend_limit",
+            "protect api quota",
+            "step limit",
+            "token limit",
+            "reached its",
+        )
+    )
+    if is_budget:
+        st.warning("This session reached its LLM budget. Reset the budget below to continue.")
+        client = st.session_state.get("api_client")
+        token = st.session_state.get("access_token")
+        active_id = st.session_state.get("active_session_id")
+        if client and token and active_id:
+            if st.button("Reset budget", key="error_reset_budget_btn"):
+                try:
+                    st.session_state["run_spend"] = client.reset_session_run(str(token), str(active_id))
+                    st.session_state["last_error"] = None
+                    st.rerun()
+                except UIApiError as exc:
+                    st.session_state["last_error"] = str(exc)
+        return
+    st.error(msg)
 
 
 def _load_sessions_and_config(client: ComplianceAPIClient, token: str) -> None:
@@ -1030,15 +1057,32 @@ def render_sidebar(client: ComplianceAPIClient, token: str, user: dict[str, Any]
             calls_limit = int(run_budget.get("calls_limit", caps.get("calls_limit", 0)) or 0)
             tokens_used = int(run_budget.get("tokens_used", caps.get("tokens_used", 0)) or 0)
             tokens_limit = int(run_budget.get("tokens_limit", caps.get("tokens_limit", 0)) or 0)
-            if scope_lbl == "offline":
-                st.markdown(f"**Run Mode:** `offline-mock (unmetered)` — `{calls_used}` calls / `{tokens_used}` tokens")
+            session_calls = int(run_budget.get("session_calls", caps.get("session_calls", calls_used)) or 0)
+            session_calls_limit = int(run_budget.get("session_calls_limit", caps.get("session_calls_limit", 0)) or 0)
+            tokens_estimated = bool(
+                run_budget.get("tokens_estimated", caps.get("tokens_estimated", scope_lbl == "offline" or profile == "mock"))
+            )
+            token_unit = "estimated tokens" if tokens_estimated else "tokens"
+            if scope_lbl == "offline" or profile == "mock":
+                st.markdown(
+                    f"**Run Mode:** `offline-mock (unmetered)` — `{calls_used}` calls / `{tokens_used}` {token_unit}"
+                )
             elif not is_paid:
-                st.markdown(f"**Run Mode:** `local-dev (safety ceiling)` — `{calls_used}/{calls_limit}` calls / `{tokens_used}/{tokens_limit}` tokens")
+                st.markdown(
+                    f"**Run Mode:** `local-dev (safety ceiling)` — `{calls_used}/{calls_limit}` calls / `{tokens_used}/{tokens_limit}` {token_unit}"
+                )
             else:
-                st.markdown(f"**Run Budget (`live`):** `{calls_used}/{calls_limit}` calls / `{tokens_used}/{tokens_limit}` tokens")
+                sess_part = (
+                    f" · Session: `{session_calls}/{session_calls_limit}` calls"
+                    if session_calls_limit > 0
+                    else ""
+                )
+                st.markdown(
+                    f"**Run Budget (`live`):** Query `{calls_used}/{calls_limit}` calls / `{tokens_used}/{tokens_limit}` {token_unit}{sess_part}"
+                )
                 if bool(run_budget.get("exhausted", False)) and active_id:
                     st.warning("This session reached its LLM budget.")
-                    if st.button("Reset Run Budget", key="reset_run_budget_btn", use_container_width=True):
+                    if st.button("Reset budget", key="reset_run_budget_btn", use_container_width=True):
                         try:
                             st.session_state["run_spend"] = client.reset_session_run(token, str(active_id))
                             st.session_state["last_error"] = None

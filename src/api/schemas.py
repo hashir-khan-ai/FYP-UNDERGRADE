@@ -97,6 +97,11 @@ class SpendStats(BaseModel):
     local_tokens: int = 0
     cached_calls: int = 0
     saved_tokens: int = 0
+    session_calls: int = 0
+    session_tokens: int = 0
+    session_calls_limit: int = 0
+    session_tokens_limit: int = 0
+    tokens_estimated: bool = False
 
 
 class RetrievalStats(BaseModel):

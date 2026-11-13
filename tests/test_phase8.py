@@ -7,6 +7,7 @@ import re
 from pathlib import Path
 from unittest.mock import MagicMock
 
+import pytest
 from streamlit.testing.v1 import AppTest
 
 from src.ingestion.chunker import (
@@ -127,3 +128,97 @@ def test_8a1_rendered_quote_escapes_html_and_never_leaks_internal_badge() -> Non
     # The badge element itself must not be indented >= 4 spaces into a CommonMark code block
     assert "                        <div class=\"internal-badge\">" not in rendered
     assert "    <div class=\"internal-badge\">" not in rendered
+
+
+# ==============================================================================
+# Phase 8A.2 — Spend Guard (Mock Bypass, Per-Query + Session Caps, Reset UI)
+# ==============================================================================
+def test_8a2_mock_does_not_count_or_enforce_max_calls_per_run() -> None:
+    """In mock/offline profiles, LLM_MAX_CALLS_PER_RUN is neither counted nor enforced."""
+    from src.core.spend_guard import SpendGuard
+
+    guard = SpendGuard(max_calls=1, max_tokens=10, session_max_calls=2, session_max_tokens=20)
+    for _ in range(10):
+        guard.check_call_allowed(profile="mock", has_paid_quota=False, is_local=True, run_id="mock-sess")
+        guard.reserve_call(profile="mock", has_paid_quota=False, is_local=True, run_id="mock-sess")
+        guard.commit_usage(50, 50, profile="mock", has_paid_quota=False, is_local=True, run_id="mock-sess")
+
+    snap = guard.status(profile="mock", has_paid_quota=False, is_local=True, run_id="mock-sess")
+    assert snap.exhausted is False
+    assert snap.paid_calls == 0
+    assert snap.paid_tokens == 0
+    assert snap.calls_limit == 0
+    assert snap.tokens_limit == 0
+    assert snap.tokens_estimated is True
+    assert snap.offline_calls == 10
+    assert snap.offline_tokens == 1000
+
+
+def test_8a2_live_budget_resets_per_query_and_enforces_session_cap() -> None:
+    """Live profiles reset per-query cap cleanly via begin_query while tracking cumulative session cap."""
+    from src.core.spend_guard import CallCapExceededError, SpendGuard
+
+    guard = SpendGuard(max_calls=2, max_tokens=5000, session_max_calls=3, session_max_tokens=10_000)
+    rid = "live-sess-01"
+
+    # Query 1 consumes 2 calls (per-query limit) -> Query 2 works after begin_query
+    guard.begin_query(rid)
+    for _ in range(2):
+        guard.reserve_call(profile="demo", has_paid_quota=True, is_local=False, run_id=rid)
+        guard.commit_usage(10, 10, profile="demo", has_paid_quota=True, is_local=False, run_id=rid)
+    with pytest.raises(CallCapExceededError):
+        guard.check_call_allowed(profile="demo", has_paid_quota=True, is_local=False, run_id=rid)
+
+    # New query resets per-query counter, leaving 1 session call remaining (session cap = 3)
+    guard.begin_query(rid)
+    guard.reserve_call(profile="demo", has_paid_quota=True, is_local=False, run_id=rid)
+    guard.commit_usage(10, 10, profile="demo", has_paid_quota=True, is_local=False, run_id=rid)
+
+    # 4th call in session hits cumulative session cap
+    guard.begin_query(rid)
+    with pytest.raises(CallCapExceededError) as exc_info:
+        guard.check_call_allowed(profile="demo", has_paid_quota=True, is_local=False, run_id=rid)
+    assert "session" in str(exc_info.value).lower()
+    assert "protect api quota" not in str(exc_info.value).lower()
+
+    snap = guard.status(profile="demo", has_paid_quota=True, is_local=False, run_id=rid)
+    assert snap.session_calls == 3
+    assert snap.session_calls_limit == 3
+    assert snap.tokens_estimated is False
+    assert snap.exhausted is True
+
+
+def test_8a2_ui_renders_human_budget_reset_and_estimated_mock_tokens() -> None:
+    """UI removes 'System Notice', offers Reset budget on cap errors, and labels mock tokens estimated."""
+    client = _make_mock_client("analyst")
+    client.get_admin_config.return_value["spend_caps"] = {
+        "calls_used": 4,
+        "calls_limit": 0,
+        "tokens_used": 320,
+        "tokens_limit": 0,
+        "tokens_estimated": 1,
+        "exhausted": 0,
+        "is_paid": 0,
+    }
+    at = AppTest.from_file("src/ui/app.py")
+    at.session_state["api_client"] = client
+    at.session_state["access_token"] = "tok-analyst"
+    at.session_state["user"] = {"id": 1, "username": "analyst_user", "role": "analyst", "full_name": "Alex Analyst"}
+    at.session_state["sessions"] = [{"id": "sess-001", "title": "Budget Session"}]
+    at.session_state["active_session_id"] = "sess-001"
+    at.session_state["last_error"] = "Spend guard cap exceeded to protect API quota."
+    at.run()
+
+    assert not at.exception
+    rendered = _collect_all_markdowns(at)
+    assert "System Notice" not in rendered
+    assert "estimated tokens" in rendered.lower()
+    assert any("reached its LLM budget" in w.value for w in at.warning)
+
+    reset_btn = next((b for b in at.button if b.key == "error_reset_budget_btn"), None)
+    assert reset_btn is not None
+    reset_btn.click()
+    at.run()
+
+    assert not at.exception
+    client.reset_session_run.assert_called_with("tok-analyst", "sess-001")

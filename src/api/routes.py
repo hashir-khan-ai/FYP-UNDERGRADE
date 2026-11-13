@@ -235,6 +235,11 @@ def _spend_stats_from_snapshot(snap: Any) -> SpendStats:
         local_tokens=snap.local_tokens,
         cached_calls=snap.cached_calls,
         saved_tokens=snap.saved_tokens,
+        session_calls=snap.session_calls,
+        session_tokens=snap.session_tokens,
+        session_calls_limit=snap.session_calls_limit,
+        session_tokens_limit=snap.session_tokens_limit,
+        tokens_estimated=snap.tokens_estimated,
     )
 
 
@@ -403,6 +408,7 @@ def chat_query(
             is_local=resolved.is_local,
         ),
     ):
+        spend_guard.begin_query(f"session:{payload.session_id}")
         return _execute_chat_turn(payload=payload, user=user)
 
 
@@ -1042,11 +1048,16 @@ def admin_config(
     )
     spend_caps_payload: dict[str, int] = {
         "calls_used": snap.calls,
-        "calls_limit": snap.calls_limit if snap.calls_limit > 0 else settings.LLM_MAX_CALLS_PER_RUN,
+        "calls_limit": snap.calls_limit,
         "calls_remaining": snap.calls_remaining,
         "tokens_used": snap.tokens,
-        "tokens_limit": snap.tokens_limit if snap.tokens_limit > 0 else settings.LLM_MAX_TOKENS_PER_RUN,
+        "tokens_limit": snap.tokens_limit,
         "tokens_remaining": snap.tokens_remaining,
+        "session_calls": snap.session_calls,
+        "session_calls_limit": snap.session_calls_limit,
+        "session_tokens": snap.session_tokens,
+        "session_tokens_limit": snap.session_tokens_limit,
+        "tokens_estimated": int(snap.tokens_estimated),
         "exhausted": int(snap.exhausted),
         "is_paid": int(snap.is_paid),
         "cached_calls": snap.cached_calls,
