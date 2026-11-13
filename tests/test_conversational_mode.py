@@ -117,3 +117,55 @@ def test_explain_mode_pipeline_grounding_and_refusal() -> None:
     answer, cited, cached, latency, usage = res
     assert answer == "I can't find that in the documents available to your role."
     assert cited == []
+
+
+def test_verification_metadata_public_vs_internal() -> None:
+    """Verify public documents receive canonical and Google links while internal documents never link out."""
+    from src.rag.baseline import build_verification_metadata
+
+    # 1. Public Basel regulation
+    public_passage = {
+        "doc_id": "DOC-BASEL-III-2023",
+        "doc_title": "Basel Committee on Banking Supervision - Basel III Capital & Liquidity Framework",
+        "section_label": "Part 1 - Minimum Capital Requirements",
+        "clause_label": "1.1 CET1 Ratio",
+        "jurisdiction": "BASEL_BCBS",
+        "content_origin": "excerpt_of_original",
+        "source_url": "https://www.bis.org/bcbs/basel3.htm",
+    }
+    public_meta = build_verification_metadata(public_passage)
+    assert public_meta["is_internal"] is False
+    assert public_meta["source_url"] == "https://www.bis.org/bcbs/basel3.htm"
+    assert "https://www.google.com/search?q=" in public_meta["verification_url"]
+    assert "Basel" in public_meta["verification_url"]
+    assert "Basel Committee" in public_meta["source_name"]
+
+    # 2. Internal audit document (synthetic)
+    internal_passage = {
+        "doc_id": "DOC-INT-AUDIT-CONF-2025",
+        "doc_title": "Bank Internal Audit Committee Review",
+        "section_label": "Audit Gaps",
+        "clause_label": "Item 3",
+        "jurisdiction": "INTERNAL_SYNTHETIC",
+        "content_origin": "synthetic",
+        "source_url": "SYNTHETIC_DATASET",
+    }
+    internal_meta = build_verification_metadata(internal_passage)
+    assert internal_meta["is_internal"] is True
+    assert internal_meta["source_url"] is None
+    assert internal_meta["verification_url"] is None
+    assert "Internal" in internal_meta["source_name"]
+
+    # 3. Internal escalation policy
+    policy_passage = {
+        "doc_id": "POL-042",
+        "doc_title": "Material Breach Escalation Policy",
+        "section_label": "Section 2",
+        "clause_label": "Clause 2.1",
+        "jurisdiction": "INTERNAL_SYNTHETIC",
+        "content_origin": "synthetic",
+    }
+    policy_meta = build_verification_metadata(policy_passage)
+    assert policy_meta["is_internal"] is True
+    assert policy_meta["source_url"] is None
+    assert policy_meta["verification_url"] is None

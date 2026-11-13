@@ -4,22 +4,38 @@ Every protected route derives the user and role from the signed bearer token.
 Client-supplied role or user identifiers are ignored by construction.
 """
 
+import inspect
 import json
 import logging
 import time
 import uuid
+from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Depends, Query, Request, status
+from fastapi import APIRouter, Depends, File, Form, Query, Request, UploadFile, status
 
-from src.api.deps import ApiError, CurrentUser, get_current_user, require_role
+from src.api.deps import (
+    ApiError,
+    CurrentUser,
+    enforce_query_rate_limit,
+    enforce_upload_rate_limit,
+    get_current_user,
+    require_role,
+)
 from src.api.schemas import (
     AdminConfigResponse,
+    AdminMetricsResponse,
     AuditLogEntry,
+    AuditMetrics,
     ChatQueryRequest,
     ChatQueryResponse,
     Citation,
+    DocumentListItem,
+    DocumentListResponse,
+    DocumentUploadResponse,
     GraderStats,
+    IndexMetrics,
+    LatencyMetrics,
     LoginRequest,
     LoginResponse,
     LogoutResponse,
@@ -30,11 +46,12 @@ from src.api.schemas import (
     SessionCreateRequest,
     SessionListResponse,
     SessionMessagesResponse,
+    SessionRenameRequest,
     SessionSummary,
     SpendStats,
     UserProfile,
 )
-from src.config import settings
+from src.config import ResolvedLLM, settings
 from src.core.auth import (
     AccountLockedError,
     LoginRateLimitedError,
@@ -45,26 +62,36 @@ from src.core.auth import (
     revoke_token,
     verify_password,
 )
+from src.core.llm_client import active_resolved_llm, llm_profile_scope
 from src.core.memory import (
     MemoryContext,
+    format_history,
     load_recent_turns,
     memory_metadata,
     rewrite_follow_up,
 )
+from src.core.prompts import load_prompt
 from src.core.router import (
     DIRECT,
     DIRECT_REPLIES,
+    INTENT_GENERAL_CHAT,
     ROUTE_API_NAMES,
     SPLIT,
     RouteDecision,
     classify_question,
     router_metadata,
+    rule_precheck,
 )
 from src.core.spend_guard import spend_guard
+from src.core.telemetry import bind_audit_id
 from src.core.xai import build_safe_reasoning_trace
 from src.db.connection import get_db_connection
 from src.db.repository import Repository
-from src.rag.baseline import BaselineRAGResponse, baseline_pipeline
+from src.rag.baseline import (
+    BaselineRAGResponse,
+    baseline_pipeline,
+    build_verification_metadata,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -188,6 +215,29 @@ def _session_summary(row: Any) -> SessionSummary:
     )
 
 
+def _spend_stats_from_snapshot(snap: Any) -> SpendStats:
+    """Convert a SpendGuardStatus snapshot into a sanitized API SpendStats payload."""
+    return SpendStats(
+        calls_used=snap.calls,
+        calls_limit=snap.calls_limit,
+        tokens_used=snap.tokens,
+        tokens_limit=snap.tokens_limit,
+        exhausted=snap.exhausted,
+        calls_remaining=snap.calls_remaining,
+        tokens_remaining=snap.tokens_remaining,
+        scope=snap.scope,
+        profile=snap.profile,
+        is_paid=snap.is_paid,
+        run_id=snap.run_id,
+        offline_calls=snap.offline_calls,
+        offline_tokens=snap.offline_tokens,
+        local_calls=snap.local_calls,
+        local_tokens=snap.local_tokens,
+        cached_calls=snap.cached_calls,
+        saved_tokens=snap.saved_tokens,
+    )
+
+
 @router.post(
     "/api/v1/sessions",
     response_model=SessionSummary,
@@ -197,12 +247,13 @@ def create_session(
     payload: SessionCreateRequest | None = None,
     user: CurrentUser = Depends(get_current_user),
 ) -> SessionSummary:
-    """Create a chat session owned by the authenticated user."""
+    """Create a chat session owned by the authenticated user and initialize a fresh run budget."""
     session_id = str(uuid.uuid4())
     title = (payload.title if payload and payload.title else "").strip() or "New Compliance Session"
     with get_db_connection() as conn:
         Repository(conn).create_session(session_id, user.id, title)
         row = Repository(conn).get_session_for_user(session_id, user.id)
+    spend_guard.reset(run_id=f"session:{session_id}")
     return _session_summary(row)
 
 
@@ -266,22 +317,99 @@ def delete_session(
         deleted = Repository(conn).delete_session_for_user(session_id, user.id)
     if not deleted:
         raise ApiError(404, "SESSION_NOT_FOUND", "Session not found.")
+    spend_guard.reset(run_id=f"session:{session_id}")
     return {"status": "deleted", "session_id": session_id}
+
+
+@router.post("/api/v1/sessions/{session_id}/new-run", response_model=SpendStats)
+def reset_session_run(
+    session_id: str,
+    user: CurrentUser = Depends(get_current_user),
+) -> SpendStats:
+    """Reset the run-scoped LLM budget counters for an owned session."""
+    with get_db_connection() as conn:
+        if Repository(conn).get_session_for_user(session_id, user.id) is None:
+            raise ApiError(404, "SESSION_NOT_FOUND", "Session not found.")
+    resolved = settings.llm
+    run_id = f"session:{session_id}"
+    spend_guard.reset(run_id=run_id)
+    snap = spend_guard.status(
+        profile=resolved.profile,
+        has_paid_quota=resolved.has_paid_quota,
+        is_local=resolved.is_local,
+        run_id=run_id,
+    )
+    return _spend_stats_from_snapshot(snap)
+
+
+@router.patch(
+    "/api/v1/sessions/{session_id}",
+    response_model=SessionSummary,
+)
+def rename_session(
+    session_id: str,
+    payload: SessionRenameRequest,
+    user: CurrentUser = Depends(get_current_user),
+) -> SessionSummary:
+    """Rename a session owned by the caller (IDOR-safe)."""
+    title = payload.title.strip()
+    if not title:
+        raise ApiError(400, "EMPTY_TITLE", "Session title cannot be empty.")
+    with get_db_connection() as conn:
+        row = Repository(conn).rename_session_for_user(session_id, user.id, title)
+    if row is None:
+        raise ApiError(404, "SESSION_NOT_FOUND", "Session not found.")
+    return _session_summary(row)
 
 
 # ==============================================================================
 # Chat (RBAC-scoped RAG)
 # ==============================================================================
-@router.post("/api/v1/chat/query", response_model=ChatQueryResponse)
+@router.post(
+    "/api/v1/chat/query",
+    response_model=ChatQueryResponse,
+    dependencies=[Depends(enforce_query_rate_limit)],
+)
 def chat_query(
     payload: ChatQueryRequest,
     user: CurrentUser = Depends(get_current_user),
 ) -> ChatQueryResponse:
-    """Execute the RAG pipeline with the caller's role enforced server-side.
+    """Execute the RAG pipeline inside an isolated per-session run boundary.
 
     The role always comes from the authenticated session. ``config_overrides``
     is accepted for API compatibility but never disables RBAC or memory.
     """
+    if payload.fallback_offline:
+        resolved = ResolvedLLM(
+            profile="mock",
+            model="mock-offline-fallback",
+            temperature=settings.LLM_TEMPERATURE,
+            timeout_seconds=settings.LLM_TIMEOUT_SECONDS,
+            max_retries=0,
+            max_rpm=0,
+            is_mock=True,
+            is_local=True,
+            has_paid_quota=False,
+        )
+    else:
+        resolved = settings.llm
+
+    with (
+        llm_profile_scope(resolved),
+        spend_guard.run_scope(
+            f"session:{payload.session_id}",
+            profile=resolved.profile,
+            has_paid_quota=resolved.has_paid_quota,
+            is_local=resolved.is_local,
+        ),
+    ):
+        return _execute_chat_turn(payload=payload, user=user)
+
+
+def _execute_chat_turn(
+    payload: ChatQueryRequest,
+    user: CurrentUser,
+) -> ChatQueryResponse:
     started = time.perf_counter()
     session_id = str(payload.session_id)
     query = payload.query.strip()
@@ -322,16 +450,46 @@ def chat_query(
 
     # Routing happens after the memory rewrite and the server-derived role, and
     # before any retrieval. Every fallback inside the router is SINGLE_SEARCH.
+    intent_mode = getattr(payload, "intent_mode", "auto")
     router_enabled = settings.ENABLE_ADAPTIVE_ROUTER
     decision: RouteDecision | None = None
     route = SINGLE_SEARCH_API
     if router_enabled:
+        router_kwargs: dict[str, Any] = {
+            "session_id": session_id,
+            "intent_mode": intent_mode,
+            "user_role": user.role,
+        }
+        try:
+            sig = inspect.signature(classify_question)
+            if not any(
+                p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()
+            ):
+                router_kwargs = {k: v for k, v in router_kwargs.items() if k in sig.parameters}
+        except (TypeError, ValueError):
+            pass
         decision = classify_question(
             baseline_pipeline.llm,
             memory.standalone_question,
-            session_id=session_id,
+            **router_kwargs,
         )
         route = decision.api_route
+    else:
+        # Check rule pre-check for safety invariants even if adaptive LLM router is off
+        prechecked = rule_precheck(memory.standalone_question, role=user.role)
+        if prechecked is not None and prechecked.direct_category in ("injection", "unsafe", "system_info"):
+            decision = prechecked
+            route = decision.api_route
+        elif intent_mode == "general":
+            decision = RouteDecision(
+                route=INTENT_GENERAL_CHAT,
+                confidence=1.0,
+                source="intent_mode",
+                intent="general_chat",
+                response_type="general_chat",
+                grounded=False,
+            )
+            route = decision.api_route
 
     result: BaselineRAGResponse | None = None
     direct_category: str | None = None
@@ -346,7 +504,7 @@ def chat_query(
         top_rerank_score = 0.0
         candidates_retrieved = 0
         candidates_filtered = 0
-        resolved_llm = settings.llm
+        resolved_llm = active_resolved_llm()
         step_timings.append(
             {
                 "step": "direct_reply",
@@ -354,6 +512,39 @@ def chat_query(
                 "tokens": decision.tokens_used,
             }
         )
+    elif decision is not None and decision.route == INTENT_GENERAL_CHAT:
+        prompt_tmpl = load_prompt("general")
+        history_str = format_history(turns) if turns else "(no previous turns)"
+        history_section = (
+            f"<conversation_history>\n{history_str}\n</conversation_history>" if turns else ""
+        )
+        general_prompt = prompt_tmpl.format(
+            question=query,
+            history_section=history_section,
+        )
+        gen_start = time.perf_counter()
+        llm_response = baseline_pipeline.llm.complete(
+            prompt=general_prompt,
+            step="general_chat",
+            session_id=session_id,
+        )
+        gen_latency = (time.perf_counter() - gen_start) * 1000.0
+        step_timings.append(
+            {
+                "step": "general_generation",
+                "latency_ms": round(gen_latency, 2),
+                "tokens": llm_response.prompt_tokens + llm_response.completion_tokens,
+            }
+        )
+        answer = f"*(Note: Answered from general AI knowledge, not grounded in company documents.)*\n\n{llm_response.content.strip()}"
+        sources = []
+        cached = llm_response.cached
+        rewritten_query = None
+        retrieval_total = 0
+        top_rerank_score = 0.0
+        candidates_retrieved = 0
+        candidates_filtered = 0
+        resolved_llm = active_resolved_llm()
     else:
         if decision is not None and decision.route == SPLIT:
             result = baseline_pipeline.ask_split(
@@ -403,9 +594,16 @@ def chat_query(
         top_rerank_score = result.retrieval_stats.top_rerank_score
         candidates_retrieved = result.retrieval_stats.candidates_retrieved
         candidates_filtered = result.retrieval_stats.candidates_filtered_by_role
-        resolved_llm = settings.llm
+        resolved_llm = active_resolved_llm()
 
     latency_ms = (time.perf_counter() - started) * 1000.0
+    spend_guard.record_latency(latency_ms, run_id=f"session:{session_id}")
+    spend_snap = spend_guard.status(
+        profile=resolved_llm.profile,
+        has_paid_quota=resolved_llm.has_paid_quota,
+        is_local=resolved_llm.is_local,
+        run_id=f"session:{session_id}",
+    )
     citations_dropped = result.citations_dropped if result is not None else 0
 
     citations = [
@@ -422,6 +620,12 @@ def chat_query(
             clause=source.clause or "",
             page=source.page,
             quote_snippet=source.quote_snippet or source.snippet,
+            source_url=getattr(source, "source_url", None),
+            verification_url=getattr(source, "verification_url", None),
+            source_name=getattr(source, "source_name", None),
+            content_origin=getattr(source, "content_origin", None),
+            is_internal=getattr(source, "is_internal", False),
+            allowed_roles=list(getattr(source, "allowed_roles", []) or []),
         )
         for source in sources
     ]
@@ -532,6 +736,55 @@ def chat_query(
                 "Step 6: One grounded answer generated from the permitted passages only."
             )
 
+    suggested_follow_ups: list[str] = []
+    if decision is not None and decision.route == INTENT_GENERAL_CHAT:
+        suggested_follow_ups = [
+            "How does this apply to banking compliance?",
+            "Search company policy documents",
+            "Explain in more technical detail",
+        ]
+    elif decision is not None and decision.direct_category == "system_info":
+        suggested_follow_ups = [
+            "What documents are in my role's corpus?",
+            "What are the Basel III capital ratios?",
+            "What are the KYC/CDD obligations?",
+        ]
+    elif decision is not None and decision.direct_category in ("injection", "unsafe"):
+        suggested_follow_ups = [
+            "What is Customer Due Diligence (CDD)?",
+            "What is the Common Equity Tier 1 (CET1) requirement?",
+        ]
+    else:
+        q_lower = query.lower()
+        if "capital" in q_lower or "basel" in q_lower or "cet1" in q_lower:
+            suggested_follow_ups = [
+                "What is the Capital Conservation Buffer requirement?",
+                "How are Risk-Weighted Assets (RWA) calculated?",
+                "What are the Tier 2 capital eligibility criteria?",
+            ]
+        elif "cdd" in q_lower or "kyc" in q_lower or "laundering" in q_lower or "aml" in q_lower:
+            suggested_follow_ups = [
+                "When is Enhanced Due Diligence (EDD) mandatory?",
+                "What are the internal escalation procedures for suspicious activity?",
+                "How long must KYC verification records be retained?",
+            ]
+        elif "cass" in q_lower or "client asset" in q_lower:
+            suggested_follow_ups = [
+                "What are the rules for segregating client money under CASS 7?",
+                "What internal reconciliations are required under CASS?",
+            ]
+        else:
+            suggested_follow_ups = [
+                "What are the specific clause numbers and citations?",
+                "Explain the operational impact in simple terms",
+                "What supervisory penalties apply for non-compliance?",
+            ]
+
+    response_type = decision.response_type if decision is not None else "rag"
+    grounded = decision.grounded if decision is not None else True
+
+    # Persist everything the UI needs to re-render a turn after a reload. This is
+    # scoped to the caller's own session and contains no prompt text or secrets.
     with get_db_connection() as conn:
         repo = Repository(conn)
         usage = repo.get_llm_usage_since(usage_floor, session_id)
@@ -552,6 +805,8 @@ def chat_query(
             metadata_json=json.dumps(
                 {
                     "chunk_ids": [source.chunk_id for source in sources],
+                    "citations": [citation.model_dump() for citation in citations],
+                    "reasoning_trace": reasoning_trace,
                     "latency_ms": round(latency_ms, 2),
                     "cached": cached,
                     "tokens_prompt": usage["prompt_tokens"],
@@ -559,6 +814,15 @@ def chat_query(
                     "router": router_metadata(decision) if decision is not None else None,
                     "citations_dropped": citations_dropped,
                     "response_mode": response_mode,
+                    "intent_mode": intent_mode,
+                    "response_type": response_type,
+                    "grounded": grounded,
+                    "refusal_category": refusal_category,
+                    "suggested_follow_ups": suggested_follow_ups,
+                    "grader_path": result.grader_path if result is not None else None,
+                    "llm_profile": resolved_llm.profile,
+                    "llm_model": resolved_llm.model,
+                    "timings": timings_dict,
                 }
             ),
         )
@@ -581,7 +845,7 @@ def chat_query(
             llm_profile=resolved_llm.profile,
             llm_calls=usage["calls"],
             cached_calls=usage["cached_calls"],
-            spend_guard_hit=spend_guard.exhausted,
+            spend_guard_hit=spend_snap.exhausted,
             prompt_version=settings.PROMPT_VERSION,
             llm_model=resolved_llm.model,
             candidates_retrieved=candidates_retrieved,
@@ -605,6 +869,7 @@ def chat_query(
             citations_dropped=citations_dropped,
             heading_path_enabled=settings.ENABLE_HEADING_PATH,
         )
+        bind_audit_id(audit_id)
 
     return ChatQueryResponse(
         session_id=session_id,
@@ -629,13 +894,7 @@ def chat_query(
             completion_tokens=usage["completion_tokens"],
             cached_response=cached,
         ),
-        spend=SpendStats(
-            calls_used=spend_guard.calls_count,
-            calls_limit=spend_guard.max_calls,
-            tokens_used=spend_guard.tokens_count,
-            tokens_limit=spend_guard.max_tokens,
-            exhausted=spend_guard.exhausted,
-        ),
+        spend=_spend_stats_from_snapshot(spend_snap),
         latency_ms=round(latency_ms, 2),
         audit_id=int(audit_id),
         role=user.role,
@@ -672,17 +931,36 @@ def chat_query(
         citations_dropped=citations_dropped,
         heading_path_enabled=settings.ENABLE_HEADING_PATH,
         response_mode=response_mode,
+        intent_mode=intent_mode,
+        response_type=response_type,
+        grounded=grounded,
+        suggested_follow_ups=suggested_follow_ups,
     )
 
 
 # ==============================================================================
 # Audit trail and admin configuration
 # ==============================================================================
+def _percentile(sorted_vals: list[float], pct: float) -> float:
+    if not sorted_vals:
+        return 0.0
+    if len(sorted_vals) == 1:
+        return round(sorted_vals[0], 2)
+    rank = (pct / 100.0) * (len(sorted_vals) - 1)
+    low = int(rank)
+    high = min(low + 1, len(sorted_vals) - 1)
+    frac = rank - low
+    return round(sorted_vals[low] + frac * (sorted_vals[high] - sorted_vals[low]), 2)
+
+
 @router.get("/api/v1/audit/logs", response_model=list[AuditLogEntry])
 def audit_logs(
     limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
     user_id: int | None = Query(default=None),
     start_date: str | None = Query(default=None),
+    route: str | None = Query(default=None),
+    user_role: str | None = Query(default=None),
     user: CurrentUser = Depends(require_role("auditor")),
 ) -> list[AuditLogEntry]:
     """Return audit *summaries*. Restricted to the auditor role.
@@ -694,8 +972,11 @@ def audit_logs(
     with get_db_connection() as conn:
         rows = Repository(conn).list_audit_logs(
             limit=limit,
+            offset=offset,
             user_id=user_id,
             start_date=start_date,
+            route=route,
+            user_role=user_role,
         )
     return [
         AuditLogEntry(
@@ -742,9 +1023,38 @@ def audit_logs(
 
 
 @router.get("/api/v1/admin/config", response_model=AdminConfigResponse)
-def admin_config(user: CurrentUser = Depends(get_current_user)) -> AdminConfigResponse:
-    """Expose the active profile, layer flags and spend caps (no secrets)."""
+def admin_config(
+    session_id: str | None = Query(default=None),
+    user: CurrentUser = Depends(get_current_user),
+) -> AdminConfigResponse:
+    """Expose the active profile, layer flags, and current-run budget telemetry (no secrets)."""
     resolved = settings.llm
+    run_id = "__unscoped_idle__"
+    if session_id:
+        with get_db_connection() as conn:
+            if Repository(conn).get_session_for_user(session_id, user.id) is not None:
+                run_id = f"session:{session_id}"
+    snap = spend_guard.status(
+        profile=resolved.profile,
+        has_paid_quota=resolved.has_paid_quota,
+        is_local=resolved.is_local,
+        run_id=run_id,
+    )
+    spend_caps_payload: dict[str, int] = {
+        "calls_used": snap.calls,
+        "calls_limit": snap.calls_limit if snap.calls_limit > 0 else settings.LLM_MAX_CALLS_PER_RUN,
+        "calls_remaining": snap.calls_remaining,
+        "tokens_used": snap.tokens,
+        "tokens_limit": snap.tokens_limit if snap.tokens_limit > 0 else settings.LLM_MAX_TOKENS_PER_RUN,
+        "tokens_remaining": snap.tokens_remaining,
+        "exhausted": int(snap.exhausted),
+        "is_paid": int(snap.is_paid),
+        "cached_calls": snap.cached_calls,
+        "saved_tokens": snap.saved_tokens,
+    }
+    if snap.last_latency_ms is not None:
+        spend_caps_payload["last_latency_ms"] = int(round(snap.last_latency_ms))
+
     return AdminConfigResponse(
         profile=resolved.profile,
         model=resolved.model,
@@ -759,12 +1069,216 @@ def admin_config(user: CurrentUser = Depends(get_current_user)) -> AdminConfigRe
             "xai_output": settings.ENABLE_XAI_OUTPUT,
             "heading_path": settings.ENABLE_HEADING_PATH,
         },
-        spend_caps={
-            "calls_limit": settings.LLM_MAX_CALLS_PER_RUN,
-            "tokens_limit": settings.LLM_MAX_TOKENS_PER_RUN,
-        },
+        spend_caps=spend_caps_payload,
         token_ttl_minutes=settings.AUTH_TOKEN_TTL_MINUTES,
+        run_budget=_spend_stats_from_snapshot(snap),
     )
+
+
+@router.get("/api/v1/admin/metrics", response_model=AdminMetricsResponse)
+def admin_metrics(
+    session_id: str | None = Query(default=None),
+    user: CurrentUser = Depends(get_current_user),
+) -> AdminMetricsResponse:
+    """Expose sanitized operational telemetry, latency percentiles, and guard status."""
+    resolved = settings.llm
+    run_id = "__unscoped_idle__"
+    with get_db_connection() as conn:
+        repo = Repository(conn)
+        if session_id and repo.get_session_for_user(session_id, user.id) is not None:
+            run_id = f"session:{session_id}"
+        raw = repo.get_system_metrics()
+
+    snap = spend_guard.status(
+        profile=resolved.profile,
+        has_paid_quota=resolved.has_paid_quota,
+        is_local=resolved.is_local,
+        run_id=run_id,
+    )
+
+    sorted_lat = sorted(float(v) for v in raw.get("latencies", []))
+    total_calls = int(raw.get("total_calls", 0))
+    cached_calls = int(raw.get("cached_calls", 0))
+    cache_hit_rate = round((cached_calls / total_calls), 4) if total_calls > 0 else 0.0
+    avg_ms = round(sum(sorted_lat) / len(sorted_lat), 2) if sorted_lat else 0.0
+
+    try:
+        vector_count = int(baseline_pipeline.qdrant.count())
+        idx_status = "online"
+    except Exception:
+        vector_count = 0
+        idx_status = "unavailable"
+    try:
+        bm25_chunks = len(getattr(baseline_pipeline.bm25, "chunks", []) or [])
+    except Exception:
+        bm25_chunks = 0
+
+    return AdminMetricsResponse(
+        profile=resolved.profile,
+        model=resolved.model,
+        prompt_version=settings.PROMPT_VERSION,
+        is_mock=resolved.is_mock,
+        is_local=resolved.is_local,
+        is_paid=resolved.has_paid_quota,
+        total_calls=total_calls,
+        cached_calls=cached_calls,
+        error_calls=int(raw.get("error_calls", 0)),
+        cache_hit_rate=cache_hit_rate,
+        total_prompt_tokens=int(raw.get("prompt_tokens", 0)),
+        total_completion_tokens=int(raw.get("completion_tokens", 0)),
+        total_tokens=int(raw.get("total_tokens", 0)),
+        latency=LatencyMetrics(
+            p50_ms=_percentile(sorted_lat, 50.0),
+            p95_ms=_percentile(sorted_lat, 95.0),
+            avg_ms=avg_ms,
+            sample_count=len(sorted_lat),
+        ),
+        index=IndexMetrics(
+            vector_count=vector_count,
+            bm25_chunks=bm25_chunks,
+            status=idx_status,
+        ),
+        audit=AuditMetrics(
+            total_turns=int(raw.get("total_turns", 0)),
+            total_role_filtered=int(raw.get("total_role_filtered", 0)),
+            total_citations_dropped=int(raw.get("total_citations_dropped", 0)),
+        ),
+        guard_status=_spend_stats_from_snapshot(snap),
+    )
+
+
+# ==============================================================================
+# Document Upload and Catalog
+# ==============================================================================
+@router.post(
+    "/api/v1/documents/upload",
+    response_model=DocumentUploadResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(enforce_upload_rate_limit)],
+)
+def upload_document(
+    file: UploadFile = File(...),
+    allowed_roles: str = Form(default='["manager", "auditor"]'),
+    title: str | None = Form(default=None),
+    doc_id: str | None = Form(default=None),
+    doc_type: str | None = Form(default=None),
+    user: CurrentUser = Depends(get_current_user),
+) -> DocumentUploadResponse:
+    """Upload and dynamically index a compliance document into Qdrant & BM25.
+
+    Role-gated: only roles in settings.UPLOAD_ALLOWED_ROLES (default: manager, auditor)
+    are permitted to upload and index documents dynamically.
+    """
+    from src.ingestion.upload_ingest import ingest_uploaded_document, UploadValidationError
+    from src.rag.baseline import invalidate_provenance_catalog
+
+    if user.role not in settings.UPLOAD_ALLOWED_ROLES:
+        raise ApiError(
+            403,
+            "FORBIDDEN",
+            f"Role '{user.role}' is not authorized to upload documents.",
+        )
+
+    roles_list: list[str] = []
+    try:
+        parsed = json.loads(allowed_roles)
+        if isinstance(parsed, list):
+            roles_list = [str(r).strip() for r in parsed if str(r).strip()]
+        elif isinstance(parsed, str):
+            roles_list = [r.strip() for r in parsed.split(",") if r.strip()]
+    except Exception:
+        roles_list = [r.strip() for r in allowed_roles.split(",") if r.strip()]
+
+    if not roles_list:
+        roles_list = ["manager", "auditor"]
+
+    if hasattr(file, "file") and hasattr(file.file, "read"):
+        content = file.file.read()
+    elif hasattr(file, "read"):
+        content = file.read()
+    else:
+        content = b""
+    filename = file.filename or "uploaded_document.txt"
+
+    clean_doc_id = str(doc_id).strip() if (doc_id and isinstance(doc_id, str) and doc_id.strip()) else None
+    clean_title = str(title).strip() if (title and isinstance(title, str) and title.strip()) else None
+    clean_doc_type = str(doc_type).strip() if (doc_type and isinstance(doc_type, str) and doc_type.strip()) else "custom"
+
+    try:
+        result = ingest_uploaded_document(
+            file_bytes=content,
+            filename=filename,
+            user_id=user.id,
+            user_role=user.role,
+            allowed_roles=roles_list,
+            doc_id=clean_doc_id,
+            title=clean_title,
+            doc_type=clean_doc_type,
+            qdrant_indexer=baseline_pipeline.qdrant,
+            bm25_indexer=baseline_pipeline.bm25,
+        )
+        baseline_pipeline.bm25.load()
+        invalidate_provenance_catalog()
+    except UploadValidationError as exc:
+        raise ApiError(400, "INVALID_UPLOAD", str(exc)) from exc
+    except Exception as exc:
+        logger.exception("Failed to ingest uploaded document '%s': %s", filename, exc)
+        raise ApiError(500, "INGESTION_ERROR", "Document ingestion failed due to a server processing error.") from exc
+
+    return DocumentUploadResponse(
+        doc_id=result["doc_id"],
+        filename=result["filename"],
+        title=result["title"],
+        chunks_indexed=result["chunks_indexed"],
+        allowed_roles=result["allowed_roles"],
+        doc_type=result["doc_type"],
+        file_path=Path(str(result["file_path"])).name,
+        message=result["message"],
+    )
+
+
+@router.get("/api/v1/documents", response_model=DocumentListResponse)
+def list_documents(user: CurrentUser = Depends(get_current_user)) -> DocumentListResponse:
+    """List documents in the compliance catalog visible to the caller's role."""
+    with get_db_connection() as conn:
+        rows = Repository(conn).list_documents()
+
+    items: list[DocumentListItem] = []
+    for r in rows:
+        roles_raw = r["allowed_roles"]
+        roles: list[str] = []
+        try:
+            roles = json.loads(roles_raw) if isinstance(roles_raw, str) else list(roles_raw)
+        except Exception:
+            roles = [r.strip() for r in str(roles_raw).split(",") if r.strip()]
+
+        if user.role.lower() in [role.lower() for role in roles]:
+            trust = build_verification_metadata(
+                {
+                    "doc_id": str(r["id"]),
+                    "doc_title": str(r["filename"]),
+                    "jurisdiction": str(r["source_jurisdiction"]),
+                    "doc_type": str(r["doc_type"]),
+                }
+            )
+            items.append(
+                DocumentListItem(
+                    id=str(r["id"]),
+                    filename=str(r["filename"]),
+                    source_jurisdiction=str(r["source_jurisdiction"]),
+                    doc_type=str(r["doc_type"]),
+                    version=str(r["version"]),
+                    allowed_roles=roles,
+                    file_path=Path(str(r["file_path"])).name,
+                    total_chunks=int(r["total_chunks"] or 0),
+                    created_at=str(r["created_at"]) if r["created_at"] is not None else None,
+                    source_url=trust.get("source_url"),
+                    source_name=trust.get("source_name"),
+                    is_internal=bool(trust.get("is_internal", False)),
+                )
+            )
+
+    return DocumentListResponse(documents=items, total=len(items))
 
 
 __all__ = ["router"]

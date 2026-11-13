@@ -43,12 +43,16 @@ env/
 *.pem
 
 # Data & Database storage
+data/*.db
+data/*.db-wal
+data/*.db-shm
 data/sqlite/*.db
 data/sqlite/*.db-wal
 data/sqlite/*.db-shm
 data/sqlite/*.pkl
 data/qdrant/
 data/cache/
+data/uploads/
 evaluation/cache/
 evaluation/results/*.csv
 evaluation/results/*.json
@@ -69,3 +73,12 @@ htmlcov/
 # OS generated files
 .DS_Store
 Thumbs.db
+
+# Next.js frontend (local-first web workspace)
+web/node_modules/
+web/.next/
+web/out/
+web/coverage/
+web/*.tsbuildinfo
+web/.env*.local
+web/.turbo/

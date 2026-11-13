@@ -194,3 +194,38 @@ def test_design_md_and_streamlit_theme_contract() -> None:
     assert 'backgroundColor = "#1C1D20"' in config_text
     assert 'textColor = "#F1F3F4"' in config_text
 
+
+def test_ui_client_upload_document_serializes_roles() -> None:
+    """upload_document serializes allowed_roles via json.dumps without NameError."""
+    captured: dict[str, str] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["path"] = request.url.path
+        captured["body"] = request.read().decode("utf-8", errors="ignore")
+        return httpx.Response(
+            201,
+            json={
+                "doc_id": "DOC-UI-1",
+                "filename": "policy.md",
+                "title": "Policy",
+                "chunks_indexed": 2,
+                "allowed_roles": ["manager", "auditor"],
+                "doc_type": "policy",
+                "file_path": "policy.md",
+                "message": "ok",
+            },
+        )
+
+    client = ComplianceAPIClient(transport=httpx.MockTransport(handler))
+    res = client.upload_document(
+        token="tok-mgr",
+        file_bytes=b"# Policy\nClause 1: Rule.",
+        filename="policy.md",
+        allowed_roles=["manager", "auditor"],
+        title="Policy",
+    )
+    assert res["doc_id"] == "DOC-UI-1"
+    assert captured["path"] == "/api/v1/documents/upload"
+    assert '["manager", "auditor"]' in captured["body"]
+
+

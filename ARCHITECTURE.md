@@ -134,10 +134,10 @@ flowchart TD
 
 ### 2.4 Spend Guard
 
-- Per-run budget configured by `LLM_MAX_CALLS_PER_RUN` and `LLM_MAX_TOKENS_PER_RUN`.
-- **Run scope:** one pipeline invocation for normal chat traffic; one full benchmark execution (all gold questions) for `scripts/run_evaluation.py`.
-- The guard checks remaining budget *before* a call (prompt tokens + `max_tokens` estimate) and reconciles actual usage *after* the response. Cache hits and mock calls consume `0` quota but are still counted as calls for telemetry.
-- On exhaustion the run stops immediately with a clear message, e.g. `LLM budget exhausted for this run: 41/40 calls, 118,420/120,000 tokens. Raise LLM_MAX_* or warm the cache.` The API maps this to HTTP `429` with code `LLM_SPEND_LIMIT`; the evaluation harness writes a partial artifact marked `status: "aborted_spend_limit"`.
+- Per-run paid quota configured by `LLM_MAX_CALLS_PER_RUN` (default `150`) and `LLM_MAX_TOKENS_PER_RUN` (default `400,000`), plus local self-hosted runaway safety limits `LLM_LOCAL_SAFETY_CALLS` (default `1000`) and `LLM_LOCAL_SAFETY_TOKENS` (default `4,000,000`).
+- **Profile awareness:** `ResolvedLLM` exposes config-derived `is_local` and `has_paid_quota`. `mock` bypasses paid-quota enforcement entirely (`offline_calls`/`offline_tokens` telemetry only). Local `dev` models (`localhost`/`127.0.0.1` Ollama) bypass paid-quota `429` stops and are protected only by the local runaway safety ceiling (`HTTP 503 LOCAL_SAFETY_LIMIT`). Paid profiles enforce strict atomic check-before-mutate `reserve_call` + `commit_usage`.
+- **Run scope:** Interactive API traffic isolates one run per user session (`run_id = "session:<session_id>"`), bound via thread/task-safe `ContextVar` (`spend_guard.run_scope(...)`) with zero mid-turn resets and zero cross-session bleed. Creating a new session or calling `POST /api/v1/sessions/{id}/new-run` resets that session's budget cleanly. Stateless `/ask` isolates one run per call; `scripts/run_evaluation.py` applies one budget per full benchmark run. Cache hits consume `0` quota.
+- On paid exhaustion the run stops before calling the upstream provider with a sanitized message (`"This run reached its LLM call budget. Start a new session to continue."`), mapped to HTTP `429` with code `LLM_SPEND_LIMIT` (detailed config diagnostics stay in server logs only); the evaluation harness writes a partial artifact marked `status: "aborted_spend_limit"`.
 
 ### 2.5 Structured Router & Grader Output
 
@@ -293,9 +293,11 @@ PROMPT_VERSION=v1
 LLM_CACHE_ENABLED=true
 LLM_CACHE_TTL_DAYS=30
 
-# Spend Guard (per run)
-LLM_MAX_CALLS_PER_RUN=40
-LLM_MAX_TOKENS_PER_RUN=120000
+# Spend Guard (per run; paid profiles only)
+LLM_MAX_CALLS_PER_RUN=150
+LLM_MAX_TOKENS_PER_RUN=400000
+LLM_LOCAL_SAFETY_CALLS=1000
+LLM_LOCAL_SAFETY_TOKENS=4000000
 
 # Local CPU Models
 EMBEDDING_MODEL_NAME=BAAI/bge-small-en-v1.5

@@ -2,9 +2,11 @@
 
 from dataclasses import dataclass
 
-from fastapi import Depends, Header
+from fastapi import Depends, Header, Request
 
+from src.config import settings
 from src.core.auth import TokenError, decode_access_token
+from src.core.rate_limiter import api_rate_limiter
 from src.db.connection import get_db_connection
 from src.db.repository import Repository
 
@@ -81,4 +83,45 @@ def require_role(*allowed_roles: str):
     return dependency
 
 
-__all__ = ["ApiError", "CurrentUser", "get_current_user", "require_role"]
+def _client_ip(request: Request) -> str:
+    if request.client and request.client.host:
+        return request.client.host
+    return "unknown"
+
+
+def enforce_query_rate_limit(
+    request: Request,
+    user: CurrentUser = Depends(get_current_user),
+) -> None:
+    """Apply sliding-window API rate limits per authenticated user and client IP."""
+    key = f"query:user:{user.id}:{_client_ip(request)}"
+    api_rate_limiter.check_and_record(
+        key,
+        limit=settings.API_RATE_LIMIT_PER_MINUTE,
+        window_seconds=60.0,
+        scope="query",
+    )
+
+
+def enforce_upload_rate_limit(
+    request: Request,
+    user: CurrentUser = Depends(get_current_user),
+) -> None:
+    """Apply stricter per-user/IP rate limits on document ingestion uploads."""
+    key = f"upload:user:{user.id}:{_client_ip(request)}"
+    api_rate_limiter.check_and_record(
+        key,
+        limit=settings.API_UPLOAD_RATE_LIMIT_PER_MINUTE,
+        window_seconds=60.0,
+        scope="upload",
+    )
+
+
+__all__ = [
+    "ApiError",
+    "CurrentUser",
+    "enforce_query_rate_limit",
+    "enforce_upload_rate_limit",
+    "get_current_user",
+    "require_role",
+]

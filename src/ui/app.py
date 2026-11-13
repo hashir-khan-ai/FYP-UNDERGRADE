@@ -14,6 +14,7 @@ from typing import Any
 
 import streamlit as st
 
+from src.config import settings
 from src.ui.api_client import (
     ComplianceAPIClient,
     UIApiError,
@@ -124,133 +125,334 @@ ROLE_STARTER_QUESTIONS: dict[str, list[dict[str, str]]] = {
 
 APPLE_DESIGN_CSS = """
 <style>
-    /* Apple SF Pro typographic hierarchy */
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    /* Native Apple system typographic hierarchy */
+    :root {
+        --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif;
+        --font-mono: "SF Mono", ui-monospace, Menlo, Monaco, Consolas, monospace;
+        --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
+    }
 
     html, body, [class*="css"], .stApp {
-        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Inter", "Helvetica Neue", sans-serif !important;
+        font-family: var(--font-sans) !important;
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
-        background-color: #121316 !important;
-        color: #F1F3F4 !important;
-        letter-spacing: -0.011em;
+        background-color: #0B0E14 !important;
+        color: #F4F6F9 !important;
+        letter-spacing: -0.012em;
     }
 
-    /* Apple-style sidebar: frosted dark glass surface */
+    /* Main chat reading column: comfortable reading width on desktop (prevents text stretching) */
+    div[data-testid="stMainBlockContainer"],
+    .main .block-container {
+        max-width: 900px !important;
+        margin: 0 auto !important;
+        padding-top: 1.5rem !important;
+        padding-bottom: 3.5rem !important;
+    }
+
+    /* Apple HIG sidebar: dark slate surface with constrained responsive width */
     section[data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #181A20 0%, #131418 100%) !important;
+        width: 300px !important;
+        min-width: 280px !important;
+        max-width: 320px !important;
+        background: linear-gradient(180deg, #141822 0%, #0B0E14 100%) !important;
         border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
-        box-shadow: 2px 0 24px rgba(0, 0, 0, 0.4);
+        box-shadow: 2px 0 24px rgba(0, 0, 0, 0.5);
     }
 
-    /* Primary buttons: Safety Orange (#FF5F00) with Matte Black (#1C1D20) text */
-    div.stButton > button[kind="primary"],
+    /* Prevent sidebar buttons and session titles from wrapping horizontally */
+    section[data-testid="stSidebar"] button {
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        transition: all 0.16s var(--ease-spring) !important;
+    }
+    section[data-testid="stSidebar"] button p {
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+    }
+
+    /* Active session button highlight: subtle blue surface with left indicator */
+    section[data-testid="stSidebar"] button[kind="primary"] {
+        background: rgba(10, 132, 255, 0.16) !important;
+        color: #F4F6F9 !important;
+        border: 1px solid rgba(10, 132, 255, 0.45) !important;
+        border-left: 3px solid #0A84FF !important;
+        font-weight: 600 !important;
+        box-shadow: 0 2px 8px rgba(10, 132, 255, 0.2) !important;
+    }
+
+    /* Primary submission buttons: Safety Orange (#FF5F00) with Matte Dark text */
     div.stFormSubmitButton > button,
-    button[data-testid="baseButton-primary"] {
+    button[data-testid="baseButton-primary"]:not(section[data-testid="stSidebar"] button) {
         background-color: #FF5F00 !important;
-        color: #1C1D20 !important;
+        color: #141822 !important;
         border: 1px solid #FF5F00 !important;
         font-weight: 700 !important;
-        border-radius: 9px !important;
-        padding: 6px 16px !important;
-        box-shadow: 0 2px 10px rgba(255, 95, 0, 0.28) !important;
-        transition: all 0.16s cubic-bezier(0.16, 1, 0.3, 1) !important;
+        border-radius: 8px !important;
+        padding: 6px 14px !important;
+        box-shadow: 0 2px 10px rgba(255, 95, 0, 0.25) !important;
+        transition: all 0.16s var(--ease-spring) !important;
     }
-    div.stButton > button[kind="primary"]:hover,
-    button[data-testid="baseButton-primary"]:hover {
+    div.stFormSubmitButton > button:hover,
+    button[data-testid="baseButton-primary"]:not(section[data-testid="stSidebar"] button):hover {
         background-color: #FF7324 !important;
-        box-shadow: 0 4px 16px rgba(255, 95, 0, 0.42) !important;
+        box-shadow: 0 4px 16px rgba(255, 95, 0, 0.38) !important;
         transform: translateY(-1px);
     }
 
-    /* Secondary buttons: Apple frosted dark chips */
+    /* Secondary buttons: Frosted slate chips */
     div.stButton > button[kind="secondary"],
     button[data-testid="baseButton-secondary"] {
         background-color: rgba(255, 255, 255, 0.05) !important;
-        color: #F1F3F4 !important;
+        color: #F4F6F9 !important;
         border: 1px solid rgba(255, 255, 255, 0.1) !important;
-        border-radius: 9px !important;
-        padding: 6px 14px !important;
-        transition: all 0.16s ease !important;
+        border-radius: 8px !important;
+        padding: 6px 12px !important;
+        transition: all 0.16s var(--ease-spring) !important;
     }
     div.stButton > button[kind="secondary"]:hover,
     button[data-testid="baseButton-secondary"]:hover {
         background-color: rgba(255, 255, 255, 0.09) !important;
         border-color: rgba(255, 255, 255, 0.2) !important;
+        transform: translateY(-1px);
+    }
+    div.stButton > button:active {
+        transform: translateY(0) !important;
     }
 
     /* High contrast accessible focus outline */
     button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
-        outline: 2px solid #FF5F00 !important;
+        outline: 2px solid #0A84FF !important;
         outline-offset: 2px !important;
+    }
+
+    /* Chat message entrance motion */
+    @keyframes fadeInSlideUp {
+        from {
+            opacity: 0;
+            transform: translateY(6px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    div[data-testid="stChatMessage"] {
+        animation: fadeInSlideUp 0.22s var(--ease-spring) forwards;
+        background-color: rgba(20, 24, 34, 0.6) !important;
+        -webkit-backdrop-filter: blur(12px) !important;
+        backdrop-filter: blur(12px) !important;
+        border: 1px solid rgba(255, 255, 255, 0.06) !important;
+        border-radius: 12px !important;
+        padding: 14px 16px !important;
+        margin-bottom: 12px !important;
+    }
+
+    /* Apple inspector expander styling */
+    div[data-testid="stExpander"] {
+        background-color: #141822 !important;
+        border: 1px solid rgba(255, 255, 255, 0.08) !important;
+        border-radius: 10px !important;
+        margin-top: 6px !important;
+        margin-bottom: 8px !important;
+        transition: border-color 0.16s ease !important;
+    }
+    div[data-testid="stExpander"]:hover {
+        border-color: rgba(255, 255, 255, 0.16) !important;
+    }
+    div[data-testid="stExpander"] summary {
+        font-size: 0.86rem !important;
+        font-weight: 600 !important;
+        color: #F4F6F9 !important;
+        padding: 8px 12px !important;
     }
 
     /* Apple glass card */
     .apple-card {
-        background: linear-gradient(180deg, rgba(32, 35, 42, 0.75) 0%, rgba(24, 26, 31, 0.85) 100%);
+        background: rgba(20, 24, 34, 0.55);
+        -webkit-backdrop-filter: blur(18px) saturate(140%);
+        backdrop-filter: blur(18px) saturate(140%);
         border: 1px solid rgba(255, 255, 255, 0.08);
-        border-top: 1px solid rgba(255, 255, 255, 0.15);
-        border-radius: 14px;
-        padding: 16px 18px;
+        border-top: 1px solid rgba(255, 255, 255, 0.14);
+        border-radius: 12px;
+        padding: 14px 16px;
         margin-bottom: 12px;
-        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.28);
-        backdrop-filter: blur(20px);
-        color: #F1F3F4;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        color: #F4F6F9;
+        transition: border-color 0.18s ease, box-shadow 0.18s ease;
     }
 
     .compliance-card {
-        background: linear-gradient(180deg, rgba(32, 35, 42, 0.75) 0%, rgba(24, 26, 31, 0.85) 100%);
+        background: #141822;
         border: 1px solid rgba(255, 255, 255, 0.08);
-        border-top: 1px solid rgba(255, 255, 255, 0.15);
-        border-radius: 14px;
-        padding: 16px 18px;
+        border-top: 1px solid rgba(255, 255, 255, 0.14);
+        border-radius: 12px;
+        padding: 14px 16px;
         margin-bottom: 12px;
-        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.28);
-        backdrop-filter: blur(20px);
-        color: #F1F3F4;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        color: #F4F6F9;
     }
 
-    /* Apple Security Refusal Alert */
+    /* Apple Security Refusal Alert — liquid glass with a vivid orange refraction edge */
     .refusal-card {
-        background: linear-gradient(180deg, rgba(46, 28, 26, 0.8) 0%, rgba(32, 22, 22, 0.9) 100%);
+        background:
+            radial-gradient(130% 150% at 0% 0%, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.03) 42%, rgba(0, 0, 0, 0.15) 100%),
+            linear-gradient(180deg, rgba(46, 28, 26, 0.72) 0%, rgba(32, 22, 22, 0.82) 100%);
+        -webkit-backdrop-filter: blur(24px) saturate(180%) hue-rotate(-5deg);
+        backdrop-filter: blur(24px) saturate(180%) hue-rotate(-5deg);
         border: 1px solid rgba(255, 95, 0, 0.35);
         border-left: 4px solid #FF5F00;
         border-radius: 12px;
         padding: 16px 18px;
         margin-top: 10px;
         margin-bottom: 12px;
-        box-shadow: 0 8px 24px rgba(255, 95, 0, 0.08);
-        color: #F1F3F4;
+        box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.3),
+            inset 4px 0 18px -8px rgba(255, 95, 0, 0.9),
+            0 8px 24px rgba(255, 95, 0, 0.08);
+        color: #F4F6F9;
+        animation: fadeInSlideUp 0.22s var(--ease-spring) forwards;
     }
 
-    /* Apple Inspector Citation Card */
+    /* Apple Inspector Citation Card — translucent glass with cursor spotlight */
     .citation-card {
-        background: rgba(22, 24, 29, 0.95);
+        position: relative;
+        isolation: isolate;
+        overflow: hidden;
+        background: rgba(20, 24, 34, 0.62);
+        -webkit-backdrop-filter: blur(14px);
+        backdrop-filter: blur(14px);
         border: 1px solid rgba(255, 255, 255, 0.08);
-        border-left: 3px solid #FF5F00;
+        border-left: 3px solid #0A84FF;
         border-radius: 10px;
-        padding: 12px 16px;
+        padding: 14px 16px;
         margin-top: 8px;
         margin-bottom: 10px;
-        transition: all 0.2s ease;
-        color: #F1F3F4;
+        transition: border-color 0.18s ease, box-shadow 0.18s ease;
+        color: #F4F6F9;
+    }
+    .citation-card::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        z-index: 0;
+        pointer-events: none;
+        background: radial-gradient(
+            240px circle at var(--mouse-x, 50%) var(--mouse-y, 50%),
+            rgba(10, 132, 255, 0.12) 0%,
+            rgba(10, 132, 255, 0.04) 35%,
+            transparent 60%
+        );
+        opacity: 0;
+        transition: opacity 0.18s ease;
+    }
+    .citation-card:hover::before {
+        opacity: 1;
+    }
+    .citation-card > * {
+        position: relative;
+        z-index: 1;
     }
     .citation-card:hover {
-        border-color: rgba(255, 255, 255, 0.16);
+        border-color: rgba(255, 255, 255, 0.18);
         box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
     }
 
     .quote-snippet {
-        font-family: "SF Mono", Menlo, Monaco, "Cascadia Code", Consolas, monospace;
-        font-size: 0.85rem;
+        font-family: var(--font-mono);
+        font-size: 0.84rem;
         line-height: 1.55;
-        background: rgba(0, 0, 0, 0.4);
+        background: rgba(0, 0, 0, 0.45);
         border: 1px solid rgba(255, 255, 255, 0.06);
         border-radius: 7px;
         padding: 10px 12px;
         margin-top: 8px;
         color: #E2E6EC;
         white-space: pre-wrap;
+    }
+
+    /* Verifiable Citation Links & Badges */
+    .citation-link-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-size: 0.76rem;
+        font-weight: 600;
+        text-decoration: none;
+        margin-right: 6px;
+        margin-top: 6px;
+        transition: all 0.15s var(--ease-spring);
+    }
+    .citation-link-btn.primary {
+        background: rgba(10, 132, 255, 0.15);
+        color: #0A84FF !important;
+        border: 1px solid rgba(10, 132, 255, 0.35);
+    }
+    .citation-link-btn.primary:hover {
+        background: rgba(10, 132, 255, 0.28);
+        border-color: #0A84FF;
+        transform: translateY(-1px);
+    }
+    .citation-link-btn.secondary {
+        background: rgba(255, 255, 255, 0.06);
+        color: #E2E6EC !important;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+    }
+    .citation-link-btn.secondary:hover {
+        background: rgba(255, 255, 255, 0.12);
+        transform: translateY(-1px);
+    }
+    .internal-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-size: 0.74rem;
+        background: rgba(255, 159, 10, 0.12);
+        color: #FF9F0A;
+        border: 1px solid rgba(255, 159, 10, 0.28);
+        margin-top: 6px;
+    }
+    .access-denied-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        padding: 4px 11px;
+        border-radius: 6px;
+        font-size: 0.74rem;
+        font-weight: 600;
+        letter-spacing: 0.01em;
+        background: rgba(255, 69, 58, 0.14);
+        color: #FF6961;
+        border: 1px solid rgba(255, 69, 58, 0.4);
+        margin-top: 6px;
+        box-shadow: inset 0 0 0 1px rgba(255, 69, 58, 0.06);
+    }
+    .access-denied-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: #FF6961;
+        box-shadow: 0 0 0 3px rgba(255, 69, 58, 0.16);
+        flex: 0 0 auto;
+    }
+    .source-authority-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 0.72rem;
+        font-weight: 600;
+        background: rgba(48, 209, 88, 0.12);
+        color: #30D158;
+        border: 1px solid rgba(48, 209, 88, 0.28);
+        margin-right: 6px;
     }
 
     /* Apple segmented pill badges */
@@ -266,7 +468,8 @@ APPLE_DESIGN_CSS = """
         margin-bottom: 4px;
         border: 1px solid rgba(255, 255, 255, 0.1);
         background: rgba(255, 255, 255, 0.06);
-        color: #F1F3F4;
+        color: #F4F6F9;
+        letter-spacing: 0.01em;
     }
     .pill-accent {
         display: inline-flex;
@@ -279,7 +482,7 @@ APPLE_DESIGN_CSS = """
         margin-right: 6px;
         margin-bottom: 4px;
         background-color: #FF5F00;
-        color: #1C1D20 !important;
+        color: #141822 !important;
         border: 1px solid #FF5F00;
         box-shadow: 0 2px 8px rgba(255, 95, 0, 0.25);
     }
@@ -287,25 +490,25 @@ APPLE_DESIGN_CSS = """
     /* Apple-style Hero Banner */
     .hero-banner {
         text-align: center;
-        padding: 32px 20px 24px 20px;
+        padding: 24px 20px 16px 20px;
         max-width: 760px;
-        margin: 0 auto 20px auto;
+        margin: 0 auto 12px auto;
     }
     .hero-icon {
-        font-size: 2.8rem;
-        margin-bottom: 8px;
+        font-size: 2.6rem;
+        margin-bottom: 6px;
         display: inline-block;
     }
     .hero-title {
-        font-size: 1.85rem;
+        font-size: 1.8rem;
         font-weight: 700;
         letter-spacing: -0.025em;
-        color: #F1F3F4;
-        margin-bottom: 8px;
+        color: #F4F6F9;
+        margin-bottom: 6px;
     }
     .hero-subtitle {
-        font-size: 0.98rem;
-        color: #9EA3AF;
+        font-size: 0.95rem;
+        color: #9AA0AE;
         line-height: 1.5;
         max-width: 600px;
         margin: 0 auto;
@@ -313,29 +516,51 @@ APPLE_DESIGN_CSS = """
 
     /* Sleek interactive starter card */
     .starter-card-box {
-        background: rgba(28, 30, 37, 0.65);
+        background: rgba(20, 24, 34, 0.75);
         border: 1px solid rgba(255, 255, 255, 0.08);
         border-radius: 12px;
         padding: 14px 16px;
-        transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        transition: all 0.2s var(--ease-spring);
         cursor: pointer;
     }
     .starter-card-box:hover {
-        background: rgba(38, 41, 50, 0.85);
-        border-color: rgba(255, 255, 255, 0.18);
+        background: rgba(27, 33, 46, 0.9);
+        border-color: rgba(255, 255, 255, 0.2);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
         transform: translateY(-2px);
     }
 
     /* Inputs: refined Apple text field */
     div[data-baseweb="input"] {
-        background-color: rgba(0, 0, 0, 0.28) !important;
-        border-radius: 9px !important;
+        background-color: rgba(0, 0, 0, 0.32) !important;
+        border-radius: 8px !important;
         border: 1px solid rgba(255, 255, 255, 0.12) !important;
         transition: all 0.15s ease !important;
     }
     div[data-baseweb="input"]:focus-within {
-        border-color: #FF5F00 !important;
-        box-shadow: 0 0 0 3px rgba(255, 95, 0, 0.22) !important;
+        border-color: #0A84FF !important;
+        box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.25) !important;
+    }
+
+    /* Accessibility: Respect user reduced-motion preferences */
+    @media (prefers-reduced-motion: reduce) {
+        *, ::before, ::after {
+            animation-duration: 0.01ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 0.01ms !important;
+            scroll-behavior: auto !important;
+        }
+        /* Blur can trigger vestibular discomfort; drop the glass, keep the surfaces legible. */
+        .apple-card,
+        .citation-card,
+        .refusal-card,
+        div[data-testid="stChatMessage"] {
+            -webkit-backdrop-filter: none !important;
+            backdrop-filter: none !important;
+        }
+        .citation-card::before {
+            display: none !important;
+        }
     }
 </style>
 """
@@ -566,19 +791,19 @@ def render_sidebar(client: ComplianceAPIClient, token: str, user: dict[str, Any]
         # User profile card
         st.markdown(
             f"""
-            <div class="apple-card" style="padding:14px 16px;margin-bottom:14px;">
-                <div style="display:flex;align-items:center;gap:12px;">
-                    <div style="width:40px;height:40px;border-radius:980px;background:rgba(255,95,0,0.18);'
-                         'border:1px solid rgba(255,95,0,0.4);display:flex;align-items:center;justify-content:center;'
-                         'font-weight:700;color:#FF5F00;font-size:0.95rem;">
+            <div class="apple-card" style="padding:12px 14px;margin-bottom:12px;">
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <div style="width:36px;height:36px;border-radius:980px;background:rgba(255,95,0,0.18);
+                         border:1px solid rgba(255,95,0,0.4);display:flex;align-items:center;justify-content:center;
+                         font-weight:700;color:#FF5F00;font-size:0.9rem;">
                         {initials}
                     </div>
-                    <div>
-                        <div style="font-weight:700;font-size:0.96rem;color:#F1F3F4;">{html.escape(full_name)}</div>
-                        <div style="font-size:0.78rem;color:#8E93A0;">@{html.escape(username)}</div>
+                    <div style="overflow:hidden;">
+                        <div style="font-weight:700;font-size:0.92rem;color:#F4F6F9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{html.escape(full_name)}</div>
+                        <div style="font-size:0.76rem;color:#9AA0AE;">@{html.escape(username)}</div>
                     </div>
                 </div>
-                <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:4px;">
+                <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px;">
                     <span class="pill-accent">ROLE: {html.escape(role.upper())}</span>
                     {_render_profile_badge(profile, model)}
                 </div>
@@ -600,7 +825,7 @@ def render_sidebar(client: ComplianceAPIClient, token: str, user: dict[str, Any]
         # Auditor-only workspace switcher
         if role == "auditor":
             st.markdown(
-                "<div style='font-size:0.8rem;font-weight:600;color:#8E93A0;text-transform:uppercase;margin-bottom:6px;'>"
+                "<div style='font-size:0.8rem;font-weight:600;color:#9AA0AE;text-transform:uppercase;margin-bottom:6px;'>"
                 "Workspace View</div>",
                 unsafe_allow_html=True,
             )
@@ -618,48 +843,13 @@ def render_sidebar(client: ComplianceAPIClient, token: str, user: dict[str, Any]
         else:
             st.session_state["active_view"] = "chat"
 
-        # 2-Minute Demo Presets Section
-        st.markdown(
-            """
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
-                <span style="font-size:0.82rem;font-weight:700;color:#F1F3F4;letter-spacing:0.02em;">
-                    ⚡ 2-MIN DEMO SHOWCASE
-                </span>
-                <span class="pill-badge" style="font-size:0.68rem;padding:2px 7px;background:rgba(255,95,0,0.12);color:#FF5F00;border-color:rgba(255,95,0,0.3);">
-                    VIVA READY
-                </span>
-            </div>
-            <div style="font-size:0.78rem;color:#8E93A0;margin-bottom:8px;">
-                Click any preset to trigger server RBAC, routing, and citations:
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-        active_id = st.session_state.get("active_session_id")
-        for preset in DEMO_PRESETS:
-            pid = preset["id"]
-            if st.button(
-                preset["label"],
-                key=f"demo_btn_{pid}",
-                help=f"{preset['desc']}\n\nQuestion: {preset['question']}",
-                use_container_width=True,
-            ):
-                if active_id:
-                    _submit_question(client, token, active_id, preset["question"])
-                else:
-                    st.session_state["staged_query"] = preset["question"]
-                    st.rerun()
-
-        st.divider()
-
-        # Compliance Sessions Section
+        # Compliance Sessions Section (Primary Priority Slot)
         st.subheader("Compliance Sessions")
         with st.form("new_session_form", clear_on_submit=True):
             new_title = st.text_input(
                 "New Session Title",
                 placeholder="Enter compliance session title...",
-                label_visibility="visible",
+                label_visibility="collapsed",
             )
             if st.form_submit_button("+ New Session", use_container_width=True):
                 try:
@@ -674,6 +864,7 @@ def render_sidebar(client: ComplianceAPIClient, token: str, user: dict[str, Any]
                     st.session_state["last_error"] = str(exc)
 
         sessions: list[dict[str, Any]] = st.session_state.get("sessions", [])
+        active_id = st.session_state.get("active_session_id")
         for sess in sessions:
             sid = str(sess["id"])
             title = str(sess.get("title") or "Compliance Session")
@@ -710,8 +901,98 @@ def render_sidebar(client: ComplianceAPIClient, token: str, user: dict[str, Any]
 
         st.divider()
 
+        # 2-Minute Demo Presets Section (Housed in collapsed expander for compact layout)
+        with st.expander("⚡ 2-Min Demo Showcase (Viva)", expanded=False):
+            st.markdown(
+                """
+                <div style="font-size:0.78rem;color:#9AA0AE;margin-bottom:8px;">
+                    Click any preset to trigger server RBAC, routing, and citations:
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+            for preset in DEMO_PRESETS:
+                pid = preset["id"]
+                if st.button(
+                    preset["label"],
+                    key=f"demo_btn_{pid}",
+                    help=f"{preset['desc']}\n\nQuestion: {preset['question']}",
+                    use_container_width=True,
+                ):
+                    if active_id:
+                        _submit_question(
+                            client,
+                            token,
+                            active_id,
+                            preset["question"],
+                            response_mode=st.session_state.get("response_mode", "compliance"),
+                            intent_mode="rag",
+                        )
+                    else:
+                        st.session_state["staged_query"] = preset["question"]
+                        st.rerun()
+
+        # Document Upload Section (Role-gated: Manager & Auditor tiers)
+        if role in settings.UPLOAD_ALLOWED_ROLES:
+            st.divider()
+            with st.expander("📄 Ingest Regulatory Document", expanded=False):
+                st.markdown(
+                    "<div style='font-size:0.8rem;color:#8E93A0;margin-bottom:8px;'>"
+                    "Upload and index regulatory policies (.md, .txt, .pdf, .html). "
+                    "Documents are immediately chunked, embedded, and role-filtered in Qdrant & BM25."
+                    "</div>",
+                    unsafe_allow_html=True,
+                )
+                uploaded_file = st.file_uploader(
+                    "Choose a document",
+                    type=["md", "txt", "pdf", "html", "htm"],
+                    key="sidebar_doc_uploader",
+                    help="Allowed formats: Markdown, Plain Text, PDF, HTML",
+                )
+                custom_title = st.text_input(
+                    "Document Title (Optional)",
+                    placeholder="e.g. Senior Manager Accountability Policy",
+                    key="upload_doc_title",
+                )
+                default_target_roles = ["manager", "auditor"] if role == "manager" else ["auditor"]
+                selected_target_roles = st.multiselect(
+                    "Permitted Roles (RBAC)",
+                    options=["analyst", "manager", "auditor"],
+                    default=default_target_roles,
+                    key="upload_target_roles",
+                    help="Server-side RBAC: chunks are visible only to users with these roles.",
+                )
+                if st.button("Upload & Index Document", key="btn_upload_doc", type="primary", use_container_width=True):
+                    if uploaded_file is None:
+                        st.warning("Please choose a file to upload.")
+                    elif not selected_target_roles:
+                        st.warning("Please select at least one permitted role.")
+                    else:
+                        with st.spinner("Chunking, embedding, and indexing into Qdrant & BM25..."):
+                            try:
+                                res = client.upload_document(
+                                    token=token,
+                                    file_bytes=uploaded_file.getvalue(),
+                                    filename=uploaded_file.name,
+                                    allowed_roles=selected_target_roles,
+                                    title=custom_title.strip() or None,
+                                )
+                                st.session_state["upload_success"] = (
+                                    f"Indexed {res.get('chunks_indexed', 0)} chunks for "
+                                    f"'{res.get('title', uploaded_file.name)}' ({res.get('doc_id')})!"
+                                )
+                                st.rerun()
+                            except UIApiError as exc:
+                                st.session_state["last_error"] = str(exc)
+                                st.rerun()
+
+                if st.session_state.get("upload_success"):
+                    st.success(st.session_state.pop("upload_success"))
+
+        st.divider()
+
         # Telemetry & Architectural Layers
-        with st.expander("System Profile & Layer Flags", expanded=False):
+        with st.expander("System Profile & Run Budget", expanded=False):
             st.markdown(f"**Active Profile:** `{profile}`")
             st.markdown(f"**Active Model:** `{model}`")
             st.markdown(f"**Prompt Version:** `{cfg.get('prompt_version', 'v1')}`")
@@ -722,90 +1003,206 @@ def render_sidebar(client: ComplianceAPIClient, token: str, user: dict[str, Any]
                     status_icon = "ON" if enabled else "OFF"
                     st.markdown(f"- `{layer_name}`: **{status_icon}**")
             caps = cfg.get("spend_caps", {})
-            if isinstance(caps, dict):
-                st.markdown(
-                    f"**Spend Caps:** `{caps.get('calls_limit', 0)}` calls / "
-                    f"`{caps.get('tokens_limit', 0)}` tokens"
-                )
+            run_budget = st.session_state.get("run_spend")
+            if isinstance(run_budget, dict) and active_id and run_budget.get("run_id") not in (None, f"session:{active_id}"):
+                run_budget = None
+            run_budget = run_budget or cfg.get("run_budget") or {}
+            is_paid = bool(run_budget.get("is_paid", caps.get("is_paid", False)))
+            scope_lbl = str(run_budget.get("scope") or ("offline" if profile == "mock" else "paid"))
+            calls_used = int(run_budget.get("calls_used", caps.get("calls_used", 0)) or 0)
+            calls_limit = int(run_budget.get("calls_limit", caps.get("calls_limit", 0)) or 0)
+            tokens_used = int(run_budget.get("tokens_used", caps.get("tokens_used", 0)) or 0)
+            tokens_limit = int(run_budget.get("tokens_limit", caps.get("tokens_limit", 0)) or 0)
+            if scope_lbl == "offline":
+                st.markdown(f"**Run Mode:** `offline-mock (unmetered)` — `{calls_used}` calls / `{tokens_used}` tokens")
+            elif not is_paid:
+                st.markdown(f"**Run Mode:** `local-dev (safety ceiling)` — `{calls_used}/{calls_limit}` calls / `{tokens_used}/{tokens_limit}` tokens")
+            else:
+                st.markdown(f"**Run Budget (`live`):** `{calls_used}/{calls_limit}` calls / `{tokens_used}/{tokens_limit}` tokens")
+                if bool(run_budget.get("exhausted", False)) and active_id:
+                    st.warning("This session reached its LLM budget.")
+                    if st.button("Reset Run Budget", key="reset_run_budget_btn", use_container_width=True):
+                        try:
+                            st.session_state["run_spend"] = client.reset_session_run(token, str(active_id))
+                            st.session_state["last_error"] = None
+                            st.rerun()
+                        except UIApiError as exc:
+                            st.session_state["last_error"] = str(exc)
 
 
-def _render_citations_and_trace(turn_data: dict[str, Any]) -> None:
-    """Render structured citations panel and expandable safe reasoning trace."""
+def _render_citations_and_trace(
+    turn_data: dict[str, Any], msg_id: int = 0, role: str = ""
+) -> None:
+    """Render structured citations panel, metadata, and expandable safe reasoning trace."""
     route = str(turn_data.get("route") or turn_data.get("route_taken") or "SINGLE_SEARCH")
-    grader_path = turn_data.get("grader_path") or (
-        turn_data.get("grader", {}).get("path")
-        if isinstance(turn_data.get("grader"), dict)
-        else None
-    )
+    response_type = str(turn_data.get("response_type") or ("general_chat" if route == "GENERAL_CHAT" else "rag"))
+    grounded = bool(turn_data.get("grounded", response_type not in ("general_chat", "system_info", "direct")))
     latency_ms = float(turn_data.get("latency_ms") or 0.0)
-    dropped = int(turn_data.get("citations_dropped") or 0)
-    refusal_cat = turn_data.get("refusal_category") or turn_data.get("refusal")
     mode = str(turn_data.get("response_mode") or "compliance")
     citations: list[dict[str, Any]] = turn_data.get("citations") or []
+    follow_ups: list[str] = turn_data.get("suggested_follow_ups") or []
 
-    mode_label = "Explain & Discuss" if mode == "explain" else "Strict Compliance"
-    pills = [
-        f"<span class='pill-badge'>Route: {html.escape(route)}</span>",
-        f"<span class='pill-badge'>Grader: {html.escape(str(grader_path or 'disabled'))}</span>",
-        f"<span class='pill-badge'>Latency: {latency_ms:.1f} ms</span>",
-        f"<span class='pill-badge'>Sources: {len(citations)}</span>",
-        f"<span class='pill-badge'>Mode: {html.escape(mode_label)}</span>",
-    ]
-    if dropped > 0:
-        pills.append(
-            f"<span class='pill-badge' style='color:#FF5F00;border-color:rgba(255,95,0,0.3);'>"
-            f"Dropped Invalid Citations: {dropped}</span>"
+    # 1. Non-grounded / Open AI knowledge / System Info: NO citation/source/trace clutter
+    if not grounded or response_type == "general_chat":
+        st.markdown(
+            f"""
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px;margin-bottom:6px;">
+                <span class="pill-badge" style="background:rgba(10,132,255,0.12);color:#0A84FF;border:1px solid rgba(10,132,255,0.3);font-weight:600;">
+                    🌐 Open AI Knowledge • Not grounded in company documents
+                </span>
+                <span class="pill-badge">Latency: {latency_ms:.1f} ms</span>
+            </div>
+            """,
+            unsafe_allow_html=True,
         )
-    if refusal_cat:
-        pills.append(
-            f"<span class='pill-accent'>Refusal: {html.escape(str(refusal_cat))}</span>"
+    elif response_type == "system_info":
+        st.markdown(
+            f"""
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px;margin-bottom:6px;">
+                <span class="pill-badge" style="background:rgba(52,199,89,0.12);color:#34C759;border:1px solid rgba(52,199,89,0.3);font-weight:600;">
+                    ⚙️ System Environment & Security Configuration
+                </span>
+                <span class="pill-badge">Direct • Zero Retrieval</span>
+                <span class="pill-badge">Latency: {latency_ms:.1f} ms</span>
+            </div>
+            """,
+            unsafe_allow_html=True,
         )
-    st.markdown("".join(pills), unsafe_allow_html=True)
+    else:
+        # 2. Grounded RAG Response
+        grader_path = turn_data.get("grader_path") or (
+            turn_data.get("grader", {}).get("path")
+            if isinstance(turn_data.get("grader"), dict)
+            else None
+        )
+        dropped = int(turn_data.get("citations_dropped") or 0)
+        refusal_cat = turn_data.get("refusal_category") or turn_data.get("refusal")
+        mode_label = "Explain & Discuss" if mode == "explain" else "Strict Compliance"
+        pills = [
+            f"<span class='pill-badge'>Route: {html.escape(route)}</span>",
+            f"<span class='pill-badge'>Grader: {html.escape(str(grader_path or 'disabled'))}</span>",
+            f"<span class='pill-badge'>Latency: {latency_ms:.1f} ms</span>",
+            f"<span class='pill-badge'>Sources: {len(citations)}</span>",
+            f"<span class='pill-badge'>Mode: {html.escape(mode_label)}</span>",
+        ]
+        if dropped > 0:
+            pills.append(
+                f"<span class='pill-badge' style='color:#FF5F00;border-color:rgba(255,95,0,0.3);'>"
+                f"Dropped Invalid Citations: {dropped}</span>"
+            )
+        if refusal_cat:
+            pills.append(
+                f"<span class='pill-accent'>Refusal: {html.escape(str(refusal_cat))}</span>"
+            )
+        st.markdown("".join(pills), unsafe_allow_html=True)
 
-    if citations:
-        with st.expander(f"Sources & citations ({len(citations)})", expanded=False):
-            st.markdown(f"**Verified Authoritative Citations ({len(citations)})**")
-            for cite in citations:
-                chunk_id = html.escape(str(cite.get("chunk_id") or cite.get("doc_id") or "CHUNK"))
-                doc_title = html.escape(
-                    str(cite.get("doc_title") or cite.get("doc_name") or "Regulatory Document")
-                )
-                heading_path = html.escape(
-                    str(cite.get("heading_path") or cite.get("section_title") or "Section n/a")
-                )
-                clause = html.escape(str(cite.get("clause") or cite.get("clause_id") or "-"))
-                page = cite.get("page") if cite.get("page") is not None else cite.get("page_number")
-                page_str = f"Page {page}" if page is not None else "Page n/a"
-                snippet = html.escape(
-                    str(cite.get("quote_snippet") or cite.get("snippet") or "")[:200]
-                )
-                st.markdown(
-                    f"""
-                    <div class="citation-card">
-                        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;">
-                            <div>
-                                <span class="pill-accent">{chunk_id}</span>
-                                <strong style="color:#F1F3F4;">{doc_title}</strong>
-                            </div>
-                            <div>
-                                <span class="pill-badge">{html.escape(page_str)}</span>
-                                <span class="pill-badge">Clause: {clause}</span>
-                            </div>
-                        </div>
-                        <div style="font-size:0.84rem;color:#8E93A0;margin-top:6px;">
-                            Heading Path: <code>{heading_path}</code>
-                        </div>
-                        <div class="quote-snippet">"{snippet}"</div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
+        if citations:
+            with st.expander(f"Sources & citations ({len(citations)})", expanded=False):
+                _render_citation_spotlight_bridge()
+                st.markdown(f"**Verified Authoritative Citations ({len(citations)})**")
+                for cite in citations:
+                    chunk_id = html.escape(str(cite.get("chunk_id") or cite.get("doc_id") or "CHUNK"))
+                    doc_title = html.escape(
+                        str(cite.get("doc_title") or cite.get("doc_name") or "Regulatory Document")
+                    )
+                    heading_path = html.escape(
+                        str(cite.get("heading_path") or cite.get("section_title") or "Section n/a")
+                    )
+                    clause = html.escape(str(cite.get("clause") or cite.get("clause_id") or "-"))
+                    page = cite.get("page") if cite.get("page") is not None else cite.get("page_number")
+                    page_str = f"Page {page}" if page is not None else "Page n/a"
+                    snippet = html.escape(
+                        str(cite.get("quote_snippet") or cite.get("snippet") or "")[:250]
+                    )
+                    is_internal = bool(cite.get("is_internal", False))
+                    source_url = cite.get("source_url")
+                    verification_url = cite.get("verification_url")
+                    source_name = html.escape(str(cite.get("source_name") or ""))
+                    allowed_roles = [
+                        str(item).strip().lower()
+                        for item in (cite.get("allowed_roles") or [])
+                        if str(item).strip()
+                    ]
+                    has_access = (
+                        not allowed_roles or str(role).strip().lower() in allowed_roles
+                    )
 
-    trace: list[str] = turn_data.get("reasoning_trace") or []
-    if trace:
-        with st.expander("How this answer was produced — Reasoning Trace & Verification Steps", expanded=False):
-            for step_line in trace:
-                st.markdown(f"- {step_line}")
+                    if not has_access:
+                        permitted = ", ".join(
+                            role_name.title() for role_name in sorted(set(allowed_roles))
+                        )
+                        links_html = f"""
+                        <div class="access-denied-badge" role="status">
+                            <span class="access-denied-dot" aria-hidden="true"></span>
+                            ⛔ Unauthorized access — restricted to {html.escape(permitted)}
+                        </div>
+                        """
+                    elif is_internal:
+                        links_html = """
+                        <div class="internal-badge">
+                            🔒 Internal Document — No public verification link (Restricted Institutional Access)
+                        </div>
+                        """
+                    else:
+                        links_parts = []
+                        if source_name:
+                            links_parts.append(f'<span class="source-authority-badge">🏛️ {source_name}</span>')
+                        if source_url:
+                            safe_src = html.escape(str(source_url), quote=True)
+                            links_parts.append(
+                                f'<a href="{safe_src}" target="_blank" rel="noopener noreferrer" class="citation-link-btn primary">'
+                                f'📖 Open Source ↗</a>'
+                            )
+                        if verification_url:
+                            safe_vurl = html.escape(str(verification_url), quote=True)
+                            links_parts.append(
+                                f'<a href="{safe_vurl}" target="_blank" rel="noopener noreferrer" class="citation-link-btn secondary">'
+                                f'🔍 Verify on Google ↗</a>'
+                            )
+                        links_html = f'<div style="margin-top:8px;display:flex;flex-wrap:wrap;align-items:center;gap:6px;">{"".join(links_parts)}</div>'
+
+                    st.markdown(
+                        f"""
+                        <div class="citation-card">
+                            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;">
+                                <div>
+                                    <span class="pill-accent">{chunk_id}</span>
+                                    <strong style="color:#F4F6F9;">{doc_title}</strong>
+                                </div>
+                                <div>
+                                    <span class="pill-badge">{html.escape(page_str)}</span>
+                                    <span class="pill-badge">Clause: {clause}</span>
+                                </div>
+                            </div>
+                            <div style="font-size:0.84rem;color:#9AA0AE;margin-top:6px;">
+                                Heading Path: <code>{heading_path}</code>
+                            </div>
+                            <div class="quote-snippet">"{snippet}"</div>
+                            {links_html}
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+
+        trace: list[str] = turn_data.get("reasoning_trace") or []
+        if trace:
+            with st.expander("How this answer was produced — Reasoning Trace & Verification Steps", expanded=False):
+                for step_line in trace:
+                    st.markdown(f"- {step_line}")
+
+    # 3. Suggested Follow-Up Chips
+    if follow_ups:
+        st.markdown(
+            "<div style='font-size:0.78rem;font-weight:600;color:#8E93A0;text-transform:uppercase;letter-spacing:0.03em;margin-top:10px;margin-bottom:6px;'>"
+            "💡 Suggested Inquiries</div>",
+            unsafe_allow_html=True,
+        )
+        chip_cols = st.columns(len(follow_ups))
+        for idx, f_q in enumerate(follow_ups):
+            with chip_cols[idx]:
+                if st.button(f_q, key=f"fup_{msg_id}_{idx}", use_container_width=True):
+                    st.session_state["staged_query"] = f_q
+                    st.rerun()
 
 
 def _submit_question(
@@ -814,6 +1211,7 @@ def _submit_question(
     session_id: str,
     query: str,
     response_mode: str = "compliance",
+    intent_mode: str = "auto",
 ) -> None:
     """Execute a chat query and update session state."""
     st.session_state["last_error"] = None
@@ -824,8 +1222,11 @@ def _submit_question(
                 session_id=session_id,
                 query=query,
                 response_mode=response_mode,
+                intent_mode=intent_mode,
             )
             st.session_state["messages"] = client.get_session_messages(token, session_id)
+            if isinstance(res, dict) and isinstance(res.get("spend"), dict):
+                st.session_state["run_spend"] = res["spend"]
             if st.session_state["messages"]:
                 last_msg_id = st.session_state["messages"][-1]["id"]
                 st.session_state["turn_details"][last_msg_id] = res
@@ -835,6 +1236,251 @@ def _submit_question(
                 _clear_auth_state()
             st.session_state["last_error"] = str(exc)
             st.rerun()
+
+
+RAG_TOPOLOGY_CANVAS_HTML = """
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: transparent;
+    overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+    user-select: none;
+  }
+  #canvas-container {
+    position: relative;
+    width: 100%;
+    height: 130px;
+    border-radius: 12px;
+    background: linear-gradient(180deg, rgba(20, 24, 34, 0.75) 0%, rgba(11, 14, 20, 0.85) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+  .overlay-badge {
+    position: absolute;
+    bottom: 8px;
+    right: 12px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: #9AA0AE;
+    background: rgba(0, 0, 0, 0.4);
+    padding: 2px 8px;
+    border-radius: 980px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+<div id="canvas-container">
+  <canvas id="rag-canvas"></canvas>
+  <div class="overlay-badge">INTERACTIVE RAG TOPOLOGY • 0.00% LEAKAGE RBAC</div>
+</div>
+<script>
+(function() {
+  const canvas = document.getElementById('rag-canvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const container = document.getElementById('canvas-container');
+  
+  function resize() {
+    canvas.width = container.clientWidth * (window.devicePixelRatio || 1);
+    canvas.height = container.clientHeight * (window.devicePixelRatio || 1);
+    ctx.scale(window.devicePixelRatio || 1, window.devicePixelRatio || 1);
+  }
+  resize();
+  window.addEventListener('resize', resize);
+  
+  const prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const nodes = [
+    { label: "BCBS Basel III", x: 0.14, y: 0.35, color: "#0A84FF", r: 5 },
+    { label: "UK MLR 2017", x: 0.14, y: 0.68, color: "#0A84FF", r: 5 },
+    { label: "FCA BCOBS", x: 0.28, y: 0.22, color: "#0A84FF", r: 5 },
+    { label: "Hybrid RRF", x: 0.38, y: 0.52, color: "#BF5AF2", r: 6 },
+    { label: "Qdrant Dense", x: 0.50, y: 0.28, color: "#30D158", r: 6 },
+    { label: "BM25 Plus", x: 0.50, y: 0.74, color: "#30D158", r: 6 },
+    { label: "RBAC Enclave", x: 0.65, y: 0.50, color: "#30D158", r: 7 },
+    { label: "Internal POL", x: 0.76, y: 0.25, color: "#FF9F0A", r: 5 },
+    { label: "Audit Findings", x: 0.76, y: 0.75, color: "#FF9F0A", r: 5 },
+    { label: "Verified XAI Citations", x: 0.88, y: 0.50, color: "#FF5F00", r: 6 }
+  ];
+
+  const links = [
+    [0, 3], [1, 3], [2, 3], [3, 4], [3, 5], [4, 6], [5, 6],
+    [6, 7], [6, 8], [6, 9], [7, 9], [8, 9]
+  ];
+
+  let mouseX = -100, mouseY = -100;
+  container.addEventListener('mousemove', function(e) {
+    const rect = container.getBoundingClientRect();
+    mouseX = e.clientX - rect.left;
+    mouseY = e.clientY - rect.top;
+  });
+  container.addEventListener('mouseleave', function() {
+    mouseX = -100; mouseY = -100;
+  });
+
+  let t = 0;
+  function draw() {
+    const cw = container.clientWidth;
+    const ch = container.clientHeight;
+    ctx.clearRect(0, 0, cw, ch);
+
+    if (!prefersReduced) t += 0.02;
+
+    // Page-scroll parallax. The canvas is embedded in a same-origin iframe, so
+    // read the host page's scroll offset and fall back to the local document.
+    // Bounded to keep every node inside the 135px canvas band.
+    let scrollDrift = 0;
+    if (!prefersReduced) {
+      let pageScroll = 0;
+      try {
+        const hostDoc = window.parent.document;
+        const scrollHost = hostDoc.querySelector(
+          'section[data-testid="stMain"], section.main, .main'
+        );
+        pageScroll = (scrollHost && scrollHost.scrollTop) || window.parent.scrollY || 0;
+        if (!pageScroll && hostDoc.scrollingElement) {
+          pageScroll = hostDoc.scrollingElement.scrollTop || 0;
+        }
+      } catch (e) {
+        pageScroll = window.scrollY || 0;
+      }
+      scrollDrift = Math.max(-18, Math.min(18, pageScroll * 0.05));
+    }
+
+    links.forEach(([i, j]) => {
+      const n1 = nodes[i];
+      const n2 = nodes[j];
+      const x1 = n1.x * cw + (prefersReduced ? 0 : Math.sin(t + i) * 2);
+      const y1 = n1.y * ch + (prefersReduced ? 0 : Math.cos(t + i) * 2) + scrollDrift;
+      const x2 = n2.x * cw + (prefersReduced ? 0 : Math.sin(t + j) * 2);
+      const y2 = n2.y * ch + (prefersReduced ? 0 : Math.cos(t + j) * 2) + scrollDrift;
+
+      const d1 = Math.hypot(mouseX - x1, mouseY - y1);
+      const d2 = Math.hypot(mouseX - x2, mouseY - y2);
+      const near = d1 < 50 || d2 < 50;
+
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.strokeStyle = near ? "rgba(10, 132, 255, 0.45)" : "rgba(255, 255, 255, 0.09)";
+      ctx.lineWidth = near ? 1.5 : 1;
+      ctx.stroke();
+
+      if (!prefersReduced) {
+        const prog = (t * 0.4 + (i * 0.3)) % 1;
+        const px = x1 + (x2 - x1) * prog;
+        const py = y1 + (y2 - y1) * prog;
+        ctx.beginPath();
+        ctx.arc(px, py, 1.8, 0, Math.PI * 2);
+        ctx.fillStyle = n2.color;
+        ctx.fill();
+      }
+    });
+
+    nodes.forEach((n, idx) => {
+      const nx = n.x * cw + (prefersReduced ? 0 : Math.sin(t + idx) * 2);
+      const ny = n.y * ch + (prefersReduced ? 0 : Math.cos(t + idx) * 2) + scrollDrift;
+      const dist = Math.hypot(mouseX - nx, mouseY - ny);
+      const isHovered = dist < 22;
+
+      if (isHovered) {
+        ctx.beginPath();
+        ctx.arc(nx, ny, n.r + 6, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(10, 132, 255, 0.22)";
+        ctx.fill();
+      }
+
+      ctx.beginPath();
+      ctx.arc(nx, ny, isHovered ? n.r + 2 : n.r, 0, Math.PI * 2);
+      ctx.fillStyle = n.color;
+      ctx.fill();
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = "#0B0E14";
+      ctx.stroke();
+
+      ctx.font = isHovered ? "600 11px -apple-system, sans-serif" : "500 9.5px -apple-system, sans-serif";
+      ctx.fillStyle = isHovered ? "#FFFFFF" : "#9AA0AE";
+      ctx.textAlign = "center";
+      ctx.fillText(n.label, nx, ny + n.r + 11);
+    });
+
+    if (!prefersReduced) {
+      requestAnimationFrame(draw);
+    }
+  }
+
+  draw();
+})();
+</script>
+</body>
+</html>
+"""
+
+
+def _render_rag_topology_canvas() -> None:
+    """Render lightweight, interactive Apple-style RAG flow topology mesh."""
+    try:
+        import streamlit.components.v1 as components
+        components.html(RAG_TOPOLOGY_CANVAS_HTML, height=135)
+    except Exception:
+        pass
+
+
+def _render_citation_spotlight_bridge() -> None:
+    """Bind a delegated pointer listener for the citation-card spotlight.
+
+    Streamlit's Markdown renderer converts inline event attributes into React
+    props and drops them, so a zero-height same-origin component owns the
+    listener instead. Delegation on the host document keeps working for cards
+    Streamlit adds after the first render. No external libraries are used.
+    """
+    try:
+        import streamlit.components.v1 as components
+
+        components.html(
+            """
+            <script>
+            (function () {
+              try {
+                var host = window.parent;
+                if (!host || host.__citationSpotlightBound) return;
+                var doc = host.document;
+                if (!doc) return;
+                host.__citationSpotlightBound = true;
+                if (host.matchMedia && host.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+                doc.addEventListener('mousemove', function (event) {
+                  var card = event.target && event.target.closest ? event.target.closest('.citation-card') : null;
+                  if (!card) return;
+                  var rect = card.getBoundingClientRect();
+                  if (!rect.width || !rect.height) return;
+                  card.style.setProperty('--mouse-x', ((event.clientX - rect.left) / rect.width * 100) + '%');
+                  card.style.setProperty('--mouse-y', ((event.clientY - rect.top) / rect.height * 100) + '%');
+                }, { passive: true });
+              } catch (err) {
+                /* Cross-origin host: CSS falls back to a centred spotlight. */
+              }
+            })();
+            </script>
+            """,
+            height=0,
+        )
+    except Exception:
+        pass
 
 
 def render_chat_view(client: ComplianceAPIClient, token: str, user: dict[str, Any]) -> None:
@@ -870,17 +1516,42 @@ def render_chat_view(client: ComplianceAPIClient, token: str, user: dict[str, An
         unsafe_allow_html=True,
     )
 
-    # Response Style Selector (Strict Compliance vs Explain & Discuss)
-    cur_mode = st.session_state.get("response_mode", "compliance")
-    selected_mode = st.segmented_control(
-        "Response Mode",
-        options=["compliance", "explain"],
-        default=cur_mode if cur_mode in ["compliance", "explain"] else "compliance",
-        format_func=lambda m: "🛡️ Strict Compliance" if m == "compliance" else "💬 Explain & Discuss",
-        key="response_mode_segmented",
-        help="Strict Compliance: concise statutory & policy text. Explain & Discuss: conversational explanation, breakdowns, and follow-ups grounded in cited clauses.",
-    ) or "compliance"
-    st.session_state["response_mode"] = selected_mode
+    # Response Controls: Knowledge Scope + Response Style
+    col_scope, col_style = st.columns([1.2, 1])
+    with col_scope:
+        cur_intent = st.session_state.get("intent_mode", "auto")
+        scope_options = ["auto", "rag", "general"]
+        scope_labels = {
+            "auto": "⚡ Auto (Smart Intent)",
+            "rag": "🏛️ Company Docs (RAG)",
+            "general": "🌐 General Chat",
+        }
+        selected_intent = st.selectbox(
+            "Knowledge Scope",
+            options=scope_options,
+            index=scope_options.index(cur_intent) if cur_intent in scope_options else 0,
+            format_func=lambda x: scope_labels.get(x, x),
+            key="intent_mode_select",
+            help="Auto: dynamically routes between corpus RAG, general chat, or system commands. Company Docs: strictly retrieves permitted compliance files. General Chat: open knowledge.",
+        ) or "auto"
+        st.session_state["intent_mode"] = selected_intent
+
+    with col_style:
+        cur_mode = st.session_state.get("response_mode", "compliance")
+        mode_options = ["compliance", "explain"]
+        mode_labels = {
+            "compliance": "🛡️ Strict Compliance",
+            "explain": "💬 Explain & Discuss",
+        }
+        selected_mode = st.selectbox(
+            "Response Style",
+            options=mode_options,
+            index=mode_options.index(cur_mode) if cur_mode in mode_options else 0,
+            format_func=lambda m: mode_labels.get(m, m),
+            key="response_mode_select",
+            help="Strict Compliance: concise statutory & policy text. Explain & Discuss: conversational explanation, breakdowns, and follow-ups grounded in cited clauses.",
+        ) or "compliance"
+        st.session_state["response_mode"] = selected_mode
 
     if st.session_state.get("last_error"):
         _render_error_banner(st.session_state["last_error"])
@@ -902,7 +1573,7 @@ def render_chat_view(client: ComplianceAPIClient, token: str, user: dict[str, An
         with col_run:
             if st.button("Run Staged Query", key="run_staged_query", type="primary", use_container_width=True):
                 st.session_state.pop("staged_query", None)
-                _submit_question(client, token, session_id, staged_query, response_mode=selected_mode)
+                _submit_question(client, token, session_id, staged_query, response_mode=selected_mode, intent_mode=selected_intent)
         with col_clear:
             if st.button("Cancel", key="cancel_staged_query", use_container_width=True):
                 st.session_state.pop("staged_query", None)
@@ -926,6 +1597,7 @@ def render_chat_view(client: ComplianceAPIClient, token: str, user: dict[str, An
             """,
             unsafe_allow_html=True,
         )
+        _render_rag_topology_canvas()
 
         starters = ROLE_STARTER_QUESTIONS.get(role, ROLE_STARTER_QUESTIONS["analyst"])
         st.markdown(
@@ -949,7 +1621,7 @@ def render_chat_view(client: ComplianceAPIClient, token: str, user: dict[str, An
                     unsafe_allow_html=True,
                 )
                 if st.button("Ask Query", key=f"starter_btn_{idx}", use_container_width=True):
-                    _submit_question(client, token, session_id, item["query"], response_mode=selected_mode)
+                    _submit_question(client, token, session_id, item["query"], response_mode=selected_mode, intent_mode=selected_intent)
 
     # Conversation stream
     for msg in messages:
@@ -996,7 +1668,7 @@ def render_chat_view(client: ComplianceAPIClient, token: str, user: dict[str, An
 
             if sender == "assistant":
                 if detail:
-                    _render_citations_and_trace(detail)
+                    _render_citations_and_trace(detail, msg_id=msg_id, role=role)
                 elif isinstance(msg.get("metadata"), dict):
                     meta = msg["metadata"]
                     chunk_ids = meta.get("chunk_ids") or []
@@ -1004,20 +1676,62 @@ def render_chat_view(client: ComplianceAPIClient, token: str, user: dict[str, An
                     lat = meta.get("latency_ms", 0.0)
                     resp_mode = meta.get("response_mode") or "compliance"
                     mode_lbl = "Explain & Discuss" if resp_mode == "explain" else "Strict Compliance"
-                    st.markdown(
-                        f"<span class='pill-badge'>Route: {html.escape(str(route_used))}</span>"
-                        f"<span class='pill-badge'>Latency: {float(lat):.1f} ms</span>"
-                        f"<span class='pill-badge'>Sources: {len(chunk_ids)}</span>"
-                        f"<span class='pill-badge'>Mode: {html.escape(mode_lbl)}</span>",
-                        unsafe_allow_html=True,
-                    )
-                    if chunk_ids:
-                        with st.expander(f"Sources ({len(chunk_ids)})", expanded=False):
-                            st.markdown(f"**Cited Chunks:** `{', '.join(chunk_ids)}`")
+                    is_grounded = meta.get("grounded", route_used != "GENERAL_CHAT" and bool(chunk_ids))
+                    resp_type = meta.get("response_type", "general_chat" if route_used == "GENERAL_CHAT" else ("rag" if chunk_ids else "direct"))
+
+                    if not is_grounded or resp_type == "general_chat":
+                        st.markdown(
+                            f"""
+                            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px;margin-bottom:6px;">
+                                <span class="pill-badge" style="background:rgba(10,132,255,0.12);color:#0A84FF;border:1px solid rgba(10,132,255,0.3);font-weight:600;">
+                                    🌐 Open AI Knowledge • Not grounded in company documents
+                                </span>
+                                <span class="pill-badge">Latency: {float(lat):.1f} ms</span>
+                            </div>
+                            """,
+                            unsafe_allow_html=True,
+                        )
+                    elif resp_type == "system_info":
+                        st.markdown(
+                            f"""
+                            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px;margin-bottom:6px;">
+                                <span class="pill-badge" style="background:rgba(52,199,89,0.12);color:#34C759;border:1px solid rgba(52,199,89,0.3);font-weight:600;">
+                                    ⚙️ System Configuration
+                                </span>
+                                <span class="pill-badge">Latency: {float(lat):.1f} ms</span>
+                            </div>
+                            """,
+                            unsafe_allow_html=True,
+                        )
+                    else:
+                        st.markdown(
+                            f"<span class='pill-badge'>Route: {html.escape(str(route_used))}</span>"
+                            f"<span class='pill-badge'>Latency: {float(lat):.1f} ms</span>"
+                            f"<span class='pill-badge'>Sources: {len(chunk_ids)}</span>"
+                            f"<span class='pill-badge'>Mode: {html.escape(mode_lbl)}</span>",
+                            unsafe_allow_html=True,
+                        )
+                        if chunk_ids:
+                            with st.expander(f"Sources ({len(chunk_ids)})", expanded=False):
+                                st.markdown(f"**Cited Chunks:** `{', '.join(chunk_ids)}`")
+
+                    meta_followups = meta.get("suggested_follow_ups") or []
+                    if meta_followups:
+                        st.markdown(
+                            "<div style='font-size:0.78rem;font-weight:600;color:#8E93A0;text-transform:uppercase;letter-spacing:0.03em;margin-top:10px;margin-bottom:6px;'>"
+                            "💡 Suggested Inquiries</div>",
+                            unsafe_allow_html=True,
+                        )
+                        chip_cols = st.columns(len(meta_followups))
+                        for idx, f_q in enumerate(meta_followups):
+                            with chip_cols[idx]:
+                                if st.button(f_q, key=f"fup_hist_{msg_id}_{idx}", use_container_width=True):
+                                    st.session_state["staged_query"] = f_q
+                                    st.rerun()
 
     prompt = st.chat_input("Ask a banking regulatory compliance question...")
     if prompt and prompt.strip():
-        _submit_question(client, token, session_id, prompt.strip(), response_mode=selected_mode)
+        _submit_question(client, token, session_id, prompt.strip(), response_mode=selected_mode, intent_mode=selected_intent)
 
 
 def render_auditor_view(client: ComplianceAPIClient, token: str, user: dict[str, Any]) -> None:

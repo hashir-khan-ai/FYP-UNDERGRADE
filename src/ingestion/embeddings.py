@@ -1,10 +1,15 @@
 """Local CPU embedding model loader and vector generator."""
 
 import logging
+import threading
 from typing import Protocol
 from src.config import settings
 
 logger = logging.getLogger(__name__)
+
+
+class ModelWeightsMissingError(RuntimeError):
+    """Raised when local offline HF model weights are absent or cannot load on CPU."""
 
 
 class EmbeddingGenerator(Protocol):
@@ -22,18 +27,27 @@ class LocalCPUEmbeddings:
     def __init__(self, model_name: str | None = None) -> None:
         self.model_name = model_name or settings.EMBEDDING_MODEL_NAME
         self._model = None
+        self._lock = threading.Lock()
 
     def _get_model(self):
         if self._model is None:
-            logger.info(f"Loading local embedding model '{self.model_name}' on CPU...")
-            try:
-                from sentence_transformers import SentenceTransformer
-            except ImportError:
-                raise ImportError(
-                    "sentence-transformers is required for local embeddings. "
-                    "Ensure requirements.txt is installed."
-                )
-            self._model = SentenceTransformer(self.model_name, device="cpu")
+            with self._lock:
+                if self._model is None:
+                    logger.info(f"Loading local embedding model '{self.model_name}' on CPU...")
+                    try:
+                        from sentence_transformers import SentenceTransformer
+                    except ImportError as exc:
+                        raise ImportError(
+                            "sentence-transformers is required for local embeddings. "
+                            "Ensure requirements.txt is installed."
+                        ) from exc
+                    try:
+                        self._model = SentenceTransformer(self.model_name, device="cpu")
+                    except Exception as exc:
+                        raise ModelWeightsMissingError(
+                            f"Local embedding model '{self.model_name}' could not be loaded "
+                            "in offline mode. Verify local HuggingFace weights before querying."
+                        ) from exc
         return self._model
 
     def embed_texts(self, texts: list[str]) -> list[list[float]]:

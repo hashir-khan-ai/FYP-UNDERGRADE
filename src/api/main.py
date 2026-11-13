@@ -1,6 +1,9 @@
 """FastAPI application: baseline endpoints plus Phase 3 auth, RBAC and memory."""
 
 import logging
+import re
+import time
+import uuid
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, Request, status
@@ -9,22 +12,32 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from src.api.deps import ApiError, CurrentUser, get_current_user
+from src.api.deps import ApiError, CurrentUser, enforce_query_rate_limit, get_current_user
 from src.api.routes import router as api_router
 from src.config import settings
 from src.core.llm_client import LLMAuthError, LLMUnavailableError
-from src.core.spend_guard import SpendGuardExceededError
+from src.core.rate_limiter import RateLimitExceededError
+from src.core.spend_guard import SpendGuardExceededError, spend_guard
+from src.core.telemetry import configure_correlation_logging, get_audit_id, request_correlation_scope
 from src.db.connection import get_db_connection
 from src.db.migrations import init_db
+from src.ingestion.embeddings import ModelWeightsMissingError
 from src.rag.baseline import BaselineRAGRequest, BaselineRAGResponse, baseline_pipeline
 
 logger = logging.getLogger("api")
+_REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Validate security flags, ensure the schema, and release Qdrant on exit."""
+    """Configure logging, validate startup readiness, ensure schema, and release Qdrant on exit."""
+    configure_correlation_logging()
+    settings.ensure_directories()
     settings.validate_security_flags()
+    try:
+        settings.ensure_llm_ready()
+    except Exception as exc:
+        logger.warning("LLM configuration readiness check deferred (%s).", type(exc).__name__)
     try:
         init_db()
     except Exception:
@@ -46,11 +59,34 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins_list,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
+    expose_headers=["Retry-After", "X-Request-ID"],
 )
 
 app.include_router(api_router)
+
+
+@app.middleware("http")
+async def correlation_middleware(request: Request, call_next):
+    """Attach request and audit correlation IDs without logging sensitive payloads."""
+    incoming = request.headers.get("X-Request-ID", "").strip()
+    req_id = incoming if _REQUEST_ID_RE.match(incoming) else uuid.uuid4().hex[:16]
+    started = time.perf_counter()
+    with request_correlation_scope(req_id):
+        response = await call_next(request)
+        latency_ms = round((time.perf_counter() - started) * 1000.0, 2)
+        response.headers["X-Request-ID"] = req_id
+        logger.info(
+            "request_completed method=%s path=%s status=%s latency_ms=%.2f request_id=%s audit_id=%s",
+            request.method,
+            request.url.path,
+            response.status_code,
+            latency_ms,
+            req_id,
+            get_audit_id(),
+        )
+        return response
 
 
 def _error(status_code: int, code: str, message: str, details: object = None) -> JSONResponse:
@@ -76,10 +112,21 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
 
 @app.exception_handler(SpendGuardExceededError)
 async def spend_guard_exception_handler(request: Request, exc: SpendGuardExceededError):
+    logger.warning("LLM guard triggered (%s): %s", exc.error_code, exc.internal_detail)
     return _error(
-        status.HTTP_429_TOO_MANY_REQUESTS,
-        "LLM_SPEND_LIMIT",
-        str(exc),
+        exc.http_status,
+        exc.error_code,
+        exc.user_message,
+    )
+
+
+@app.exception_handler(RateLimitExceededError)
+async def rate_limit_exception_handler(request: Request, exc: RateLimitExceededError):
+    logger.warning("API rate limit exceeded (%s).", exc.scope)
+    return JSONResponse(
+        status_code=exc.http_status,
+        content={"error": {"code": exc.error_code, "message": exc.user_message, "details": None}},
+        headers={"Retry-After": str(exc.retry_after)},
     )
 
 
@@ -116,6 +163,16 @@ async def llm_unavailable_exception_handler(request: Request, exc: LLMUnavailabl
         status.HTTP_503_SERVICE_UNAVAILABLE,
         "LLM_UNAVAILABLE",
         "The LLM provider is currently unavailable. Please retry later.",
+    )
+
+
+@app.exception_handler(ModelWeightsMissingError)
+async def model_weights_missing_handler(request: Request, exc: ModelWeightsMissingError):
+    logger.error("Local offline model weights unavailable: %s", exc)
+    return _error(
+        status.HTTP_503_SERVICE_UNAVAILABLE,
+        "MODEL_WEIGHTS_MISSING",
+        "Local offline embedding or re-ranking model weights are unavailable on this server.",
     )
 
 
@@ -190,13 +247,44 @@ def health_check():
     return _health_payload()
 
 
+@app.get("/ready")
+def readiness_check():
+    """Readiness probe verifying database connectivity, LLM config, and vector store."""
+    payload = _health_payload()
+    db_ok = bool(payload.get("database", {}).get("connected"))
+    vector_online = payload.get("vector_store", {}).get("status") == "online"
+    try:
+        settings.ensure_llm_ready()
+        llm_ready = True
+    except Exception:
+        llm_ready = False
+
+    is_ready = db_ok and llm_ready and vector_online
+    return JSONResponse(
+        status_code=status.HTTP_200_OK if is_ready else status.HTTP_503_SERVICE_UNAVAILABLE,
+        content={
+            "status": "ready" if is_ready else "not_ready",
+            "checks": {
+                "database": db_ok,
+                "llm_config": llm_ready,
+                "vector_store": vector_online,
+            },
+            "profile": payload.get("llm", {}).get("profile"),
+        },
+    )
+
+
 @app.get("/api/v1/admin/health")
 def admin_health_check(user: CurrentUser = Depends(get_current_user)):
     """API.md health endpoint; requires authentication."""
     return _health_payload()
 
 
-@app.post("/ask", response_model=BaselineRAGResponse)
+@app.post(
+    "/ask",
+    response_model=BaselineRAGResponse,
+    dependencies=[Depends(enforce_query_rate_limit)],
+)
 def ask_question(
     request: BaselineRAGRequest,
     user: CurrentUser = Depends(get_current_user),
@@ -205,5 +293,12 @@ def ask_question(
     query = request.query.strip()
     if not query:
         raise ApiError(400, "EMPTY_QUERY", "Query string cannot be empty.")
-    return baseline_pipeline.ask(query, role=user.role, session_id=request.session_id)
+    resolved = settings.llm
+    with spend_guard.run_scope(
+        f"ask:{uuid.uuid4()}",
+        profile=resolved.profile,
+        has_paid_quota=resolved.has_paid_quota,
+        is_local=resolved.is_local,
+    ):
+        return baseline_pipeline.ask(query, role=user.role, session_id=request.session_id)
 

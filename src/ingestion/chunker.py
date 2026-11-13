@@ -27,6 +27,9 @@ class DocumentChunk:
     text_content: str
     token_count: int = 0
     heading_path: str = ""
+    source_url: str | None = None
+    jurisdiction: str = ""
+    content_origin: str = ""
 
     def __post_init__(self) -> None:
         if not self.heading_path:
@@ -296,6 +299,9 @@ class ClauseAwareChunker:
                     text_content=part.strip(),
                     token_count=len(part_words),
                     heading_path=heading_path,
+                    source_url=getattr(doc, "source_url", None),
+                    jurisdiction=getattr(doc, "jurisdiction", ""),
+                    content_origin=getattr(doc, "content_origin", ""),
                 )
             )
         return chunks
@@ -373,6 +379,9 @@ class ClauseAwareChunker:
                     allowed_roles=list(doc.allowed_roles),
                     text_content=sub_text,
                     token_count=len(words[start:end]),
+                    source_url=getattr(doc, "source_url", None),
+                    jurisdiction=getattr(doc, "jurisdiction", ""),
+                    content_origin=getattr(doc, "content_origin", ""),
                 )
             )
             if end >= len(words):

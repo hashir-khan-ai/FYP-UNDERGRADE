@@ -422,3 +422,100 @@ def test_demo_preset_triggers_query() -> None:
     client.ask_chat_query.assert_called_once()
     call_args = client.ask_chat_query.call_args
     assert "MLR 2017" in call_args.kwargs.get("query", "")
+
+
+def test_citation_verifiable_links_and_internal_badge() -> None:
+    """Public citations render verifiable source/google links while internal citations display an institutional badge."""
+    client = _make_mock_client("manager")
+    at = AppTest.from_file("src/ui/app.py")
+    at.session_state["api_client"] = client
+    at.session_state["access_token"] = "tok-manager"
+    at.session_state["user"] = {"id": 2, "username": "mgr_user", "role": "manager", "full_name": "Morgan Manager"}
+    at.session_state["sessions"] = [{"id": "sess-001", "title": "Verification Test"}]
+    at.session_state["active_session_id"] = "sess-001"
+    at.session_state["messages"] = [
+        {"id": 1, "sender": "user", "content": "What is the policy?"},
+        {"id": 2, "sender": "assistant", "content": "Summary of requirements."},
+    ]
+    at.session_state["turn_details"] = {
+        2: {
+            "session_id": "sess-001",
+            "answer": "Summary of requirements.",
+            "route": "SINGLE_SEARCH",
+            "latency_ms": 110.0,
+            "citations": [
+                {
+                    "chunk_id": "CH-PUB-01",
+                    "doc_title": "Basel Framework",
+                    "heading_path": "Part 1 > Capital",
+                    "clause": "1.1",
+                    "snippet": "Minimum ratio is 4.5%.",
+                    "is_internal": False,
+                    "source_url": "https://www.bis.org/bcbs/basel3.htm",
+                    "verification_url": "https://www.google.com/search?q=Basel+Framework",
+                    "source_name": "Basel Committee (BIS)",
+                },
+                {
+                    "chunk_id": "CH-INT-02",
+                    "doc_title": "Bank Internal Policy POL-042",
+                    "heading_path": "Section 2 > Escalation",
+                    "clause": "2.1",
+                    "snippet": "Escalate to ExCo within 24 hours.",
+                    "is_internal": True,
+                    "source_name": "Internal Bank Policy",
+                },
+            ],
+        }
+    }
+    at.run()
+
+    assert not at.exception
+    all_text = _collect_all_markdowns(at)
+    # Check public citation link elements
+    assert "Open Source ↗" in all_text
+    assert "Verify on Google ↗" in all_text
+    assert "Basel Committee (BIS)" in all_text
+    # Check internal citation badge
+    assert "Internal Document — No public verification link" in all_text
+
+
+def test_unauthorized_citation_shows_access_warning() -> None:
+    """A citation outside the caller's role renders a red unauthorized-access indicator."""
+    client = _make_mock_client("analyst")
+    at = AppTest.from_file("src/ui/app.py")
+    at.session_state["api_client"] = client
+    at.session_state["access_token"] = "tok-analyst"
+    at.session_state["user"] = {"id": 1, "username": "analyst_user", "role": "analyst", "full_name": "Alex Analyst"}
+    at.session_state["sessions"] = [{"id": "sess-001", "title": "Access Test"}]
+    at.session_state["active_session_id"] = "sess-001"
+    at.session_state["messages"] = [
+        {"id": 1, "sender": "user", "content": "What did the audit find?"},
+        {"id": 2, "sender": "assistant", "content": "Summary of findings."},
+    ]
+    at.session_state["turn_details"] = {
+        2: {
+            "session_id": "sess-001",
+            "answer": "Summary of findings.",
+            "route": "SINGLE_SEARCH",
+            "latency_ms": 120.0,
+            "citations": [
+                {
+                    "chunk_id": "CH-AUD-01",
+                    "doc_title": "Internal Audit KYC Review AUD-2024-03",
+                    "heading_path": "Part 9 > Findings",
+                    "clause": "9.1",
+                    "snippet": "Two control gaps were identified.",
+                    "is_internal": True,
+                    "allowed_roles": ["auditor"],
+                    "source_name": "Internal Audit Findings",
+                },
+            ],
+        }
+    }
+    at.run()
+
+    assert not at.exception
+    all_text = _collect_all_markdowns(at)
+    assert "Unauthorized access" in all_text
+    assert "restricted to Auditor" in all_text
+    assert "Internal Document — No public verification link" not in all_text

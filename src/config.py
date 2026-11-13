@@ -12,6 +12,21 @@ from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+from urllib.parse import urlparse
+from pydantic import model_validator
+
+_LOCAL_PROVIDER_HOSTS = frozenset({"localhost", "127.0.0.1", "::1", "0.0.0.0", "host.docker.internal"})
+
+
+def is_local_provider_url(base_url: str | None) -> bool:
+    """Return True when a configured OpenAI-compatible base_url points to a loopback/local host."""
+    if not base_url:
+        return False
+    parsed = urlparse(base_url.strip())
+    host = (parsed.hostname or "").lower().rstrip(".")
+    return host in _LOCAL_PROVIDER_HOSTS or host.endswith(".local")
+
+
 class ResolvedLLM(BaseModel):
     """Fully resolved LLM provider settings for the active profile."""
 
@@ -24,6 +39,29 @@ class ResolvedLLM(BaseModel):
     max_retries: int = 3
     max_rpm: int = 20
     is_mock: bool = False
+    is_local: bool = False
+    has_paid_quota: bool = False
+
+    @model_validator(mode="after")
+    def _derive_quota_flags(self) -> "ResolvedLLM":
+        """Derive single-source-of-truth local and paid-quota flags on resolved settings."""
+        if "is_local" not in self.model_fields_set:
+            if self.profile == "mock" or self.is_mock:
+                self.is_local = True
+            elif self.profile == "dev":
+                self.is_local = is_local_provider_url(self.base_url)
+            else:
+                self.is_local = False
+
+        if "has_paid_quota" not in self.model_fields_set:
+            if self.profile == "mock" or self.is_mock:
+                self.has_paid_quota = False
+            elif self.profile == "dev":
+                self.has_paid_quota = not self.is_local
+            else:
+                self.has_paid_quota = True
+
+        return self
 
 
 class Settings(BaseSettings):
@@ -40,7 +78,7 @@ class Settings(BaseSettings):
     API_HOST: str = Field(default="127.0.0.1", description="FastAPI bind address")
     API_PORT: int = Field(default=8000, description="FastAPI port")
     CORS_ORIGINS: str = Field(
-        default="http://localhost:8501,http://127.0.0.1:8501",
+        default="http://localhost:3000,http://127.0.0.1:3000,http://localhost:8501,http://127.0.0.1:8501",
         description="Comma-separated permitted CORS origins",
     )
     SECRET_KEY: str = Field(
@@ -116,13 +154,22 @@ class Settings(BaseSettings):
     )
 
     # Spend guard (per run; evaluation applies one budget per benchmark run)
+    # Adaptive pipeline uses up to 5-7 calls/turn (~8k-12k tokens); 150 calls / 400k tokens supports ~20-25 live turns.
     LLM_MAX_CALLS_PER_RUN: int = Field(
-        default=40,
-        description="Hard cap on LLM calls per run before stopping",
+        default=150,
+        description="Hard cap on paid-profile LLM calls per run before stopping",
     )
     LLM_MAX_TOKENS_PER_RUN: int = Field(
-        default=120_000,
-        description="Hard cap on prompt + completion tokens per run before stopping",
+        default=400_000,
+        description="Hard cap on paid-profile prompt + completion tokens per run before stopping",
+    )
+    LLM_LOCAL_SAFETY_CALLS: int = Field(
+        default=1000,
+        description="Runaway-loop call safety ceiling for local/self-hosted dev models (never billed as API quota)",
+    )
+    LLM_LOCAL_SAFETY_TOKENS: int = Field(
+        default=4_000_000,
+        description="Runaway-loop token safety ceiling for local/self-hosted dev models (never billed as API quota)",
     )
 
     # Optional dev-only failover (unused under demo to keep runs reproducible)
@@ -162,6 +209,22 @@ class Settings(BaseSettings):
         default="./data/sqlite/bm25_index.pkl",
         description="Pickled BM25 index built from the same chunks as Qdrant",
     )
+    UPLOAD_DIR: str = Field(
+        default="./data/uploads",
+        description="Directory for user-uploaded documents",
+    )
+    UPLOAD_MAX_FILE_SIZE_MB: int = Field(
+        default=10,
+        description="Maximum upload file size in megabytes",
+    )
+    UPLOAD_ALLOWED_EXTENSIONS: list[str] = Field(
+        default=["md", "txt", "pdf", "html", "htm"],
+        description="Allowed file extensions for dynamic document uploads",
+    )
+    UPLOAD_ALLOWED_ROLES: list[str] = Field(
+        default=["manager", "auditor"],
+        description="User roles permitted to upload and index documents dynamically",
+    )
 
     # Ablation Experiment Flags. Phase 2 is baseline-only, so every later layer is
     # explicitly disabled until its phase is authorised.
@@ -184,6 +247,10 @@ class Settings(BaseSettings):
     ENABLE_HEADING_PATH: bool = Field(
         default=True,
         description="Structure-aware retrieval: include full heading path in chunk embeddings and BM25",
+    )
+    ENABLE_GRAPH_RAG: bool = Field(
+        default=False,
+        description="Enable local SQLite knowledge-graph cross-reference augmentation in hybrid retrieval",
     )
 
     # Phase 3 security and memory flags. RBAC is on by default and may only be
@@ -287,6 +354,16 @@ class Settings(BaseSettings):
     AUTH_LOGIN_RATE_LIMIT_PER_MINUTE: int = Field(
         default=10,
         description="Login attempts allowed per minute per username and client",
+    )
+    API_RATE_LIMIT_PER_MINUTE: int = Field(
+        default=60,
+        ge=1,
+        description="API query requests allowed per minute per authenticated user and IP",
+    )
+    API_UPLOAD_RATE_LIMIT_PER_MINUTE: int = Field(
+        default=20,
+        ge=1,
+        description="Document upload requests allowed per minute per authenticated user and IP",
     )
 
     # Seed script credential. Intentionally has no built-in default: the seed

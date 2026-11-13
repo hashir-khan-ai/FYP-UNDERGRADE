@@ -599,3 +599,84 @@ in LaTeX thesis documents without manual transcription errors.
 5. Authored `docs/DEMO_SCRIPT.md`: a complete 5-minute timeboxed live demonstration script detailing minute-by-minute physical actions, spoken commentary, audience takeaways, and technical contingency fallback procedures. Updated `docs/UI_TEST_CHECKLIST.md` with headless test commands.
 
 **Why:** Fulfills all Phase 8 requirements under the frozen project scope, providing automated UI test coverage without flaky browser drivers and giving the student a polished, fail-safe script for final viva examinations.
+
+---
+
+## Part K — Conversational Experience, Local $0 Ollama Support & Local Graph RAG Augmentation
+
+### 53. Collapsed Citations UI Pattern with Compact Metadata Badges
+**Decision:** Replaced default full inline citation cards in `src/ui/app.py` with a clean, compact metadata pill bar (Route, Grader, Latency, Source count, Mode) and a per-message collapsed expander control: `st.expander(f"Sources & citations ({len(citations)})", expanded=False)`. Detailed clause information, heading paths, page numbers, and verbatim source snippets remain fully accessible on demand. Citation generation, server-side validation, and SQLite audit trail storage remain completely intact.
+
+**Why:** Eliminates visual clutter so that answers can be read fluidly like modern conversational assistants (ChatGPT/Claude), while maintaining rigorous regulatory traceability and full evidence accessibility when audit scrutiny is required.
+
+### 54. Conversational Grounded "Explain & Discuss" Mode (`response_mode`)
+**Decision:** Added response mode selection to the API (`ChatQueryRequest.response_mode: Literal["compliance", "explain"] = "compliance"`) and UI (`st.segmented_control`):
+- `compliance`: Standard formal, evidence-forward compliance statutory answers.
+- `explain`: Conversational AI overview style using `prompts/v1/explain.txt`. Translates dense legal rules into accessible plain language, explains regulatory intent and operational impact, and supports conversational follow-ups by feeding recent dialogue context into generation.
+- Grounding & Security: Strictly enforced across both modes. Every factual claim must be derived from `<authoritative_documents>`. If unpermitted or unsupported by permitted passages for the user's role, the uniform non-leaking refusal is returned (`"I can't find that in the documents available to your role."`). Zero leakage is preserved (0.00%).
+
+**Why:** Enables policy educators and compliance officers to understand complex standards conversationally while preserving absolute fidelity to the authorized corpus.
+
+### 55. Local $0 Ollama Profile Configuration & Runbook
+**Decision:** Documented and configured 100% local, zero-external-cost execution via local Ollama in `.env.example`, `docs/RUNBOOK.md`, and `src/config.py`. Setting `LLM_PROFILE=dev`, `LLM_BASE_URL=http://localhost:11434/v1`, `LLM_API_KEY=ollama`, and `LLM_MODEL=llama3.1:8b` (or `qwen2.5:7b-instruct`) allows the complete system to run locally without incurring API spend or transmitting data across the internet. Automated tests continue to default strictly to `mock` profile (no network).
+
+**Why:** Provides an offline, zero-cost development and testing path for students and examiners without requiring external paid API keys.
+
+### 56. SQLite Knowledge Graph (Graph RAG) Augmentation with Server-Side RBAC
+**Decision:** Implemented a lightweight, local-first Knowledge Graph module (`src/retrieval/knowledge_graph.py`) backed by SQLite tables (`kg_nodes` and `kg_edges`) and an automated indexing script (`scripts/build_knowledge_graph.py`). Nodes represent regulations, topics, internal policies, and audit reports; edges represent `implements`, `covers`, and `audits` relationships. Every node enforces `allowed_roles` server-side: queries and 1-hop traversals strictly exclude unpermitted nodes, ensuring 0.00% data leakage across user tiers.
+
+**Why:** Augments hybrid BM25 + dense vector retrieval with explicit cross-reference reasoning between internal banking policies and governing statutory codes without introducing heavy external graph database infrastructure.
+
+### 57. Dynamic Document Upload & On-the-Fly Hybrid Ingestion with Server-Side RBAC
+**Decision:** Implemented an on-the-fly document upload and ingestion subsystem (`src/ingestion/upload_ingest.py`), backend REST endpoints (`POST /api/v1/documents/upload`, `GET /api/v1/documents`), and frontend role-gated UI controls (`src/ui/app.py`). Role gating (`settings.UPLOAD_ALLOWED_ROLES=["manager", "auditor"]`) is enforced at the API layer with sanitized 403 ApiError responses for unauthorized tiers. Uploaded documents (.md, .txt, .pdf, .html up to 10MB) are sanitized against path traversal, stored per-user in `data/uploads/user_{id}/{uuid}/`, chunked via `ClauseAwareChunker`, tagged with `allowed_roles`, indexed into embedded Qdrant with deterministic UUIDv5 vectors, atomically merged into BM25 (`BM25Indexer.merge_and_save`), and registered in SQLite `documents` catalog. In-memory BM25 index is reloaded immediately (`baseline_pipeline.bm25.load()`) making uploaded documents available for immediate chat retrieval in new or existing sessions. Server-side RBAC ensures strict 0.00% cross-role leakage.
+
+**Why:** Allows managers and auditors to ingest new regulatory updates or internal institutional policies dynamically without requiring offline CLI re-indexing scripts, while maintaining uncompromising server-side security boundaries.
+
+### 58. Smart Intent Routing (General Chat vs Compliance RAG), System Info & Conversational Presentation
+**Decision:**
+1. Extended the adaptive router (`src/core/router.py`) and API schemas (`src/api/schemas.py`, `ChatQueryRequest.intent_mode`) with intent classification: `general_chat`, `system_info`, `injection`, `unsafe`, and `corpus_rag`.
+2. Deterministic Pre-Check: Prompt injection overrides (`SYSTEM OVERRIDE`, bypass commands) are intercepted deterministically and neutralized as direct refusals (`grounded=False`, 0 retrieval, 0 citations). System capability queries ("which model", "show system info") return safe environment configurations (profiles, embeddings, local indexes, active role) with zero leakage of API keys, tokens, or local paths.
+3. General Chat: Open-domain knowledge queries (machine learning, coding, general conversation) route to `general_chat` using `prompts/v1/general.txt` without calling retrieval/rerank/grader/citations. The UI renders an explicit blue badge `🌐 Open AI Knowledge • Not grounded in company documents`, hiding all citation cards, source expanders, and reasoning traces.
+4. RAG Quality & UI Continuity: For grounded compliance responses, metadata pills and per-message collapsed expanders (`Sources & citations (N)`) are displayed alongside clickable suggested follow-up chips. The chat interface provides dual Apple HIG controls for Knowledge Scope (`Auto`, `Company Docs (RAG)`, `General Chat`) and Response Style (`Strict Compliance`, `Explain & Discuss`).
+5. Testing & Verification: 7 dedicated tests in `tests/test_intent_routing.py` and 203 passing tests overall, preserving strictly 0.00% leakage across all 36 test cells.
+
+**Why:** Combines the natural, friendly experience of modern conversational AI (ChatGPT) for open exploration with rigorous, audit-traceable, role-enforced compliance RAG for banking regulatory policies.
+
+### 59. Apple HIG Frontend Architecture Hardening & Verifiable Source Citation Links
+**Decision:**
+1. **Sidebar Architecture & Layout Refinement:** Constrained desktop sidebar width to 300px (`min-width: 280px !important; max-width: 320px !important`) to eliminate excessive horizontal whitespace and horizontal window clipping. Added CSS text truncation with ellipsis (`text-overflow: ellipsis; white-space: nowrap; overflow: hidden;`) to sidebar buttons and session titles. Repositioned **Compliance Sessions** to the top primary slot below the compact user identity card, moving the 2-Minute Demo Showcase into a collapsed expander (`with st.expander("⚡ 2-Min Demo Showcase (Viva)", expanded=False):`) preserving widget keys (`demo_btn_public`, etc.) and headless test suite contracts.
+2. **Apple HIG Typography & Palette:** Removed Google Inter font network dependency (`@import ... Inter`), switching to native Apple system font hierarchy (`-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", sans-serif` for UI; `"SF Mono", ui-monospace, Menlo, Monaco, Consolas, monospace` for code/snippets). Adopted a financial-compliance palette: Deep Charcoal/Navy base (`#0B0E14`), slate cards (`#141822`, `#1B212E`), off-white text (`#F4F6F9`), slate secondary text (`#9AA0AE`), Apple Blue (`#0A84FF`), Verified Green (`#30D158`), and Safety Orange (`#FF5F00`) for primary actions.
+3. **Verifiable Source Citation Links (End-to-End):**
+   - Extended data models (`LoadedDocument`, `DocumentChunk`, `QdrantIndexer`, `BM25Indexer`, `SourceChunk`, `Citation`) with 5 verification fields: `source_url`, `verification_url`, `source_name`, `content_origin`, and `is_internal`.
+   - Populated verification metadata in `src/rag/baseline.py` via `build_verification_metadata`: public regulations (`excerpt_of_original`) attach canonical URLs from sidecars and generate Google verification search links alongside friendly regulatory badges (e.g. `🏛️ Basel Committee (BIS)`, `⚖️ FCA Handbook`); internal and synthetic documents (`DOC-INT-*`, `POL-*`, `AUD-*`, `SOP-*`, `content_origin="synthetic"`) strictly NEVER link out, displaying an institutional badge `🔒 Internal Document — No public verification link (Restricted Institutional Access)`.
+4. **Testing & Invariants:** Added test coverage in `tests/test_conversational_mode.py` and `tests/test_ui_app.py`. All 205 automated non-slow tests passed (`205 passed, 1 deselected in 34.59s`). Automated leakage check confirmed strictly 0.00% leakage across all 36 test cells.
+
+**Why:** Elevates UI/UX to authentic Apple Human Interface Guidelines suitable for enterprise banking compliance officers and academic examiners, while giving users instant, verifiable web citations for public regulations without compromising the confidentiality of internal institutional policies.
+
+### 60. Enterprise Motion Design, Adaptive Max-Reading Width & Interactive RAG Topology Canvas
+**Decision:**
+1. **Comfortable Reading Width:** Clamped main chat container (`div[data-testid="stMainBlockContainer"]`) to `900px` max-width centered on screen, preventing statutory passages and explanations from stretching across wide desktop displays while maintaining full-width flexibility for auditor data tables.
+2. **Apple Spring Motion & Micro-Interactions:** Introduced CSS animation tokens with standard Apple spring easing (`cubic-bezier(0.16, 1, 0.3, 1)`):
+   - Message entrance animation (`fadeInSlideUp`) for user and assistant messages (220ms).
+   - Interactive hover lifts (`transform: translateY(-1px)`), active state depressions, and elevation transitions on cards, buttons, and expanders.
+   - Active session highlight in sidebar with distinct left accent indicator (`#0A84FF`) and background tint.
+   - WCAG accessibility compliance via `@media (prefers-reduced-motion: reduce)`, automatically clamping animation and transition durations to 0.01ms.
+3. **Lightweight Interactive RAG Topology Canvas:** Embedded `_render_rag_topology_canvas()` via `st.components.v1.html` in the empty chat state. A pure local HTML5 canvas visualizes the live interaction between public regulations (Basel III, MLR, BCOBS), hybrid retrieval (Qdrant & BM25), server-side RBAC enclaves, and verified citations with gentle particle drift and mouse-hover reactions. Zero external CDNs or network dependencies, $0 cost, and full reduced-motion safety.
+4. **Testing & Verification:** Verified across headless UI tests (`tests/test_ui_app.py`) and full 205-test suite (`pytest -q -m "not slow"`). RBAC leakage rate confirmed at strictly 0.00% across all 36 cells.
+
+**Why:** Transforms the frontend into a calm, premium financial compliance workstation with purposeful micro-interactions and an intuitive architectural visualization, distinguishing the dissertation project in academic and industry demonstrations.
+
+### 61. Profile-Driven Paid Quota Boundary & Session-Scoped SpendGuard Lifecycle
+**Decision:**
+1. **Single-Source Profile Capability Flags (`src/config.py`):** Added explicit `is_local: bool` and `has_paid_quota: bool` fields derived once on `ResolvedLLM` (`mock` -> `is_local=True, has_paid_quota=False`; `dev` targeting `localhost`/`127.0.0.1`/`::1`/`host.docker.internal`/`.local` -> `is_local=True, has_paid_quota=False`; `demo` or remote paid `dev` -> `is_local=False, has_paid_quota=True`). `ResilientLLMClient` consumes `resolved.has_paid_quota` and `resolved.is_local` in one place and never inspects URLs directly.
+2. **Offline Parity & Local Runaway Protection (`src/core/spend_guard.py`, `src/core/llm_client.py`):**
+   - `mock` profile completely bypasses paid-quota enforcement while recording separate `offline_calls` and `offline_tokens` telemetry counters (`exhausted=False` always).
+   - Local self-hosted `dev` models (e.g. Ollama) never trigger paid-quota HTTP `429` stops; instead they record `local_calls`/`local_tokens` against a high runaway safety ceiling (`LLM_LOCAL_SAFETY_CALLS=1000`, `LLM_LOCAL_SAFETY_TOKENS=4000000`), mapped on overflow to HTTP `503` (`LOCAL_SAFETY_LIMIT`), never API-quota `429`.
+   - Paid profiles (`demo`/remote `dev`) enforce atomic `reserve_call` check-before-mutate + `commit_usage` (`CallCapExceededError` / `TokenCapExceededError`, zero concurrency overshoot, never discarding an already-paid `200 OK` response). Defaults raised from `40/120k` to `150/400k` to support 20+ adaptive multi-step turns cleanly.
+3. **Explicit Run Lifecycle Boundary (`src/api/routes.py`, `src/api/main.py`):**
+   - For interactive API sessions, **one logical run == one user session** (`run_id = f"session:{session_id}"`), bound per request via `spend_guard.run_scope(...)` (`ContextVar` + lock, LRU-bounded) with zero mid-turn resets and strict isolation across concurrent users/sessions. New session creation resets its run, and `POST /api/v1/sessions/{session_id}/new-run` clears an exhausted session budget on demand.
+   - Stateless `/ask` binds an ephemeral per-turn `ask:{uuid}` scope; evaluation scripts retain per-benchmark `spend_guard.reset()`.
+   - Sanitized error messages remove all env var names and local paths from API responses (`user_message`) while keeping internal diagnostics strictly in server logs.
+
+**Why:** Eliminates offline HTTP 429 deadlocks, stops cross-session state bleed on multi-user API servers, prevents concurrency overshoot or wasted paid completions, and guarantees offline `mock`/local `dev` behave structurally identically to online runs.
+

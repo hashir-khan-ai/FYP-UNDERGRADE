@@ -9,16 +9,21 @@ runs after re-ranking on every retrieval path. RBAC is applied before and after
 the grader; the grader never sees or reveals restricted content.
 """
 
+import inspect
+import json
 import logging
+from pathlib import Path
 import re
+import threading
 import time
+import urllib.parse
 from dataclasses import dataclass, field
 from typing import Any
 
 from pydantic import BaseModel, Field
 
 from src.config import settings
-from src.core.llm_client import ResilientLLMClient, llm_client
+from src.core.llm_client import ResilientLLMClient, active_resolved_llm, llm_client
 from src.core.prompts import load_prompt
 from src.core.security import enforce_role_visibility, normalize_role
 from src.core.xai import (
@@ -28,6 +33,7 @@ from src.core.xai import (
     filter_passages_for_citations,
     validate_cited_chunks,
 )
+from src.ingestion.embeddings import ModelWeightsMissingError
 from src.ingestion.indexer import BM25Indexer, QdrantIndexer, SearchResult
 
 logger = logging.getLogger(__name__)
@@ -52,6 +58,15 @@ class SourceChunk(BaseModel):
     score: float
     snippet: str
     quote_snippet: str = ""
+    # Verifiable source metadata
+    source_url: str | None = None
+    verification_url: str | None = None
+    source_name: str | None = None
+    content_origin: str | None = None
+    is_internal: bool = False
+    # Kept for authenticated citation labelling; excluded from the baseline
+    # /ask payload so role metadata is never exposed on that response.
+    allowed_roles: list[str] = Field(default_factory=list, exclude=True)
 
 
 
@@ -149,17 +164,26 @@ class CrossEncoderReranker:
     def __init__(self, model_name: str | None = None) -> None:
         self.model_name = model_name or settings.RERANKER_MODEL_NAME
         self._model = None
+        self._lock = threading.Lock()
 
     def _get_model(self):
         if self._model is None:
-            logger.info("Loading local cross-encoder '%s' on CPU...", self.model_name)
-            try:
-                from sentence_transformers import CrossEncoder
-            except ImportError as exc:
-                raise ImportError(
-                    "sentence-transformers is required for cross-encoder re-ranking."
-                ) from exc
-            self._model = CrossEncoder(self.model_name, device="cpu")
+            with self._lock:
+                if self._model is None:
+                    logger.info("Loading local cross-encoder '%s' on CPU...", self.model_name)
+                    try:
+                        from sentence_transformers import CrossEncoder
+                    except ImportError as exc:
+                        raise ImportError(
+                            "sentence-transformers is required for cross-encoder re-ranking."
+                        ) from exc
+                    try:
+                        self._model = CrossEncoder(self.model_name, device="cpu")
+                    except Exception as exc:
+                        raise ModelWeightsMissingError(
+                            f"Local re-ranker model '{self.model_name}' could not be loaded "
+                            "in offline mode. Verify local HuggingFace weights before querying."
+                        ) from exc
         return self._model
 
     def rerank(
@@ -222,15 +246,20 @@ def reciprocal_rank_fusion(
     vector_results: list[dict[str, Any]],
     k: int = 60,
     top_k: int = 20,
+    extra_results: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
-    """Merge sparse and dense rankings with RRF: sum(1 / (k + rank))."""
+    """Merge sparse, dense, and optional graph rankings with RRF: sum(1 / (k + rank))."""
     if k < 0:
         raise ValueError("RRF k must be non-negative")
 
     scores: dict[str, float] = {}
     chunk_map: dict[str, dict[str, Any]] = {}
 
-    for results in (bm25_results, vector_results):
+    result_lists = [bm25_results, vector_results]
+    if extra_results:
+        result_lists.append(extra_results)
+
+    for results in result_lists:
         for rank, document in enumerate(results, start=1):
             chunk_id = document.get("chunk_id")
             if not chunk_id:
@@ -245,6 +274,120 @@ def reciprocal_rank_fusion(
         item["rrf_score"] = scores[chunk_id]
         fused.append(item)
     return fused
+
+
+_PROVENANCE_CATALOG: dict[str, dict[str, Any]] | None = None
+_PROVENANCE_LOCK = threading.Lock()
+
+
+def invalidate_provenance_catalog() -> None:
+    """Clear the cached sidecar provenance catalog after dynamic uploads."""
+    global _PROVENANCE_CATALOG
+    with _PROVENANCE_LOCK:
+        _PROVENANCE_CATALOG = None
+
+
+def _get_provenance_catalog() -> dict[str, dict[str, Any]]:
+    global _PROVENANCE_CATALOG
+    with _PROVENANCE_LOCK:
+        if _PROVENANCE_CATALOG is not None:
+            return _PROVENANCE_CATALOG
+
+        catalog: dict[str, dict[str, Any]] = {}
+        scan_dirs = [Path("data/raw"), Path("data/synthetic"), Path(settings.UPLOAD_DIR)]
+        for sdir in scan_dirs:
+            if not sdir.exists():
+                continue
+            for sidecar in sdir.glob("*.meta.json"):
+                try:
+                    meta = json.loads(sidecar.read_text(encoding="utf-8"))
+                    doc_id = meta.get("doc_id")
+                    if doc_id:
+                        catalog[str(doc_id)] = meta
+                except Exception:
+                    continue
+
+        _PROVENANCE_CATALOG = catalog
+        return _PROVENANCE_CATALOG
+
+
+def build_verification_metadata(passage: dict[str, Any]) -> dict[str, Any]:
+    """Derive verifiable public URLs or flag confidential/internal bank documents."""
+    doc_id = str(passage.get("doc_id") or "")
+    catalog = _get_provenance_catalog()
+    meta = catalog.get(doc_id, {})
+
+    content_origin = str(passage.get("content_origin") or meta.get("content_origin") or "")
+    doc_type = str(passage.get("doc_type") or meta.get("doc_type") or "")
+    jurisdiction = str(passage.get("jurisdiction") or meta.get("jurisdiction") or "")
+    raw_source = passage.get("source_url") or meta.get("source") or meta.get("source_url") or ""
+
+    # Internal / confidential detection:
+    is_internal_flag = (
+        doc_id.startswith(("DOC-INT-", "POL-", "AUD-", "SOP-"))
+        or content_origin == "synthetic"
+        or "INTERNAL" in jurisdiction
+        or doc_type in ("CONFIDENTIAL_AUDIT_FINDINGS", "INTERNAL_MANAGEMENT_POLICY", "INTERNAL_SOP")
+        or not str(raw_source).startswith(("http://", "https://"))
+    )
+
+    if is_internal_flag:
+        friendly_source = "Internal Bank Policy"
+        if "AUDIT" in doc_id or "audit" in doc_type.lower():
+            friendly_source = "Internal Audit Findings"
+        elif "SOP" in doc_id:
+            friendly_source = "Standard Operating Procedure"
+        return {
+            "source_url": None,
+            "verification_url": None,
+            "source_name": friendly_source,
+            "content_origin": content_origin or "synthetic",
+            "is_internal": True,
+        }
+
+    # Public regulation
+    source_url = str(raw_source) if str(raw_source).startswith(("http://", "https://")) else None
+
+    # Friendly regulatory authority name
+    url_lower = (source_url or "").lower()
+    jur_lower = jurisdiction.lower()
+    if "bis.org" in url_lower or "bcbs" in jur_lower or "basel" in doc_id.lower():
+        source_name = "Basel Committee (BIS)"
+    elif "legislation.gov.uk" in url_lower or "statute" in jur_lower or "mlr" in doc_id.lower():
+        source_name = "UK Statutory Legislation"
+    elif "handbook.fca.org.uk" in url_lower or "fca" in jur_lower:
+        source_name = "FCA Handbook"
+    elif "bankofengland.co.uk" in url_lower or "pra" in jur_lower:
+        source_name = "Bank of England (PRA)"
+    elif "eba.europa.eu" in url_lower or "eba" in jur_lower:
+        source_name = "European Banking Authority (EBA)"
+    else:
+        source_name = meta.get("title") or passage.get("doc_title") or "Official Regulatory Authority"
+
+    # Construct Google verification search query for public regulation
+    query_parts: list[str] = []
+    doc_title = passage.get("doc_title") or meta.get("title") or ""
+    if doc_title:
+        query_parts.append(str(doc_title))
+    clause = passage.get("clause_label") or passage.get("clause")
+    if clause:
+        query_parts.append(str(clause))
+    sec = passage.get("section_label") or passage.get("section")
+    if sec and sec != clause:
+        query_parts.append(str(sec))
+    if jurisdiction and jurisdiction != "INTERNAL_SYNTHETIC":
+        query_parts.append(jurisdiction.replace("_", " "))
+
+    search_query = " ".join(p for p in query_parts if p).strip()
+    verification_url = f"https://www.google.com/search?q={urllib.parse.quote_plus(search_query)}"
+
+    return {
+        "source_url": source_url,
+        "verification_url": verification_url,
+        "source_name": source_name,
+        "content_origin": content_origin or "excerpt_of_original",
+        "is_internal": False,
+    }
 
 
 # ==============================================================================
@@ -301,15 +444,35 @@ class BaselineRAGPipeline:
             bm25_result = SearchResult()
         try:
             vector_result = self.qdrant.search(query, top_k=top_k, role=effective_role)
+        except ModelWeightsMissingError:
+            raise
         except Exception as exc:
             logger.warning("Vector retrieval failed (%s).", type(exc).__name__)
             vector_result = SearchResult()
+
+        kg_hits: list[dict[str, Any]] = []
+        if getattr(settings, "ENABLE_GRAPH_RAG", False):
+            try:
+                from src.retrieval.knowledge_graph import KnowledgeGraphStore
+                kg = KnowledgeGraphStore()
+                candidate_cids = kg.find_candidate_chunk_ids(query, role=role, limit=top_k)
+                pool = {
+                    h.get("chunk_id"): h
+                    for h in (bm25_result.hits + vector_result.hits)
+                    if h.get("chunk_id")
+                }
+                for cid in candidate_cids:
+                    if cid in pool:
+                        kg_hits.append(pool[cid])
+            except Exception as exc:
+                logger.debug("Graph RAG candidate lookup failed: %s", exc)
 
         fused = reciprocal_rank_fusion(
             bm25_result.hits,
             vector_result.hits,
             k=settings.RETRIEVAL_RRF_K,
             top_k=top_k,
+            extra_results=kg_hits if kg_hits else None,
         )
         stats = {
             "candidates_retrieved": len(bm25_result.hits) + len(vector_result.hits),
@@ -357,6 +520,33 @@ class BaselineRAGPipeline:
                 "</passage>"
             )
         return "\n\n".join(blocks)
+
+    def _invoke_generate(
+        self,
+        query: str,
+        passages: list[dict[str, Any]],
+        *,
+        session_id: str | None = None,
+        role: str | None = None,
+        response_mode: str = "compliance",
+        history: list[dict[str, str]] | None = None,
+    ) -> tuple[str, list[str], bool, float, dict[str, int]]:
+        """Call ``self.generate`` while preserving legacy monkeypatch signatures."""
+        kwargs: dict[str, Any] = {
+            "session_id": session_id,
+            "role": role,
+            "response_mode": response_mode,
+            "history": history,
+        }
+        try:
+            sig = inspect.signature(self.generate)
+            if not any(
+                p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()
+            ):
+                kwargs = {k: v for k, v in kwargs.items() if k in sig.parameters}
+        except (TypeError, ValueError):
+            pass
+        return self.generate(query, passages, **kwargs)
 
     def generate(
         self,
@@ -459,6 +649,7 @@ class BaselineRAGPipeline:
             text = passage.get("text_content", "")
             verbatim = extract_verbatim_snippet(text)
             h_path = build_heading_path(passage)
+            vmeta = build_verification_metadata(passage)
             sources.append(
                 SourceChunk(
                     chunk_id=passage.get("chunk_id", ""),
@@ -471,6 +662,12 @@ class BaselineRAGPipeline:
                     score=float(passage.get("score", 0.0)),
                     snippet=verbatim,
                     quote_snippet=verbatim,
+                    source_url=vmeta.get("source_url"),
+                    verification_url=vmeta.get("verification_url"),
+                    source_name=vmeta.get("source_name"),
+                    content_origin=vmeta.get("content_origin"),
+                    is_internal=vmeta.get("is_internal", False),
+                    allowed_roles=[str(role) for role in (passage.get("allowed_roles") or [])],
                 )
             )
         return sources
@@ -616,7 +813,7 @@ class BaselineRAGPipeline:
 
             if grader_dec.refused:
                 # Uniform refusal — does not reveal whether restricted docs exist.
-                llm_cfg = settings.llm
+                llm_cfg = active_resolved_llm(getattr(self.llm, "_resolved_override", None))
                 step_timings = list(context.step_timings) + [grader_step_timing]
                 return BaselineRAGResponse(
                     query=query,
@@ -669,10 +866,11 @@ class BaselineRAGPipeline:
                 )
             final_passages = grader_dec.kept_passages
 
-        answer, cited_ids, cached, generation_ms, usage = self.generate(
+        answer, cited_ids, cached, generation_ms, usage = self._invoke_generate(
             query,
             final_passages,
             session_id=session_id,
+            role=normalized_role,
             response_mode=response_mode,
             history=history,
         )
@@ -691,7 +889,7 @@ class BaselineRAGPipeline:
                 else final_passages
             )
 
-        llm = settings.llm
+        llm = active_resolved_llm(getattr(self.llm, "_resolved_override", None))
         retrieval_stats = RetrievalStats(
             candidates_retrieved=context.candidates_retrieved,
             candidates_filtered_by_role=context.candidates_filtered_by_role,
@@ -866,10 +1064,11 @@ class BaselineRAGPipeline:
                 )
             effective_passages = grader_dec.kept_passages
 
-        answer, cited_ids, cached, generation_ms, usage = self.generate(
+        answer, cited_ids, cached, generation_ms, usage = self._invoke_generate(
             retrieval_query,
             effective_passages,
             session_id=session_id,
+            role=normalized_role,
             response_mode=response_mode,
             history=history,
         )
@@ -890,7 +1089,7 @@ class BaselineRAGPipeline:
             )
         sources = self._to_sources(source_passages)
 
-        llm = settings.llm
+        llm = active_resolved_llm(getattr(self.llm, "_resolved_override", None))
         retrieval_stats = RetrievalStats(
             candidates_retrieved=filter_stats["candidates_retrieved"],
             candidates_filtered_by_role=(

@@ -9,11 +9,15 @@ Credentials and full prompts are never written to logs.
 """
 
 import collections
+from collections.abc import Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
 import hashlib
 import json
 import logging
 import random
 import re
+import threading
 import time
 from datetime import datetime, timedelta, timezone
 from typing import Any, TypeVar
@@ -21,8 +25,8 @@ from typing import Any, TypeVar
 import httpx
 from pydantic import BaseModel
 
-from src.config import settings
-from src.core.spend_guard import SpendGuardExceededError, spend_guard
+from src.config import ResolvedLLM, settings
+from src.core.spend_guard import SpendGuard, SpendGuardExceededError, spend_guard
 from src.db.connection import get_db_connection
 from src.db.migrations import SCHEMA_DDL, apply_migrations
 from src.db.repository import Repository
@@ -32,6 +36,31 @@ T = TypeVar("T", bound=BaseModel)
 
 _SAFE_RETRY_STATUSES = {429, 500, 502, 503, 504}
 _SCHEMA_READY = False
+_SCHEMA_LOCK = threading.Lock()
+_RESOLVED_LLM_CTX: ContextVar[ResolvedLLM | None] = ContextVar(
+    "resolved_llm_override",
+    default=None,
+)
+
+
+def active_resolved_llm(override: ResolvedLLM | None = None) -> ResolvedLLM:
+    """Return request-scoped LLM override if active, else instance override or config."""
+    scoped = _RESOLVED_LLM_CTX.get()
+    if scoped is not None:
+        return scoped
+    if override is not None:
+        return override
+    return settings.llm
+
+
+@contextmanager
+def llm_profile_scope(resolved: ResolvedLLM) -> Iterator[ResolvedLLM]:
+    """Bind a request-local LLM profile override safely across FastAPI threads."""
+    token = _RESOLVED_LLM_CTX.set(resolved)
+    try:
+        yield resolved
+    finally:
+        _RESOLVED_LLM_CTX.reset(token)
 
 
 class LLMClientError(RuntimeError):
@@ -176,34 +205,34 @@ def parse_json_response(raw_text: str, schema: type[T]) -> T | None:
 
 
 class RateLimiter:
-    """In-memory sliding-window rate limiter enforcing max requests per minute."""
+    """Thread-safe in-memory sliding-window rate limiter enforcing max requests per minute."""
 
     def __init__(self, max_rpm: int = 20) -> None:
         self.max_rpm = max_rpm
         self.timestamps: collections.deque[float] = collections.deque()
+        self._lock = threading.Lock()
 
     def acquire(self) -> None:
-        """Block until a request slot is available, then reserve it."""
+        """Block until a request slot is available, then atomically reserve it."""
         if self.max_rpm <= 0:
             return
-        now = time.time()
-        while self.timestamps and now - self.timestamps[0] > 60.0:
-            self.timestamps.popleft()
-
-        if len(self.timestamps) >= self.max_rpm:
-            sleep_needed = 60.0 - (now - self.timestamps[0]) + 0.1
-            if sleep_needed > 0:
-                logger.info(
-                    "Rate limit reached (%s RPM); throttling for %.2fs.",
-                    self.max_rpm,
-                    sleep_needed,
-                )
-                time.sleep(sleep_needed)
+        while True:
+            sleep_needed = 0.0
+            with self._lock:
                 now = time.time()
                 while self.timestamps and now - self.timestamps[0] > 60.0:
                     self.timestamps.popleft()
+                if len(self.timestamps) < self.max_rpm:
+                    self.timestamps.append(now)
+                    return
+                sleep_needed = max(60.0 - (now - self.timestamps[0]) + 0.05, 0.05)
 
-        self.timestamps.append(time.time())
+            logger.info(
+                "Rate limit reached (%s RPM); throttling for %.2fs.",
+                self.max_rpm,
+                sleep_needed,
+            )
+            time.sleep(sleep_needed)
 
 
 def _ensure_schema() -> None:
@@ -211,13 +240,16 @@ def _ensure_schema() -> None:
     global _SCHEMA_READY
     if _SCHEMA_READY:
         return
-    try:
-        with get_db_connection() as conn:
-            conn.executescript(SCHEMA_DDL)
-            apply_migrations(conn)
-        _SCHEMA_READY = True
-    except Exception as exc:  # pragma: no cover - defensive path
-        logger.warning("Could not initialise LLM telemetry schema: %s", type(exc).__name__)
+    with _SCHEMA_LOCK:
+        if _SCHEMA_READY:
+            return
+        try:
+            with get_db_connection() as conn:
+                conn.executescript(SCHEMA_DDL)
+                apply_migrations(conn)
+            _SCHEMA_READY = True
+        except Exception as exc:  # pragma: no cover - defensive path
+            logger.warning("Could not initialise LLM telemetry schema: %s", type(exc).__name__)
 
 
 class ResilientLLMClient:
@@ -228,9 +260,17 @@ class ResilientLLMClient:
             provider responses without network access.
     """
 
-    def __init__(self, transport: httpx.BaseTransport | None = None) -> None:
+    def __init__(
+        self,
+        transport: httpx.BaseTransport | None = None,
+        *,
+        resolved_override: ResolvedLLM | None = None,
+        spend_guard_instance: SpendGuard | None = None,
+    ) -> None:
         self.rate_limiter = RateLimiter(max_rpm=settings.LLM_MAX_RPM)
         self.transport = transport
+        self._resolved_override = resolved_override
+        self._spend_guard_override = spend_guard_instance
 
     def _compute_cache_key(
         self,
@@ -243,9 +283,18 @@ class ResilientLLMClient:
         step: str,
     ) -> str:
         """Return the deterministic SHA-256 cache key for one request."""
-        key_raw = (
-            f"{profile}:{model}:{settings.PROMPT_VERSION}:{step}:"
-            f"{system_prompt or ''}:{prompt}:{temperature:.2f}:{max_tokens}"
+        key_raw = json.dumps(
+            [
+                profile,
+                model,
+                settings.PROMPT_VERSION,
+                step,
+                system_prompt or "",
+                prompt,
+                f"{temperature:.2f}",
+                max_tokens,
+            ],
+            separators=(",", ":"),
         )
         return hashlib.sha256(key_raw.encode("utf-8")).hexdigest()
 
@@ -279,7 +328,8 @@ class ResilientLLMClient:
         limited, retried only on 429/5xx/timeouts, and logged to ``llm_calls``.
         """
         _ensure_schema()
-        resolved = settings.llm
+        resolved = active_resolved_llm(self._resolved_override)
+        guard = self._spend_guard_override or spend_guard
         profile = resolved.profile
         model = resolved.model
         temp = temperature if temperature is not None else resolved.temperature
@@ -292,6 +342,10 @@ class ResilientLLMClient:
         if settings.LLM_CACHE_ENABLED and not force_cache_refresh:
             cached = self._read_cache(cache_key)
             if cached is not None:
+                guard.record_cache_hit(
+                    cached["prompt_tokens"],
+                    cached["completion_tokens"],
+                )
                 self._log_call(
                     profile=profile,
                     model=model,
@@ -314,13 +368,18 @@ class ResilientLLMClient:
                     profile=profile,
                 )
 
-        spend_guard.check_call_allowed()
-
         if profile == "mock" or resolved.is_mock:
             content = self._generate_mock_response(prompt)
             prompt_toks = max(len(prompt.split()), 1)
             completion_toks = max(len(content.split()), 1)
-            spend_guard.record_usage(prompt_toks, completion_toks)
+            guard.record_usage(
+                prompt_toks,
+                completion_toks,
+                profile="mock",
+                has_paid_quota=resolved.has_paid_quota,
+                is_local=resolved.is_local,
+            )
+            guard.record_latency(1.0)
             self._write_cache(cache_key, prompt_hash, model, content, prompt_toks, completion_toks)
             self._log_call(
                 profile=profile,
@@ -344,6 +403,12 @@ class ResilientLLMClient:
                 profile=profile,
             )
 
+        # Single consumption point for config-driven paid-quota / local-safety flags.
+        guard.reserve_call(
+            profile=profile,
+            has_paid_quota=resolved.has_paid_quota,
+            is_local=resolved.is_local,
+        )
         self.rate_limiter.acquire()
         start_time = time.perf_counter()
         try:
@@ -355,6 +420,11 @@ class ResilientLLMClient:
                 max_tokens=max_tokens,
             )
         except LLMClientError as exc:
+            guard.release_call(
+                profile=profile,
+                has_paid_quota=resolved.has_paid_quota,
+                is_local=resolved.is_local,
+            )
             self._log_call(
                 profile=profile,
                 model=model,
@@ -371,7 +441,14 @@ class ResilientLLMClient:
             raise
 
         latency_ms = (time.perf_counter() - start_time) * 1000.0
-        spend_guard.record_usage(prompt_toks, completion_toks)
+        guard.commit_usage(
+            prompt_toks,
+            completion_toks,
+            profile=profile,
+            has_paid_quota=resolved.has_paid_quota,
+            is_local=resolved.is_local,
+        )
+        guard.record_latency(latency_ms)
         self._write_cache(cache_key, prompt_hash, model, content, prompt_toks, completion_toks)
         self._log_call(
             profile=profile,
@@ -422,7 +499,7 @@ class ResilientLLMClient:
         prompt_tokens: int,
         completion_tokens: int,
     ) -> None:
-        if not settings.LLM_CACHE_ENABLED:
+        if not settings.LLM_CACHE_ENABLED or not content or not str(content).strip():
             return
         try:
             with get_db_connection() as conn:
@@ -436,6 +513,16 @@ class ResilientLLMClient:
                 )
         except Exception as exc:
             logger.warning("LLM cache write failed (%s); response was still returned.", type(exc).__name__)
+
+    def _delete_cache(self, cache_key: str) -> None:
+        """Remove a malformed cached completion so invalid JSON is not re-served."""
+        if not settings.LLM_CACHE_ENABLED:
+            return
+        try:
+            with get_db_connection() as conn:
+                Repository(conn).delete_cached_llm(cache_key)
+        except Exception as exc:
+            logger.debug("LLM cache delete failed (%s).", type(exc).__name__)
 
     def _log_call(
         self,
@@ -532,7 +619,12 @@ class ResilientLLMClient:
                             headers=headers,
                             json=payload,
                         )
-                except (httpx.TimeoutException, httpx.ConnectError, httpx.RemoteProtocolError) as exc:
+                except (
+                    httpx.TimeoutException,
+                    httpx.ConnectError,
+                    httpx.RemoteProtocolError,
+                    httpx.TransportError,
+                ) as exc:
                     last_failure = type(exc).__name__
                     logger.warning(
                         "LLM %s provider network failure (%s), attempt %s/%s.",
@@ -628,6 +720,18 @@ class ResilientLLMClient:
         if parsed is not None:
             return parsed
 
+        resolved = active_resolved_llm(self._resolved_override)
+        self._delete_cache(
+            self._compute_cache_key(
+                resolved.profile,
+                resolved.model,
+                full_prompt,
+                system_prompt,
+                0.0,
+                1024,
+                step,
+            )
+        )
         logger.warning("LLM output failed schema %s; one repair retry will run.", schema.__name__)
         repair_prompt = (
             f"Your previous response was invalid for the requested JSON schema.\n"
@@ -639,12 +743,25 @@ class ResilientLLMClient:
             prompt=repair_prompt,
             system_prompt=system_prompt,
             temperature=0.0,
+            force_cache_refresh=True,
             step=step,
             session_id=session_id,
         )
         parsed_repair = parse_json_response(repaired.content, schema)
         if parsed_repair is not None:
             return parsed_repair
+
+        self._delete_cache(
+            self._compute_cache_key(
+                resolved.profile,
+                resolved.model,
+                repair_prompt,
+                system_prompt,
+                0.0,
+                1024,
+                step,
+            )
+        )
 
         if fallback is not None:
             logger.warning(
@@ -715,6 +832,8 @@ __all__ = [
     "RateLimiter",
     "ResilientLLMClient",
     "SpendGuardExceededError",
+    "active_resolved_llm",
     "llm_client",
+    "llm_profile_scope",
     "parse_json_response",
 ]

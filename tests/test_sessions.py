@@ -1,5 +1,6 @@
 """Session ownership (IDOR) and chat/session API contract tests."""
 
+import json
 import uuid
 
 from fastapi.testclient import TestClient
@@ -21,6 +22,9 @@ def test_session_endpoints_require_authentication() -> None:
     assert client.post("/api/v1/sessions", json={}).status_code == 401
     assert client.get(f"/api/v1/sessions/{uuid.uuid4()}/messages").status_code == 401
     assert client.delete(f"/api/v1/sessions/{uuid.uuid4()}").status_code == 401
+    assert client.patch(
+        f"/api/v1/sessions/{uuid.uuid4()}", json={"title": "Renamed"}
+    ).status_code == 401
 
 
 def test_create_and_list_only_own_sessions(auth_headers) -> None:
@@ -79,6 +83,18 @@ def test_chat_persists_turns_with_role_and_metadata(auth_headers) -> None:
     assert messages[1]["route_used"] == "SINGLE_SEARCH"
     assert isinstance(messages[1]["metadata"]["chunk_ids"], list)
     assert messages[1]["metadata"]["cached"] is not None
+    # Reload parity: the owner can re-render citations, grounding and trace
+    # without calling the audit endpoint.
+    assert messages[1]["metadata"]["citations"] == body["citations"]
+    assert messages[1]["metadata"]["reasoning_trace"] == body["reasoning_trace"]
+    assert messages[1]["metadata"]["grounded"] == body["grounded"]
+    assert messages[1]["metadata"]["response_type"] == body["response_type"]
+    assert messages[1]["metadata"]["refusal_category"] == body["refusal_category"]
+    assert (
+        messages[1]["metadata"]["suggested_follow_ups"]
+        == body["suggested_follow_ups"]
+    )
+    assert "system_prompt" not in json.dumps(messages[1]["metadata"]).lower()
 
 
 def test_idor_cannot_read_or_delete_another_users_session(auth_headers) -> None:
@@ -124,7 +140,6 @@ def test_invalid_session_uuid_is_rejected(auth_headers) -> None:
 def test_delete_own_session_cascades_messages(auth_headers) -> None:
     headers = auth_headers("analyst")
     session_id = _create_session(headers, "Temporary session")
-
     assert client.post(
         "/api/v1/chat/query",
         json={"session_id": session_id, "query": "What are the CDD rules?"},
@@ -153,3 +168,53 @@ def test_chat_rejects_blank_query(auth_headers) -> None:
     )
     assert response.status_code == 400
     assert response.json()["error"]["code"] == "EMPTY_QUERY"
+
+
+def test_rename_session_is_owner_scoped(auth_headers) -> None:
+    owner = auth_headers("manager")
+    other = auth_headers("auditor")
+    session_id = _create_session(owner, "Draft escalation review")
+
+    renamed = client.patch(
+        f"/api/v1/sessions/{session_id}",
+        json={"title": "  Escalation runbook  "},
+        headers=owner,
+    )
+    assert renamed.status_code == 200
+    assert renamed.json()["id"] == session_id
+    assert renamed.json()["title"] == "Escalation runbook"
+
+    foreign = client.patch(
+        f"/api/v1/sessions/{session_id}",
+        json={"title": "Hijacked"},
+        headers=other,
+    )
+    assert foreign.status_code == 404
+    assert foreign.json()["error"]["code"] == "SESSION_NOT_FOUND"
+
+    # The original owner's title is unchanged by the failed foreign attempt.
+    listing = client.get("/api/v1/sessions", headers=owner).json()["sessions"]
+    assert next(item for item in listing if item["id"] == session_id)["title"] == (
+        "Escalation runbook"
+    )
+
+
+def test_rename_session_rejects_blank_and_overlong_titles(auth_headers) -> None:
+    headers = auth_headers("analyst")
+    session_id = _create_session(headers)
+
+    blank = client.patch(
+        f"/api/v1/sessions/{session_id}",
+        json={"title": "   "},
+        headers=headers,
+    )
+    assert blank.status_code == 400
+    assert blank.json()["error"]["code"] == "EMPTY_TITLE"
+
+    too_long = client.patch(
+        f"/api/v1/sessions/{session_id}",
+        json={"title": "x" * 121},
+        headers=headers,
+    )
+    assert too_long.status_code == 422
+    assert too_long.json()["error"]["code"] == "VALIDATION_ERROR"

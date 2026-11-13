@@ -181,6 +181,21 @@ class Repository:
         )
         return cur.rowcount > 0
 
+    def rename_session_for_user(self, session_id: str, user_id: int, title: str) -> sqlite3.Row | None:
+        """Rename a session owned by ``user_id``; return the updated row or None."""
+        cur = self.conn.cursor()
+        cur.execute(
+            """
+            UPDATE sessions
+            SET title = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ? AND user_id = ?;
+            """,
+            (title, session_id, user_id),
+        )
+        if cur.rowcount == 0:
+            return None
+        return self.get_session_for_user(session_id, user_id)
+
 
     # --------------------------------------------------------------------------
     # Messages (Memory Layer)
@@ -370,6 +385,9 @@ class Repository:
         limit: int = 50,
         user_id: int | None = None,
         start_date: str | None = None,
+        route: str | None = None,
+        user_role: str | None = None,
+        offset: int = 0,
     ) -> list[sqlite3.Row]:
         """Return newest-first audit rows, optionally filtered.
 
@@ -382,10 +400,23 @@ class Repository:
             SELECT * FROM audit_log
             WHERE (? IS NULL OR user_id = ?)
               AND (? IS NULL OR created_at >= ?)
-            ORDER BY created_at DESC
-            LIMIT ?;
+              AND (? IS NULL OR final_route = ?)
+              AND (? IS NULL OR user_role = ?)
+            ORDER BY created_at DESC, id DESC
+            LIMIT ? OFFSET ?;
             """,
-            (user_id, user_id, start_date, start_date, limit),
+            (
+                user_id,
+                user_id,
+                start_date,
+                start_date,
+                route,
+                route,
+                user_role,
+                user_role,
+                limit,
+                max(int(offset), 0),
+            ),
         )
         return cur.fetchall()
 
@@ -437,6 +468,11 @@ class Repository:
         cur = self.conn.cursor()
         cur.execute("SELECT * FROM llm_cache WHERE cache_key = ?;", (cache_key,))
         return cur.fetchone()
+
+    def delete_cached_llm(self, cache_key: str) -> None:
+        """Delete one invalidated or malformed cache entry."""
+        cur = self.conn.cursor()
+        cur.execute("DELETE FROM llm_cache WHERE cache_key = ?;", (cache_key,))
 
     def set_cached_llm(
         self,
@@ -600,4 +636,56 @@ class Repository:
                 "cache_hits": row["cache_hits"],
             }
         return {"total_calls": 0, "total_tokens": 0, "cache_hits": 0}
+
+    def get_system_metrics(self) -> dict[str, Any]:
+        """Return aggregated non-sensitive operational metrics and recent latency samples."""
+        cur = self.conn.cursor()
+        cur.execute(
+            """
+            SELECT
+                COUNT(*) AS total_calls,
+                COALESCE(SUM(CASE WHEN cache_hit = 1 THEN 1 ELSE 0 END), 0) AS cached_calls,
+                COALESCE(SUM(CASE WHEN call_status = 'error' THEN 1 ELSE 0 END), 0) AS error_calls,
+                COALESCE(SUM(prompt_tokens), 0) AS prompt_tokens,
+                COALESCE(SUM(completion_tokens), 0) AS completion_tokens,
+                COALESCE(SUM(total_tokens), 0) AS total_tokens
+            FROM llm_calls;
+            """
+        )
+        llm_row = cur.fetchone()
+
+        cur.execute(
+            """
+            SELECT
+                COUNT(*) AS total_turns,
+                COALESCE(SUM(candidates_filtered), 0) AS total_role_filtered,
+                COALESCE(SUM(citations_dropped), 0) AS total_citations_dropped
+            FROM audit_log;
+            """
+        )
+        audit_row = cur.fetchone()
+
+        cur.execute(
+            """
+            SELECT latency_ms
+            FROM audit_log
+            WHERE latency_ms IS NOT NULL
+            ORDER BY id DESC
+            LIMIT 1000;
+            """
+        )
+        latencies = [float(r["latency_ms"]) for r in cur.fetchall() if r["latency_ms"] is not None]
+
+        return {
+            "total_calls": int(llm_row["total_calls"] or 0) if llm_row else 0,
+            "cached_calls": int(llm_row["cached_calls"] or 0) if llm_row else 0,
+            "error_calls": int(llm_row["error_calls"] or 0) if llm_row else 0,
+            "prompt_tokens": int(llm_row["prompt_tokens"] or 0) if llm_row else 0,
+            "completion_tokens": int(llm_row["completion_tokens"] or 0) if llm_row else 0,
+            "total_tokens": int(llm_row["total_tokens"] or 0) if llm_row else 0,
+            "total_turns": int(audit_row["total_turns"] or 0) if audit_row else 0,
+            "total_role_filtered": int(audit_row["total_role_filtered"] or 0) if audit_row else 0,
+            "total_citations_dropped": int(audit_row["total_citations_dropped"] or 0) if audit_row else 0,
+            "latencies": latencies,
+        }
 

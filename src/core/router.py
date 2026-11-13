@@ -33,6 +33,11 @@ logger = logging.getLogger(__name__)
 DIRECT = "direct"
 SINGLE_SEARCH = "single_search"
 SPLIT = "split"
+INTENT_GENERAL_CHAT = "general_chat"
+INTENT_SYSTEM_INFO = "system_info"
+INTENT_UNSAFE = "unsafe"
+INTENT_INJECTION = "injection"
+INTENT_CORPUS_RAG = "corpus_rag"
 
 # Canonical API / audit names. The LLM-facing JSON stays lowercase so the prompt
 # and the Pydantic schema agree, while the frozen API/DB vocabulary is preserved.
@@ -40,6 +45,7 @@ ROUTE_API_NAMES: dict[str, str] = {
     DIRECT: "DIRECT_REPLY",
     SINGLE_SEARCH: "SINGLE_SEARCH",
     SPLIT: "MULTI_PART_SPLIT",
+    INTENT_GENERAL_CHAT: "GENERAL_CHAT",
 }
 
 MAX_SUB_QUESTION_CHARS = 400
@@ -57,23 +63,45 @@ DIRECT_REPLIES: dict[str, str] = {
     ),
     "capability": (
         "I search the regulatory and internal policy documents available to your "
-        "role and answer with clause-level citations. I do not answer from general "
-        "knowledge, so I cannot help with topics outside that corpus."
+        "role and answer with clause-level citations. I can also assist with general "
+        "AI knowledge queries or system configuration."
     ),
     "out_of_scope": (
-        "That request is outside the scope of this assistant. I only answer "
-        "questions about the banking regulatory and internal policy documents "
-        "available to your role."
+        "That request is outside the scope of banking compliance documents. "
+        "You can switch to 'General Chat' mode for open-domain questions."
     ),
     "unsafe": (
         "I can't help with that. I only answer compliance questions grounded in "
         "the documents available to your role."
+    ),
+    "injection": (
+        "I cannot comply with that request. I operate under strict enterprise security rules "
+        "and only answer compliance questions grounded in the regulatory documents permitted for your role."
     ),
     "clarification": (
         "Please ask a specific compliance question, for example about KYC/CDD "
         "requirements, anti-money-laundering rules, or Basel capital ratios."
     ),
 }
+
+
+def format_system_info(role: str = "analyst") -> str:
+    """Return safe, config-derived assistant environment status (never exposes keys or paths)."""
+    from src.core.llm_client import active_resolved_llm
+
+    resolved = active_resolved_llm()
+    return (
+        f"**Enterprise Regulatory Compliance Assistant** (Version 0.3.0)\n\n"
+        f"- **LLM Profile**: `{resolved.profile}` (Model: `{resolved.model}`)\n"
+        f"- **Embeddings**: `{settings.EMBEDDING_MODEL_NAME}` (Local CPU, 384 dimensions)\n"
+        f"- **Re-ranker**: `{settings.RERANKER_MODEL_NAME}` (Local CPU cross-encoder)\n"
+        f"- **Vector & Lexical Engines**: Embedded Qdrant (Cosine) + BM25Plus\n"
+        f"- **Access Control (RBAC)**: Active server-side payload filtering (Current session role: `{role}`)\n"
+        f"- **Knowledge Graph**: SQLite-backed cross-reference graph active\n\n"
+        f"*Security Guarantee: Chunks outside your role never enter LLM context (strictly 0.00% leakage). "
+        f"No API keys, host credentials, or restricted documents are ever exposed.*"
+    )
+
 
 _GREETING_RE = re.compile(
     r"^(?:hi|hello|hey|hiya|good\s+(?:morning|afternoon|evening)|greetings)"
@@ -106,6 +134,54 @@ _UNSAFE_PATTERNS: tuple[re.Pattern[str], ...] = (
     ),
     re.compile(r"\bget away with (?:money laundering|fraud|tax evasion)\b", re.IGNORECASE),
 )
+
+_INJECTION_PATTERNS: tuple[re.Pattern[str], ...] = (
+    re.compile(
+        r"\b(?:ignore\s+(?:all\s+)?(?:previous|prior)\s+instructions|system\s+prompt|jailbreak|disregard\s+(?:all\s+)?(?:rules|instructions))\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\b(?:bypass\s+(?:rbac|security|role|filter)|override\s+(?:all\s+)?instructions|reveal\s+(?:all\s+)?documents)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\b(?:you\s+are\s+now\s+dan|developer\s+mode\s+enabled|reveal\s+(?:the\s+)?system\s+prompt)\b",
+        re.IGNORECASE,
+    ),
+)
+
+_SYSTEM_INFO_PATTERNS: tuple[re.Pattern[str], ...] = (
+    re.compile(
+        r"\b(?:which|what)\s+(?:(?:llm|language)\s+)?(?:model|profile)\b(?:\s+(?:are\s+you\s+using|is\s+(?:active|running|configured|loaded)))?",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\b(?:what\s+profile|current\s+model|system\s+info|system\s+status|which\s+model\s+version|llm\s+profile)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(r"^(?:system\s+information|system\s+info|model\s+info)\??$", re.IGNORECASE),
+)
+
+_GENERAL_CHAT_PATTERNS: tuple[re.Pattern[str], ...] = (
+    re.compile(r"\b(?:weather|forecast|rain|temperature|climate)\b", re.IGNORECASE),
+    re.compile(
+        r"\b(?:reinforcement\s+learning|q-learning|policy\s+gradient|actor-critic|deep\s+learning|neural\s+network|gradient\s+descent)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\b(?:recipe|cooking|poem|poetry|joke|humor|movie|song\s+lyrics|story|write\s+a\s+haiku)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\b(?:who\s+won\s+the\s+world\s+cup|capital\s+of\s+[a-z]+|tell\s+me\s+about\s+(?:paris|mars|einstein|quantum))\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\b(?:how\s+to\s+code\s+in\s+python|write\s+(?:a\s+)?(?:[a-z]+\s+)?(?:function|script|code|program|algorithm)|quicksort|quick\s+sort|mergesort|merge\s+sort|bubble\s+sort|binary\s+search|in\s+python)\b",
+        re.IGNORECASE,
+    ),
+)
+
 _OUT_OF_SCOPE_RE = re.compile(
     r"\b(?:weather|football|soccer|basketball|world cup|recipe|poem|joke|horoscope|"
     r"movie|song lyrics|translate this|stock tip|bitcoin price|crypto price|"
@@ -123,7 +199,7 @@ class RouterOutput(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    route: Literal["direct", "single_search", "split"]
+    route: Literal["direct", "single_search", "split", "general_chat"]
     sub_questions: list[str] = Field(default_factory=list, max_length=6)
     confidence: float = Field(ge=0.0, le=1.0)
 
@@ -155,11 +231,14 @@ class RouteDecision:
     tokens_used: int = 0
     source: str = "llm"
     extra_notes: tuple[str, ...] = field(default_factory=tuple)
+    intent: str = "corpus_rag"
+    response_type: str = "rag"
+    grounded: bool = True
 
     @property
     def api_route(self) -> str:
         """Return the frozen API/audit route name."""
-        return ROUTE_API_NAMES[self.route]
+        return ROUTE_API_NAMES.get(self.route, self.route.upper())
 
 
 def sanitize_question(question: str) -> str:
@@ -168,16 +247,25 @@ def sanitize_question(question: str) -> str:
 
 
 def _direct_decision(category: str, source: str) -> RouteDecision:
+    if category == "injection":
+        intent = INTENT_INJECTION
+    elif category == "unsafe":
+        intent = INTENT_UNSAFE
+    else:
+        intent = "direct"
     return RouteDecision(
         route=DIRECT,
         confidence=1.0 if source == "rule" else None,
         direct_category=category,
-        direct_reply=DIRECT_REPLIES[category],
+        direct_reply=DIRECT_REPLIES.get(category, DIRECT_REPLIES["out_of_scope"]),
         source=source,
+        intent=intent,
+        response_type="direct",
+        grounded=False,
     )
 
 
-def rule_precheck(question: str) -> RouteDecision | None:
+def rule_precheck(question: str, role: str = "analyst") -> RouteDecision | None:
     """Cheap deterministic classification for obvious cases.
 
     Returns ``None`` when the question needs the LLM classifier. A greeting or
@@ -185,6 +273,19 @@ def rule_precheck(question: str) -> RouteDecision | None:
     is still classified and retrieved normally.
     """
     text = question.strip()
+    if any(pattern.search(text) for pattern in _INJECTION_PATTERNS):
+        return _direct_decision("injection", "rule")
+    if any(pattern.search(text) for pattern in _SYSTEM_INFO_PATTERNS):
+        return RouteDecision(
+            route=DIRECT,
+            confidence=1.0,
+            direct_category="system_info",
+            direct_reply=format_system_info(role),
+            source="rule",
+            intent="system_info",
+            response_type="system_info",
+            grounded=False,
+        )
     if _GREETING_RE.match(text):
         return _direct_decision("greeting", "rule")
     if _THANKS_RE.match(text):
@@ -195,8 +296,24 @@ def rule_precheck(question: str) -> RouteDecision | None:
         return _direct_decision("clarification", "rule")
     if any(pattern.search(text) for pattern in _UNSAFE_PATTERNS):
         return _direct_decision("unsafe", "rule")
+    if any(pattern.search(text) for pattern in _GENERAL_CHAT_PATTERNS):
+        return RouteDecision(
+            route=INTENT_GENERAL_CHAT,
+            confidence=1.0,
+            source="rule",
+            intent="general_chat",
+            response_type="general_chat",
+            grounded=False,
+        )
     if _OUT_OF_SCOPE_RE.search(text):
-        return _direct_decision("out_of_scope", "rule")
+        return RouteDecision(
+            route=INTENT_GENERAL_CHAT,
+            confidence=1.0,
+            source="rule",
+            intent="general_chat",
+            response_type="general_chat",
+            grounded=False,
+        )
     return None
 
 
@@ -243,22 +360,49 @@ def classify_question(
     llm: ResilientLLMClient,
     question: str,
     session_id: str | None = None,
+    intent_mode: str = "auto",
+    user_role: str = "analyst",
 ) -> RouteDecision:
-    """Classify one question into ``direct``, ``single_search`` or ``split``.
+    """Classify one question into ``direct``, ``general_chat``, ``single_search`` or ``split``.
 
     Args:
         llm: The single LLM gateway (never a provider SDK).
         question: Standalone question produced by the memory step.
         session_id: Session identifier for per-call telemetry linkage.
+        intent_mode: "auto" (default), "rag" (force compliance docs), or "general" (force general chat).
+        user_role: Caller's authenticated role for config/system info display.
 
     Returns:
         A :class:`RouteDecision`. Any failure or ambiguity degrades to
         ``single_search``; this function never falls back to ``direct``.
     """
-    prechecked = rule_precheck(question)
+    # 1. Security Invariant: Injection & Unsafe pre-check always runs first
+    text = question.strip()
+    if any(pattern.search(text) for pattern in _INJECTION_PATTERNS):
+        return _direct_decision("injection", "rule")
+    if any(pattern.search(text) for pattern in _UNSAFE_PATTERNS):
+        return _direct_decision("unsafe", "rule")
+
+    # 2. Manual intent mode overrides
+    if intent_mode == "general":
+        return RouteDecision(
+            route=INTENT_GENERAL_CHAT,
+            confidence=1.0,
+            source="intent_mode",
+            intent="general_chat",
+            response_type="general_chat",
+            grounded=False,
+        )
+
+    # 3. Rule pre-check for obvious deterministic patterns
+    prechecked = rule_precheck(question, role=user_role)
     if prechecked is not None:
-        logger.debug("Router rule pre-check selected %s.", prechecked.route)
-        return prechecked
+        if intent_mode == "rag" and prechecked.route == INTENT_GENERAL_CHAT:
+            # When user forces Company Docs, don't auto-divert to general chat
+            pass
+        else:
+            logger.debug("Router rule pre-check selected %s.", prechecked.route)
+            return prechecked
 
     prompt = load_prompt("router").format(
         question=sanitize_question(question),
@@ -287,7 +431,6 @@ def classify_question(
         )
 
     elapsed = (time.perf_counter() - start) * 1000.0
-    # Total tokens for the routing step, including a repair retry if one ran.
     tokens_used = max(spend_guard.tokens_count - tokens_before, 0)
     calls_used = max(spend_guard.calls_count - calls_before, 0)
 
@@ -314,6 +457,27 @@ def classify_question(
             tokens_used=tokens_used,
         )
 
+    if output.route == INTENT_GENERAL_CHAT:
+        if intent_mode == "rag":
+            return RouteDecision(
+                route=SINGLE_SEARCH,
+                confidence=output.confidence,
+                latency_ms=elapsed,
+                tokens_used=tokens_used,
+                extra_notes=(f"router_calls={calls_used}", "override_rag_mode"),
+            )
+        return RouteDecision(
+            route=INTENT_GENERAL_CHAT,
+            confidence=output.confidence,
+            latency_ms=elapsed,
+            tokens_used=tokens_used,
+            source="llm",
+            intent="general_chat",
+            response_type="general_chat",
+            grounded=False,
+            extra_notes=(f"router_calls={calls_used}",),
+        )
+
     if output.route == DIRECT:
         category = _direct_category_for(question)
         return RouteDecision(
@@ -323,6 +487,9 @@ def classify_question(
             direct_reply=DIRECT_REPLIES[category],
             latency_ms=elapsed,
             tokens_used=tokens_used,
+            intent=category,
+            response_type="direct",
+            grounded=False,
             extra_notes=(f"router_calls={calls_used}",),
         )
 
@@ -334,6 +501,9 @@ def classify_question(
             confidence=output.confidence,
             latency_ms=elapsed,
             tokens_used=tokens_used,
+            intent="corpus_rag",
+            response_type="rag",
+            grounded=True,
             extra_notes=(f"router_calls={calls_used}",),
         )
 
@@ -342,6 +512,9 @@ def classify_question(
         confidence=output.confidence,
         latency_ms=elapsed,
         tokens_used=tokens_used,
+        intent="corpus_rag",
+        response_type="rag",
+        grounded=True,
         extra_notes=(f"router_calls={calls_used}",),
     )
 
@@ -360,18 +533,27 @@ def router_metadata(decision: RouteDecision) -> dict[str, object]:
         "latency_ms": round(decision.latency_ms, 2),
         "tokens_used": decision.tokens_used,
         "notes": list(decision.extra_notes),
+        "intent": decision.intent,
+        "response_type": decision.response_type,
+        "grounded": decision.grounded,
     }
 
 
 __all__ = [
     "DIRECT",
     "DIRECT_REPLIES",
+    "INTENT_CORPUS_RAG",
+    "INTENT_GENERAL_CHAT",
+    "INTENT_INJECTION",
+    "INTENT_SYSTEM_INFO",
+    "INTENT_UNSAFE",
     "ROUTE_API_NAMES",
     "SINGLE_SEARCH",
     "SPLIT",
     "RouteDecision",
     "RouterOutput",
     "classify_question",
+    "format_system_info",
     "router_metadata",
     "rule_precheck",
     "sanitize_question",

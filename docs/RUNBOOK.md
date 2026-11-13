@@ -64,14 +64,26 @@ On the login screen, click one of the 1-click synthetic accounts:
 - **Manager Tier** (`manager_user`): Permitted to public regulations PLUS internal policies (e.g. `POL-042`).
 - **Auditor Tier** (`auditor_user`): Complete access including confidential audit findings (`AUD-2025-01`), plus exclusive access to the **Auditor Compliance & RBAC Summary View**.
 
-### 3.2 Response Modes
+### 3.2 Knowledge Scope & Intent Routing
+- **⚡ Auto (Smart Intent):** Automatically detects whether an inquiry relates to banking regulations, system configuration, or general open knowledge. Neutralizes adversarial prompt injections deterministically with zero retrieval.
+- **🏛️ Company Docs (RAG):** Strictly forces hybrid retrieval (Qdrant vector + BM25 keyword + Knowledge Graph cross-references) across authorized compliance documents under server-side RBAC filters with clause citations.
+- **🌐 General Chat:** Direct conversational LLM response for open-domain concepts (machine learning, coding, business definitions, weather). Displayed with a clear visual notice: *(Note: Answered from general AI knowledge, not grounded in company documents.)* and zero citation clutter.
+
+### 3.3 Response Styles
 - **🛡️ Strict Compliance:** Generates concise, formal compliance answers with strict statutory grounding and clause citations.
 - **💬 Explain & Discuss:** Conversational AI overview style designed for policy comprehension. Translates dense clauses into plain language, explains rationale, and supports conversational follow-up questions while strictly preserving grounding and server-side RBAC filters.
 
-### 3.3 Collapsed Citations & Reasoning Trace
+### 3.4 Collapsed Citations & Reasoning Trace
 Citations are grouped cleanly beneath each assistant response under:
 `Sources & citations (N)` (collapsed by default).
-Clicking the expander reveals full heading paths, clause identifiers, page numbers, and verbatim source snippets.
+Clicking the expander reveals full heading paths, clause identifiers, page numbers, and verbatim source snippets. For non-grounded general chat and system info responses, source expanders and traces are completely hidden.
+
+### 3.5 Dynamic Document Ingestion (Role-Gated)
+Authenticated users in authorized roles (Manager & Auditor) can dynamically upload regulatory documents (`.md`, `.txt`, `.pdf`, `.html`) from the Streamlit sidebar or API (`POST /api/v1/documents/upload`):
+- Automatically parsed with `DocumentLoader` and chunked with `ClauseAwareChunker`.
+- Indexed into Qdrant embedded vector store and BM25 index with assigned `allowed_roles` payload.
+- Registered in SQLite metadata table.
+- Immediately available for retrieval in the active or new sessions without server restart.
 
 ---
 
@@ -89,3 +101,4 @@ $env:HF_HUB_OFFLINE="1"
 # 3. Streamlit UI automated test suite:
 .\.venv\Scripts\python.exe -m pytest tests/test_ui_app.py -v
 ```
+

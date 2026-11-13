@@ -25,6 +25,8 @@ class LoadedDocument:
     doc_type: str = "REGULATION"
     jurisdiction: str = "UK_FCA"
     version: str = "1.0"
+    source_url: str | None = None
+    content_origin: str = "original_text"
 
 
 def _extract_header_metadata(text: str) -> dict[str, Any]:
@@ -133,6 +135,9 @@ class DocumentLoader:
         allowed_roles = meta.get("allowed_roles", ["analyst", "manager", "auditor"])
         jurisdiction = meta.get("jurisdiction", "UK_FCA")
         version = str(meta.get("version", "1.0"))
+        raw_source = meta.get("source") or meta.get("source_url")
+        source_url = str(raw_source) if (raw_source and str(raw_source).startswith(("http://", "https://"))) else None
+        content_origin = str(meta.get("content_origin", "original_text"))
 
         return LoadedDocument(
             file_path=str(path),
@@ -143,6 +148,8 @@ class DocumentLoader:
             doc_type=_doc_type_from_metadata(meta),
             jurisdiction=jurisdiction,
             version=version,
+            source_url=source_url,
+            content_origin=content_origin,
         )
 
     @classmethod
@@ -168,6 +175,9 @@ class DocumentLoader:
         doc_id = meta.get("doc_id", f"DOC-{path.stem.upper()}")
         title = meta.get("title", path.stem.replace("-", " ").title())
         allowed_roles = meta.get("allowed_roles", ["analyst", "manager", "auditor"])
+        raw_source = meta.get("source") or meta.get("source_url")
+        source_url = str(raw_source) if (raw_source and str(raw_source).startswith(("http://", "https://"))) else None
+        content_origin = str(meta.get("content_origin", "original_text"))
 
         return LoadedDocument(
             file_path=str(path),
@@ -178,6 +188,8 @@ class DocumentLoader:
             doc_type=_doc_type_from_metadata(meta),
             jurisdiction=meta.get("jurisdiction", "UK_FCA"),
             version=str(meta.get("version", "1.0")),
+            source_url=source_url,
+            content_origin=content_origin,
         )
 
     @classmethod
@@ -210,6 +222,9 @@ class DocumentLoader:
         )
         doc_id = meta.get("doc_id", f"DOC-{path.stem.upper()}")
         allowed_roles = meta.get("allowed_roles", ["analyst", "manager", "auditor"])
+        raw_source = meta.get("source") or meta.get("source_url")
+        source_url = str(raw_source) if (raw_source and str(raw_source).startswith(("http://", "https://"))) else None
+        content_origin = str(meta.get("content_origin", "original_text"))
 
         return LoadedDocument(
             file_path=str(path),
@@ -220,5 +235,7 @@ class DocumentLoader:
             doc_type=_doc_type_from_metadata(meta),
             jurisdiction=meta.get("jurisdiction", "UK_FCA"),
             version=str(meta.get("version", "1.0")),
+            source_url=source_url,
+            content_origin=content_origin,
         )
 

@@ -221,15 +221,33 @@ def test_complete_json_raises_without_fallback(monkeypatch: pytest.MonkeyPatch) 
 
 
 def test_client_spend_guard_stops_before_second_call(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Verify the wrapper refuses calls once the per-run call budget is exhausted."""
+    """Verify the wrapper refuses paid-profile calls once the per-run call budget is exhausted."""
+    import httpx
     import src.core.llm_client as llm_module
+    from src.config import ResolvedLLM
 
     guard = SpendGuard(max_calls=1, max_tokens=10_000)
     monkeypatch.setattr(llm_module, "spend_guard", guard)
-    client = ResilientLLMClient()
+    paid_resolved = ResolvedLLM(
+        profile="demo",
+        model="gpt-4o-mini",
+        base_url="https://api.openai.com/v1",
+        api_key="sk-test-demo",
+        is_mock=False,
+    )
+    transport = httpx.MockTransport(
+        lambda request: httpx.Response(
+            200,
+            json={
+                "choices": [{"message": {"content": "Paid response 1."}}],
+                "usage": {"prompt_tokens": 12, "completion_tokens": 6},
+            },
+        )
+    )
+    client = ResilientLLMClient(transport=transport, resolved_override=paid_resolved)
 
     first = client.complete(prompt="spend guard first prompt", force_cache_refresh=True)
-    assert first.content
+    assert first.content == "Paid response 1."
 
     with pytest.raises(SpendGuardExceededError, match="Spend guard cap exceeded"):
         client.complete(prompt="spend guard second prompt", force_cache_refresh=True)
@@ -247,4 +265,84 @@ def test_no_api_keys_leaked_in_logs(caplog: pytest.LogCaptureFixture) -> None:
         assert secret_key not in record.getMessage()
         assert "Bearer" not in record.getMessage()
         assert "gsk_" not in record.getMessage()
+
+
+def test_rate_limiter_is_thread_safe() -> None:
+    """Concurrent threads acquiring slots must not race or corrupt deque state."""
+    import concurrent.futures
+    from src.core.llm_client import RateLimiter
+
+    limiter = RateLimiter(max_rpm=200)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
+        futures = [pool.submit(limiter.acquire) for _ in range(32)]
+        for fut in futures:
+            fut.result()
+    assert len(limiter.timestamps) == 32
+
+
+def test_complete_json_prevents_cache_poisoning(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Malformed JSON outputs must never remain persisted in llm_cache."""
+    client = ResilientLLMClient()
+    prompt = "Prevent cache poisoning prompt 987654"
+    monkeypatch.setattr(client, "_generate_mock_response", lambda p: "invalid json output")
+
+    with pytest.raises(LLMClientError):
+        client.complete_json(prompt=prompt, schema=SampleSchema, step="router")
+
+    resolved = SimpleNamespace(
+        profile="mock",
+        model="mock-deterministic",
+    )
+    key = client._compute_cache_key(
+        resolved.profile,
+        resolved.model,
+        prompt
+        + '\n\nOUTPUT INSTRUCTION: Respond ONLY with a valid JSON object matching this schema:\n```json\n'
+        + __import__("json").dumps(SampleSchema.model_json_schema(), indent=2)
+        + "\n```\nDo not include explanation or text outside the JSON object.",
+        None,
+        0.0,
+        1024,
+        "router",
+    )
+    with get_db_connection() as conn:
+        row = conn.execute("SELECT * FROM llm_cache WHERE cache_key = ?;", (key,)).fetchone()
+    assert row is None
+
+
+def test_cache_hit_records_saved_tokens_without_paid_spend() -> None:
+    """Cache hits increment per-run cache savings without consuming paid quota."""
+    guard = SpendGuard(max_calls=1, max_tokens=5000)
+    client = ResilientLLMClient(spend_guard_instance=guard)
+    with guard.run_scope("cache-savings-run", profile="mock", has_paid_quota=False, is_local=True):
+        first = client.complete(prompt="Unique savings prompt 112233", force_cache_refresh=True)
+        second = client.complete(prompt="Unique savings prompt 112233")
+        snap = guard.status(profile="mock", has_paid_quota=False, is_local=True)
+    assert first.cached is False
+    assert second.cached is True
+    assert snap.cached_calls == 1
+    assert snap.saved_tokens == second.total_tokens
+    assert snap.paid_calls == 0
+
+
+def test_offline_missing_weights_raise_actionable_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Missing offline HF model weights fail at load time with an actionable message."""
+    import sentence_transformers
+    from src.ingestion.embeddings import LocalCPUEmbeddings, ModelWeightsMissingError
+    from src.rag.baseline import CrossEncoderReranker
+
+    def boom(*args, **kwargs):
+        raise OSError("LocalEntryNotFoundError: not in local cache")
+
+    monkeypatch.setattr(sentence_transformers, "SentenceTransformer", boom)
+    monkeypatch.setattr(sentence_transformers, "CrossEncoder", boom)
+
+    embedder = LocalCPUEmbeddings(model_name="nonexistent/offline-model")
+    with pytest.raises(ModelWeightsMissingError, match="offline mode"):
+        embedder.embed_query("test")
+
+    reranker = CrossEncoderReranker(model_name="nonexistent/offline-reranker")
+    with pytest.raises(ModelWeightsMissingError, match="offline mode"):
+        reranker.rerank("q", [{"chunk_id": "1", "text_content": "a"}, {"chunk_id": "2", "text_content": "b"}])
+
 

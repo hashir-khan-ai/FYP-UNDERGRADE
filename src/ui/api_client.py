@@ -7,6 +7,7 @@ by the server from the bearer token.
 """
 
 from dataclasses import dataclass
+import json
 from typing import Any
 
 import httpx
@@ -119,6 +120,8 @@ class ComplianceAPIClient:
         *,
         token: str | None = None,
         json_body: dict[str, Any] | None = None,
+        data: dict[str, Any] | None = None,
+        files: Any = None,
         params: dict[str, Any] | None = None,
     ) -> Any:
         url = f"{self.base_url}{path}"
@@ -129,6 +132,8 @@ class ComplianceAPIClient:
                     url=url,
                     headers=self._headers(token),
                     json=json_body,
+                    data=data,
+                    files=files,
                     params=params,
                 )
         except httpx.RequestError:
@@ -209,11 +214,14 @@ class ComplianceAPIClient:
         session_id: str,
         query: str,
         response_mode: str = "compliance",
+        intent_mode: str = "auto",
     ) -> dict[str, Any]:
         """Submit a question to the RBAC-scoped RAG pipeline."""
         body: dict[str, Any] = {"session_id": session_id, "query": query}
         if response_mode and response_mode != "compliance":
             body["response_mode"] = response_mode
+        if intent_mode and intent_mode != "auto":
+            body["intent_mode"] = intent_mode
         return self._request(
             "POST",
             "/api/v1/chat/query",
@@ -237,13 +245,54 @@ class ComplianceAPIClient:
         data = self._request("GET", "/api/v1/audit/logs", token=token, params=params)
         return data if isinstance(data, list) else []
 
-    def get_admin_config(self, token: str) -> dict[str, Any]:
-        """Fetch active profile, model, layer flags, and spend caps."""
-        return self._request("GET", "/api/v1/admin/config", token=token)
+    def get_admin_config(self, token: str, session_id: str | None = None) -> dict[str, Any]:
+        """Fetch active profile, model, layer flags, and current-run budget telemetry."""
+        params = {"session_id": session_id} if session_id else None
+        return self._request("GET", "/api/v1/admin/config", token=token, params=params)
+
+    def reset_session_run(self, token: str, session_id: str) -> dict[str, Any]:
+        """Reset the active session's run-scoped LLM budget counters."""
+        return self._request("POST", f"/api/v1/sessions/{session_id}/new-run", token=token)
 
     def get_health(self) -> dict[str, Any]:
         """Fetch public health and vector store status."""
         return self._request("GET", "/health")
+
+    # ------------------------------------------------------------------
+    # Document Upload & Catalog
+    # ------------------------------------------------------------------
+    def upload_document(
+        self,
+        token: str,
+        file_bytes: bytes,
+        filename: str,
+        allowed_roles: list[str],
+        title: str | None = None,
+        doc_id: str | None = None,
+        doc_type: str | None = None,
+    ) -> dict[str, Any]:
+        """Upload and dynamically index a compliance document into the vector/lexical index."""
+        data: dict[str, Any] = {"allowed_roles": json.dumps(allowed_roles)}
+        if title:
+            data["title"] = title
+        if doc_id:
+            data["doc_id"] = doc_id
+        if doc_type:
+            data["doc_type"] = doc_type
+
+        files = {"file": (filename, file_bytes)}
+        return self._request(
+            "POST",
+            "/api/v1/documents/upload",
+            token=token,
+            data=data,
+            files=files,
+        )
+
+    def list_documents(self, token: str) -> list[dict[str, Any]]:
+        """List documents in the catalog visible to the caller's role."""
+        res = self._request("GET", "/api/v1/documents", token=token)
+        return list(res.get("documents", [])) if isinstance(res, dict) else []
 
 
 __all__ = [

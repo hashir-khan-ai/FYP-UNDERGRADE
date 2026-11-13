@@ -317,3 +317,17 @@ Harden the Streamlit user interface, implement a headless AppTest automated test
 - Zero data leakage (0.00% across 36 cells).
 - Demo presets trigger query pipeline and adhere strictly to server-side RBAC.
 - Presentation script documented and verified.
+
+---
+
+## Phase 9: Conversational UX, Local $0 Ollama & Knowledge Graph Augmentation [Completed]
+
+### Goal
+Deliver a modern, conversational, ChatGPT-like compliance experience for regulatory understanding with $0 local-first execution, collapsed non-dominating citations, grounded conversational "Explain & Discuss" mode, and lightweight SQLite-backed Knowledge Graph cross-reference augmentation.
+
+### Concrete Tasks
+1. [x] **Citations UI Collapse (`src/ui/app.py`):** Replaced inline citation cards with a compact metadata badge line (`Route`, `Grader`, `Latency`, `Sources`, `Mode`) and an expandable collapsed control (`st.expander("Sources & citations (N)", expanded=False)`) preserving heading paths, clause identifiers, page numbers, and verbatim source snippets on demand.
+2. [x] **Conversational "Explain & Discuss" Mode (`response_mode`):** Added mode selection (`compliance` vs `explain`) across API schema (`ChatQueryRequest`, `ChatQueryResponse`), UI segmented control, and RAG pipeline. Mode `"explain"` loads `prompts/v1/explain.txt` to explain complex regulatory clauses conversationally with dialogue continuity while strictly enforcing grounding in `<authoritative_documents>` and uniform refusal on unpermitted queries.
+3. [x] **Local $0 Ollama Support & Runbook:** Configured local OpenAI-compatible endpoint support in `src/config.py` and `.env.example`, documented in `docs/RUNBOOK.md` (`LLM_PROFILE=dev`, `LLM_BASE_URL=http://localhost:11434/v1`, `LLM_API_KEY=ollama`, `LLM_MODEL=llama3.1:8b`).
+4. [x] **SQLite Knowledge Graph Cross-Reference Augmentation:** Built `src/retrieval/knowledge_graph.py` and `scripts/build_knowledge_graph.py` creating 38 nodes (regulations, topics, internal policies, audit findings) and 35 directed cross-reference edges (`implements`, `covers`, `audits`) in SQLite with strict server-side RBAC enforcement.
+5. [x] **Automated Tests:** Authored `tests/test_conversational_mode.py` (4 tests) and `tests/test_knowledge_graph.py` (2 tests). Full test suite: **191 passed**; leakage rate: **0.00%**.

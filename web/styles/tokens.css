@@ -1,0 +1,114 @@
+/* ============================================================================
+   Design tokens — Enterprise Regulatory Compliance Workspace
+   Apple HIG-inspired banking palette. All values are semantic and AA-checked.
+   ========================================================================== */
+
+:root {
+  color-scheme: dark;
+
+  /* Surfaces: deep navy-charcoal, not pure black */
+  --canvas: #070b11;
+  --canvas-raised: #090e15;
+  --surface: #0d131c;
+  --surface-2: #111925;
+  --surface-3: #162130;
+  --surface-glass: rgba(13, 19, 28, 0.78);
+  --surface-hover: rgba(158, 182, 214, 0.06);
+  --surface-active: rgba(120, 169, 255, 0.1);
+
+  /* Hairlines */
+  --line: rgba(164, 184, 212, 0.12);
+  --line-strong: rgba(164, 184, 212, 0.22);
+  --line-accent: rgba(120, 169, 255, 0.36);
+
+  /* Text */
+  --ink: #f3f6fa;
+  --ink-soft: #d9e1eb;
+  --muted: #a4afbf;
+  --faint: #7f8b9d;
+
+  /* Accents */
+  --accent: #78a9ff;
+  --accent-strong: #4f8df7;
+  --accent-ink: #06101d;
+  --accent-soft: rgba(120, 169, 255, 0.12);
+  --teal: #54d6c4;
+  --teal-soft: rgba(84, 214, 196, 0.12);
+
+  /* Semantic */
+  --success: #56d99b;
+  --success-soft: rgba(86, 217, 155, 0.12);
+  --warning: #f0c36a;
+  --warning-soft: rgba(240, 195, 106, 0.12);
+  --danger: #ff8585;
+  --danger-soft: rgba(255, 133, 133, 0.1);
+  --info: #83c9ff;
+  --info-soft: rgba(131, 201, 255, 0.12);
+  --non-grounded: #c1a8ff;
+  --non-grounded-soft: rgba(193, 168, 255, 0.12);
+
+  /* Typography */
+  --type-ui: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
+    "Helvetica Neue", Arial, sans-serif;
+  --type-mono: "SF Mono", ui-monospace, Menlo, Monaco, Consolas, monospace;
+  --text-2xs: 0.6875rem;
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-base: 0.9375rem;
+  --text-md: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.375rem;
+  --text-2xl: 1.75rem;
+  --text-3xl: 2.25rem;
+  --text-4xl: 2.875rem;
+
+  /* Spacing rhythm: 4pt */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+  --space-20: 5rem;
+
+  /* Radii */
+  --r-xs: 0.375rem;
+  --r-sm: 0.5rem;
+  --r-md: 0.75rem;
+  --r-lg: 1rem;
+  --r-xl: 1.25rem;
+  --r-2xl: 1.5rem;
+  --r-pill: 999px;
+
+  /* Elevation */
+  --elev-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --elev-md: 0 8px 24px rgba(0, 0, 0, 0.28);
+  --elev-lg: 0 24px 64px rgba(0, 0, 0, 0.42);
+  --elev-accent: 0 8px 28px rgba(79, 141, 247, 0.18);
+  --inset-top: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-fast: 120ms;
+  --duration-base: 180ms;
+  --duration-slow: 240ms;
+
+  /* Layout */
+  --sidebar-width: 300px;
+  --sidebar-collapsed: 76px;
+  --reading-width: 768px;
+  --content-width: 1120px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast: 1ms;
+    --duration-base: 1ms;
+    --duration-slow: 1ms;
+  }
+}

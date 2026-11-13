@@ -5,6 +5,7 @@ import logging
 import pickle
 import re
 import shutil
+import threading
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -15,7 +16,7 @@ from rank_bm25 import BM25Plus
 from src.config import settings
 from src.core.security import chunk_visible_to_role, get_role_filter, normalize_role
 from src.ingestion.chunker import DocumentChunk
-from src.ingestion.embeddings import EmbeddingGenerator, embeddings
+from src.ingestion.embeddings import EmbeddingGenerator, ModelWeightsMissingError, embeddings
 
 logger = logging.getLogger(__name__)
 COLLECTION_NAME = "compliance_chunks"
@@ -75,6 +76,7 @@ class QdrantIndexer:
         self.embedder = embedder or embeddings
         self._client = None
         self._atexit_registered = False
+        self._lock = threading.RLock()
 
     def __enter__(self) -> "QdrantIndexer":
         return self
@@ -83,38 +85,51 @@ class QdrantIndexer:
         self.close()
 
     def _get_client(self):
-        if self._client is None:
-            from qdrant_client import QdrantClient
+        with self._lock:
+            if self._client is None:
+                from qdrant_client import QdrantClient
 
-            Path(self.storage_path).mkdir(parents=True, exist_ok=True)
-            self._client = QdrantClient(path=self.storage_path)
-            if not self._atexit_registered:
-                # Safety net for scripts and tests that forget an explicit close.
-                atexit.register(_close_qdrant_quietly, self._client)
-                self._atexit_registered = True
-        return self._client
+                Path(self.storage_path).mkdir(parents=True, exist_ok=True)
+                self._client = QdrantClient(path=self.storage_path)
+                if not self._atexit_registered:
+                    # Safety net for scripts and tests that forget an explicit close.
+                    atexit.register(_close_qdrant_quietly, self._client)
+                    self._atexit_registered = True
+            return self._client
 
     def close(self) -> None:
         """Release the embedded Qdrant file lock."""
-        if self._client is not None:
-            client, self._client = self._client, None
-            _close_qdrant_quietly(client)
-
+        with self._lock:
+            if self._client is not None:
+                client, self._client = self._client, None
+                _close_qdrant_quietly(client)
 
     def ensure_collection(self, vector_dim: int = 384) -> None:
-        """Create the collection if it does not exist."""
+        """Create the collection if absent, or verify vector dimension matches."""
         from qdrant_client.http import models
 
-        client = self._get_client()
-        if not any(c.name == COLLECTION_NAME for c in client.get_collections().collections):
-            logger.info("Creating Qdrant collection '%s' (dim=%s, cosine).", COLLECTION_NAME, vector_dim)
-            client.create_collection(
-                collection_name=COLLECTION_NAME,
-                vectors_config=models.VectorParams(
-                    size=vector_dim,
-                    distance=models.Distance.COSINE,
-                ),
-            )
+        with self._lock:
+            client = self._get_client()
+            existing = [c.name for c in client.get_collections().collections]
+            if COLLECTION_NAME not in existing:
+                logger.info("Creating Qdrant collection '%s' (dim=%s, cosine).", COLLECTION_NAME, vector_dim)
+                client.create_collection(
+                    collection_name=COLLECTION_NAME,
+                    vectors_config=models.VectorParams(
+                        size=vector_dim,
+                        distance=models.Distance.COSINE,
+                    ),
+                )
+            else:
+                info = client.get_collection(COLLECTION_NAME)
+                vec_cfg = getattr(getattr(info, "config", None), "params", None)
+                vectors = getattr(vec_cfg, "vectors", None)
+                existing_dim = getattr(vectors, "size", None)
+                if existing_dim is not None and int(existing_dim) != int(vector_dim):
+                    raise ValueError(
+                        f"Embedding dimension mismatch for '{COLLECTION_NAME}': "
+                        f"collection expects {existing_dim}, embedder produced {vector_dim}."
+                    )
 
     def reset(self) -> None:
         """Delete the collection so ``--rebuild`` starts from a clean index.
@@ -123,22 +138,24 @@ class QdrantIndexer:
         Windows, so the local storage directory is removed while the client is
         closed. This method is only used by an explicit ``--rebuild``.
         """
-        self.close()
-        storage = Path(self.storage_path)
-        if storage.exists():
-            shutil.rmtree(storage)
-            logger.info("Removed local Qdrant storage at '%s'.", storage)
-        storage.mkdir(parents=True, exist_ok=True)
+        with self._lock:
+            self.close()
+            storage = Path(self.storage_path)
+            if storage.exists():
+                shutil.rmtree(storage)
+                logger.info("Removed local Qdrant storage at '%s'.", storage)
+            storage.mkdir(parents=True, exist_ok=True)
 
     def count(self) -> int:
         """Return the number of indexed points, or 0 if no collection exists."""
-        client = self._get_client()
-        try:
-            if not any(c.name == COLLECTION_NAME for c in client.get_collections().collections):
+        with self._lock:
+            client = self._get_client()
+            try:
+                if not any(c.name == COLLECTION_NAME for c in client.get_collections().collections):
+                    return 0
+                return int(client.count(collection_name=COLLECTION_NAME, exact=True).count)
+            except Exception:
                 return 0
-            return int(client.count(collection_name=COLLECTION_NAME, exact=True).count)
-        except Exception:
-            return 0
 
     def index_chunks(self, chunks: list[DocumentChunk]) -> int:
         """Idempotently upsert chunks using deterministic UUIDv5 point IDs."""
@@ -147,38 +164,43 @@ class QdrantIndexer:
 
         from qdrant_client.http import models
 
-        client = self._get_client()
         texts = [build_indexable_text(chunk) for chunk in chunks]
         vectors = self.embedder.embed_texts(texts)
-        self.ensure_collection(vector_dim=len(vectors[0]))
 
-        points: list[models.PointStruct] = []
-        for chunk, vector in zip(chunks, vectors):
-            point_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, chunk.chunk_id))
-            payload = {
-                "chunk_id": chunk.chunk_id,
-                "doc_id": chunk.doc_id,
-                "doc_title": chunk.doc_title,
-                "section_label": chunk.section_label,
-                "clause_label": chunk.clause_label,
-                "heading_path": chunk.heading_path,
-                "page": chunk.page,
-                "source_path": chunk.source_path,
-                "allowed_roles": chunk.allowed_roles,
-                "text_content": chunk.text_content,
-                "token_count": chunk.token_count,
-            }
-            points.append(models.PointStruct(id=point_id, vector=vector, payload=payload))
+        with self._lock:
+            client = self._get_client()
+            self.ensure_collection(vector_dim=len(vectors[0]))
 
-        # Upsert in modest batches so local embedded mode stays responsive.
-        batch_size = 64
-        for start in range(0, len(points), batch_size):
-            client.upsert(
-                collection_name=COLLECTION_NAME,
-                points=points[start : start + batch_size],
-                wait=True,
-            )
-        return len(points)
+            points: list[models.PointStruct] = []
+            for chunk, vector in zip(chunks, vectors):
+                point_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, chunk.chunk_id))
+                payload = {
+                    "chunk_id": chunk.chunk_id,
+                    "doc_id": chunk.doc_id,
+                    "doc_title": chunk.doc_title,
+                    "section_label": chunk.section_label,
+                    "clause_label": chunk.clause_label,
+                    "heading_path": chunk.heading_path,
+                    "page": chunk.page,
+                    "source_path": chunk.source_path,
+                    "allowed_roles": chunk.allowed_roles,
+                    "text_content": chunk.text_content,
+                    "token_count": chunk.token_count,
+                    "source_url": getattr(chunk, "source_url", None),
+                    "jurisdiction": getattr(chunk, "jurisdiction", ""),
+                    "content_origin": getattr(chunk, "content_origin", ""),
+                }
+                points.append(models.PointStruct(id=point_id, vector=vector, payload=payload))
+
+            # Upsert in modest batches so local embedded mode stays responsive.
+            batch_size = 64
+            for start in range(0, len(points), batch_size):
+                client.upsert(
+                    collection_name=COLLECTION_NAME,
+                    points=points[start : start + batch_size],
+                    wait=True,
+                )
+            return len(points)
 
     def search(self, query: str, top_k: int, role: str | None) -> SearchResult:
         """Dense similarity search restricted to the caller's role.
@@ -197,22 +219,27 @@ class QdrantIndexer:
             InvalidRoleError: if a non-None role is not in the frozen role model.
         """
         role_filter = get_role_filter(role) if role is not None else None
-        client = self._get_client()
-        try:
-            if not any(c.name == COLLECTION_NAME for c in client.get_collections().collections):
+        with self._lock:
+            client = self._get_client()
+            try:
+                if not any(c.name == COLLECTION_NAME for c in client.get_collections().collections):
+                    return SearchResult()
+                if int(client.count(collection_name=COLLECTION_NAME, exact=False).count) == 0:
+                    return SearchResult()
+                query_vector = self.embedder.embed_query(query)
+                response = client.query_points(
+                    collection_name=COLLECTION_NAME,
+                    query=query_vector,
+                    query_filter=role_filter,
+                    limit=top_k,
+                    with_payload=True,
+                )
+                results = response.points
+            except ModelWeightsMissingError:
+                raise
+            except Exception as exc:
+                logger.warning("Vector search unavailable (%s); returning no vector hits.", type(exc).__name__)
                 return SearchResult()
-            query_vector = self.embedder.embed_query(query)
-            response = client.query_points(
-                collection_name=COLLECTION_NAME,
-                query=query_vector,
-                query_filter=role_filter,
-                limit=top_k,
-                with_payload=True,
-            )
-            results = response.points
-        except Exception as exc:
-            logger.warning("Vector search unavailable (%s); returning no vector hits.", type(exc).__name__)
-            return SearchResult()
 
         hits: list[dict[str, Any]] = []
         for result in results:
@@ -232,6 +259,9 @@ class QdrantIndexer:
                     "source_path": payload.get("source_path"),
                     "allowed_roles": payload.get("allowed_roles", []),
                     "text_content": payload.get("text_content", ""),
+                    "source_url": payload.get("source_url"),
+                    "jurisdiction": payload.get("jurisdiction", ""),
+                    "content_origin": payload.get("content_origin", ""),
                     "score": float(result.score),
                 }
             )
@@ -246,17 +276,55 @@ class BM25Indexer:
         self.index_path = Path(index_path or settings.BM25_INDEX_PATH)
         self.bm25: BM25Plus | None = None
         self.chunks: list[dict[str, Any]] = []
+        self._lock = threading.RLock()
 
     def build_and_save(self, chunks: list[DocumentChunk]) -> int:
         """Fit BM25 over all chunks and atomically replace the persisted index."""
         tokenized_corpus = [tokenize_for_bm25(build_indexable_text(chunk)) for chunk in chunks]
-        if not tokenized_corpus:
-            self.bm25 = None
-            self.chunks = []
-        else:
-            # BM25Plus avoids zero-IDF collapse on tiny fixture corpora.
-            self.bm25 = BM25Plus(tokenized_corpus)
-            self.chunks = [
+        with self._lock:
+            if not tokenized_corpus:
+                self.bm25 = None
+                self.chunks = []
+            else:
+                # BM25Plus avoids zero-IDF collapse on tiny fixture corpora.
+                self.bm25 = BM25Plus(tokenized_corpus)
+                self.chunks = [
+                    {
+                        "chunk_id": chunk.chunk_id,
+                        "doc_id": chunk.doc_id,
+                        "doc_title": chunk.doc_title,
+                        "section_label": chunk.section_label,
+                        "clause_label": chunk.clause_label,
+                        "heading_path": chunk.heading_path,
+                        "page": chunk.page,
+                        "source_path": chunk.source_path,
+                        "allowed_roles": chunk.allowed_roles,
+                        "text_content": chunk.text_content,
+                        "token_count": chunk.token_count,
+                        "source_url": getattr(chunk, "source_url", None),
+                        "jurisdiction": getattr(chunk, "jurisdiction", ""),
+                        "content_origin": getattr(chunk, "content_origin", ""),
+                    }
+                    for chunk in chunks
+                ]
+
+            self.index_path.parent.mkdir(parents=True, exist_ok=True)
+            temp_path = self.index_path.with_suffix(self.index_path.suffix + ".tmp")
+            with open(temp_path, "wb") as handle:
+                pickle.dump({"bm25": self.bm25, "chunks": self.chunks}, handle)
+            temp_path.replace(self.index_path)
+            return len(self.chunks)
+
+    def merge_and_save(self, new_chunks: list[DocumentChunk]) -> int:
+        """Merge new chunks into existing BM25 index idempotently and save atomically."""
+        with self._lock:
+            if not self.chunks and self.index_path.exists():
+                self.load()
+
+            new_doc_ids = {c.doc_id for c in new_chunks}
+            kept_chunks = [c for c in self.chunks if c.get("doc_id") not in new_doc_ids]
+
+            new_dict_chunks = [
                 {
                     "chunk_id": chunk.chunk_id,
                     "doc_id": chunk.doc_id,
@@ -269,30 +337,49 @@ class BM25Indexer:
                     "allowed_roles": chunk.allowed_roles,
                     "text_content": chunk.text_content,
                     "token_count": chunk.token_count,
+                    "source_url": getattr(chunk, "source_url", None),
+                    "jurisdiction": getattr(chunk, "jurisdiction", ""),
+                    "content_origin": getattr(chunk, "content_origin", ""),
                 }
-                for chunk in chunks
+                for chunk in new_chunks
             ]
 
-        self.index_path.parent.mkdir(parents=True, exist_ok=True)
-        temp_path = self.index_path.with_suffix(self.index_path.suffix + ".tmp")
-        with open(temp_path, "wb") as handle:
-            pickle.dump({"bm25": self.bm25, "chunks": self.chunks}, handle)
-        temp_path.replace(self.index_path)
-        return len(self.chunks)
+            combined = kept_chunks + new_dict_chunks
+            tokenized_corpus = []
+            for item in combined:
+                text = item.get("text_content", "")
+                h_path = item.get("heading_path", "")
+                indexable = f"{h_path}\n{text}" if (settings.ENABLE_HEADING_PATH and h_path) else text
+                tokenized_corpus.append(tokenize_for_bm25(indexable))
+
+            if not tokenized_corpus:
+                self.bm25 = None
+                self.chunks = []
+            else:
+                self.bm25 = BM25Plus(tokenized_corpus)
+                self.chunks = combined
+
+            self.index_path.parent.mkdir(parents=True, exist_ok=True)
+            temp_path = self.index_path.with_suffix(self.index_path.suffix + ".tmp")
+            with open(temp_path, "wb") as handle:
+                pickle.dump({"bm25": self.bm25, "chunks": self.chunks}, handle)
+            temp_path.replace(self.index_path)
+            return len(self.chunks)
 
     def load(self) -> bool:
         """Load the persisted index, returning False when it is absent."""
-        if not self.index_path.exists():
-            return False
-        try:
-            with open(self.index_path, "rb") as handle:
-                data = pickle.load(handle)
-        except Exception as exc:
-            logger.warning("Could not load BM25 index (%s).", type(exc).__name__)
-            return False
-        self.bm25 = data.get("bm25")
-        self.chunks = data.get("chunks", [])
-        return self.bm25 is not None
+        with self._lock:
+            if not self.index_path.exists():
+                return False
+            try:
+                with open(self.index_path, "rb") as handle:
+                    data = pickle.load(handle)
+            except Exception as exc:
+                logger.warning("Could not load BM25 index (%s).", type(exc).__name__)
+                return False
+            self.bm25 = data.get("bm25")
+            self.chunks = data.get("chunks", [])
+            return self.bm25 is not None
 
     def search(self, query: str, top_k: int, role: str | None) -> SearchResult:
         """Return the top-k positively scored chunks visible to ``role``.
@@ -311,14 +398,17 @@ class BM25Indexer:
         """
         if role is not None:
             normalize_role(role)
-        if self.bm25 is None and not self.load():
-            return SearchResult()
+        with self._lock:
+            if self.bm25 is None and not self.load():
+                return SearchResult()
+            bm25_ref = self.bm25
+            chunks_ref = list(self.chunks)
 
         tokenized_query = tokenize_for_bm25(query)
-        if not tokenized_query:
+        if not tokenized_query or bm25_ref is None:
             return SearchResult()
 
-        scores = self.bm25.get_scores(tokenized_query)
+        scores = bm25_ref.get_scores(tokenized_query)
         positive = [index for index in range(len(scores)) if float(scores[index]) > 0.0]
         if role is None:
             eligible = positive
@@ -326,7 +416,7 @@ class BM25Indexer:
             eligible = [
                 index
                 for index in positive
-                if index < len(self.chunks) and chunk_visible_to_role(self.chunks[index], role)
+                if index < len(chunks_ref) and chunk_visible_to_role(chunks_ref[index], role)
             ]
         filtered = len(positive) - len(eligible)
         ranked = sorted(
@@ -339,7 +429,7 @@ class BM25Indexer:
             score = float(scores[index])
             if score <= 0.0:
                 continue
-            item = dict(self.chunks[index])
+            item = dict(chunks_ref[index])
             if not item.get("heading_path"):
                 sec = item.get("section_label") or ""
                 cls = item.get("clause_label") or ""

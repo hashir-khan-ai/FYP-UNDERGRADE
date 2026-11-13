@@ -58,6 +58,14 @@ class Citation(BaseModel):
     clause: str = ""
     page: int | None = None
     quote_snippet: str = ""
+    # Verifiable source metadata
+    source_url: str | None = None
+    verification_url: str | None = None
+    source_name: str | None = None
+    content_origin: str | None = None
+    is_internal: bool = False
+    # Roles permitted to retrieve this source; used only to label access in the UI.
+    allowed_roles: list[str] = Field(default_factory=list)
 
 
 class LLMStats(BaseModel):
@@ -77,6 +85,18 @@ class SpendStats(BaseModel):
     tokens_used: int
     tokens_limit: int
     exhausted: bool
+    calls_remaining: int = 0
+    tokens_remaining: int = 0
+    scope: str = "offline"
+    profile: str = "mock"
+    is_paid: bool = False
+    run_id: str | None = None
+    offline_calls: int = 0
+    offline_tokens: int = 0
+    local_calls: int = 0
+    local_tokens: int = 0
+    cached_calls: int = 0
+    saved_tokens: int = 0
 
 
 class RetrievalStats(BaseModel):
@@ -93,6 +113,14 @@ class ChatQueryRequest(BaseModel):
     response_mode: Literal["compliance", "explain"] = Field(
         default="compliance",
         description="Response mode: 'compliance' (strict, concise) or 'explain' (conversational AI overview)",
+    )
+    intent_mode: Literal["auto", "rag", "general"] = Field(
+        default="auto",
+        description="Intent routing mode: 'auto' (smart classification), 'rag' (force Company Docs RAG), or 'general' (force General Chat)",
+    )
+    fallback_offline: bool = Field(
+        default=False,
+        description="When true, execute this turn using the offline deterministic fallback profile.",
     )
 
 
@@ -151,10 +179,20 @@ class ChatQueryResponse(BaseModel):
     citations_dropped: int = 0
     heading_path_enabled: bool = True
     response_mode: str = "compliance"
+    intent_mode: str = "auto"
+    response_type: str = "rag"
+    grounded: bool = True
+    suggested_follow_ups: list[str] = Field(default_factory=list)
 
 
 class SessionCreateRequest(BaseModel):
     title: str | None = Field(default=None, max_length=120)
+
+
+class SessionRenameRequest(BaseModel):
+    """New title for a session owned by the authenticated caller."""
+
+    title: str = Field(..., min_length=1, max_length=120)
 
 
 class SessionSummary(BaseModel):
@@ -227,7 +265,81 @@ class AdminConfigResponse(BaseModel):
     layers: dict[str, bool]
     spend_caps: dict[str, int]
     token_ttl_minutes: int
+    run_budget: SpendStats | None = None
+
+
+class LatencyMetrics(BaseModel):
+    p50_ms: float = 0.0
+    p95_ms: float = 0.0
+    avg_ms: float = 0.0
+    sample_count: int = 0
+
+
+class IndexMetrics(BaseModel):
+    vector_count: int = 0
+    bm25_chunks: int = 0
+    status: str = "online"
+
+
+class AuditMetrics(BaseModel):
+    total_turns: int = 0
+    total_role_filtered: int = 0
+    total_citations_dropped: int = 0
+
+
+class AdminMetricsResponse(BaseModel):
+    profile: str
+    model: str
+    prompt_version: str
+    is_mock: bool
+    is_local: bool
+    is_paid: bool
+    total_calls: int = 0
+    cached_calls: int = 0
+    error_calls: int = 0
+    cache_hit_rate: float = 0.0
+    total_prompt_tokens: int = 0
+    total_completion_tokens: int = 0
+    total_tokens: int = 0
+    latency: LatencyMetrics
+    index: IndexMetrics
+    audit: AuditMetrics
+    guard_status: SpendStats
 
 
 class LogoutResponse(BaseModel):
     status: str = "ok"
+
+
+class DocumentUploadResponse(BaseModel):
+    doc_id: str
+    filename: str
+    title: str
+    chunks_indexed: int
+    allowed_roles: list[str]
+    doc_type: str
+    file_path: str
+    message: str = "Document successfully ingested and indexed."
+
+
+class DocumentListItem(BaseModel):
+    id: str
+    filename: str
+    source_jurisdiction: str
+    doc_type: str
+    version: str
+    allowed_roles: list[str]
+    file_path: str
+    total_chunks: int
+    created_at: str | None = None
+    # Additive trust metadata: official URL only from trusted sidecars;
+    # internal documents carry no public link.
+    source_url: str | None = None
+    source_name: str | None = None
+    is_internal: bool = False
+
+
+class DocumentListResponse(BaseModel):
+    documents: list[DocumentListItem]
+    total: int
+

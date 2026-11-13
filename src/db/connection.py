@@ -21,12 +21,13 @@ def get_db_connection(db_path: str | None = None) -> Generator[sqlite3.Connectio
     Enforces WAL mode and foreign key constraints.
     """
     path = get_db_path(db_path)
-    conn = sqlite3.connect(path, timeout=10.0)
+    conn = sqlite3.connect(path, timeout=30.0)
     conn.row_factory = sqlite3.Row
 
     # Performance and integrity pragmas
     conn.execute("PRAGMA foreign_keys = ON;")
     conn.execute("PRAGMA journal_mode = WAL;")
+    conn.execute("PRAGMA busy_timeout = 5000;")
 
     try:
         yield conn
