@@ -331,3 +331,16 @@ Deliver a modern, conversational, ChatGPT-like compliance experience for regulat
 3. [x] **Local $0 Ollama Support & Runbook:** Configured local OpenAI-compatible endpoint support in `src/config.py` and `.env.example`, documented in `docs/RUNBOOK.md` (`LLM_PROFILE=dev`, `LLM_BASE_URL=http://localhost:11434/v1`, `LLM_API_KEY=ollama`, `LLM_MODEL=llama3.1:8b`).
 4. [x] **SQLite Knowledge Graph Cross-Reference Augmentation:** Built `src/retrieval/knowledge_graph.py` and `scripts/build_knowledge_graph.py` creating 38 nodes (regulations, topics, internal policies, audit findings) and 35 directed cross-reference edges (`implements`, `covers`, `audits`) in SQLite with strict server-side RBAC enforcement.
 5. [x] **Automated Tests:** Authored `tests/test_conversational_mode.py` (4 tests) and `tests/test_knowledge_graph.py` (2 tests). Full test suite: **191 passed**; leakage rate: **0.00%**.
+
+---
+
+## Phase 8A–8D: Integrity Fixes, Citation Redesign, Stretch Features & UI Polish [Completed]
+
+### Goal
+Resolve chunk HTML/markdown sanitization, profile-aware SpendGuard caps, runtime flag telemetry, dynamic login leakage status, human-friendly citation cards with inline jump markers, RBAC-safe `claim_check` and AST `calculator` stretch modules with `gold_v2` ablations, and `DESIGN.md`-aligned 60/30/10 CSS/SVG UI polish verified via headless Chrome DevTools.
+
+### Concrete Tasks
+1. [x] **Phase 8A Integrity Fixes:** Chunk HTML/markdown stripping + escaped citation quote rendering; profile-aware unmetered `mock` / safety-ceiling local `dev` / per-query + session live budgets; exact runtime layer flag telemetry & `xai_output` gating; dynamic `reports/leakage_*.json` login readout & `DEMO_MODE`-gated quick-fill buttons.
+2. [x] **Phase 8B Citation Card Redesign:** Human title -> deduplicated single breadcrumb -> role-aware `Internal · visible to <Roles>` / `Public · verifiable` pill -> highlighted escaped quote -> collapsed `Technical details` with copy; clickable/hoverable inline `[1]`/`[2]` scroll-and-pulse markers.
+3. [x] **Phase 8C Stretch Tools & Ablations:** Config-gated `src/core/claim_check.py` and AST-whitelisted `src/core/calculator.py` with `enforce_role_visibility` gates, SQLite persistence, extended `scripts/leakage_check.py` (45/45 cells, 0.00% leakage), `data/gold_v2.jsonl` (115 items), and `A6_claim_check` / `A7_calculator` ablations marked `"MOCK, not evidence"`.
+4. [x] **Phase 8D UI Polish & Visual Audit:** Inline SVG icon helper (`get_svg_icon`), 5-stage animated pipeline stepper, CSS 3D citation card tilt + sidebar layer stack, `@media (prefers-reduced-motion: reduce)` fallbacks, 0-console-error headless Chrome CDP boot check + 4 screenshots (`docs/screenshots/phase8/`), and documentation closeout (`DESIGN.md`, `docs/PHASE8_NOTES.md`, `STATUS.md`, `PLAN.md`, `DECISIONS.md`).

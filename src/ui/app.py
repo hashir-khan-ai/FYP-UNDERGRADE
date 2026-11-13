@@ -73,54 +73,82 @@ DEMO_PRESETS: list[dict[str, str]] = [
     },
 ]
 
+_SVG_ICON_PATHS: dict[str, str] = {
+    "bank": '<path d="M3 10h18M5 10v8M9 10v8M15 10v8M19 10v8M2 18h20M12 3l9 5H3l9-5z"/>',
+    "search": '<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/>',
+    "alert": '<path d="M12 3l10 17H2L12 3z"/><path d="M12 10v4"/><circle cx="12" cy="17" r="0.8" fill="currentColor"/>',
+    "shield": '<path d="M12 2l7 3v6c0 5-3.5 9.5-7 11-3.5-1.5-7-6-7-11V5l7-3z"/><path d="M9.5 12l2 2 3.5-4"/>',
+    "chart": '<path d="M4 19h16M7 16v-5M12 16V7M17 16v-8"/>',
+    "clipboard": '<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V2h6v2M9 10h6M9 14h6"/>',
+    "scale": '<path d="M12 3v18M5 7h14M6 7l-3 6h6l-3-6zM18 7l-3 6h6l-3-6zM8 21h8"/>',
+    "database": '<ellipse cx="12" cy="5" rx="7" ry="3"/><path d="M5 5v14c0 1.66 3.13 3 7 3s7-1.34 7-3V5M5 12c0 1.66 3.13 3 7 3s7-1.34 7-3"/>',
+    "zap": '<path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z"/>',
+    "globe": '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a13 13 0 0 1 0 18M12 3a13 13 0 0 0 0 18"/>',
+    "sliders": '<path d="M4 7h16M4 17h16M9 4v6M15 14v6"/>',
+    "sparkles": '<path d="M12 3l1.8 4.2L18 9l-4.2 1.8L12 15l-1.8-4.2L6 9l4.2-1.8L12 3z"/>',
+    "check": '<circle cx="12" cy="12" r="9"/><path d="M8.5 12.5l2.5 2.5 4.5-5"/>',
+}
+
+
+def get_svg_icon(name: str, *, color: str = "currentColor", size: int = 16) -> str:
+    """Return a compact, zero-dependency inline SVG icon."""
+    paths = _SVG_ICON_PATHS.get(name, _SVG_ICON_PATHS["shield"])
+    return (
+        f'<svg aria-hidden="true" width="{int(size)}" height="{int(size)}" '
+        f'viewBox="0 0 24 24" fill="none" stroke="{html.escape(color)}" '
+        f'stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" '
+        f'style="vertical-align:middle;flex-shrink:0;">{paths}</svg>'
+    )
+
+
 ROLE_STARTER_QUESTIONS: dict[str, list[dict[str, str]]] = {
     "analyst": [
         {
-            "icon": "🏛️",
+            "icon": "bank",
             "title": "Basel III CET1 Capital",
             "query": "What minimum CET1 capital ratio must banks maintain under Basel III?",
         },
         {
-            "icon": "🔍",
+            "icon": "search",
             "title": "Customer Due Diligence",
             "query": "What customer due diligence measures must firms apply when establishing a new business relationship?",
         },
         {
-            "icon": "🚨",
+            "icon": "alert",
             "title": "Suspicious Activity Reports",
             "query": "When must a firm submit a Suspicious Activity Report to the NCA?",
         },
     ],
     "manager": [
         {
-            "icon": "⚠️",
+            "icon": "alert",
             "title": "Breach Escalation Policy",
             "query": "What is the escalation procedure for material breaches to the compliance committee?",
         },
         {
-            "icon": "🛡️",
+            "icon": "shield",
             "title": "PEP Enhanced Due Diligence",
             "query": "What are the requirements for enhanced due diligence on politically exposed persons?",
         },
         {
-            "icon": "📊",
+            "icon": "chart",
             "title": "LCR vs NSFR Ratios",
             "query": "Compare the Liquidity Coverage Ratio and Net Stable Funding Ratio requirements.",
         },
     ],
     "auditor": [
         {
-            "icon": "📋",
+            "icon": "clipboard",
             "title": "KYC Remediation Audit",
             "query": "What did the internal audit conclude about control gaps in the KYC remediation plan?",
         },
         {
-            "icon": "⚖️",
+            "icon": "scale",
             "title": "Breach Escalation Policy",
             "query": "What is the escalation procedure for material breaches to the compliance committee?",
         },
         {
-            "icon": "🗄️",
+            "icon": "database",
             "title": "Statutory Record Keeping",
             "query": "What records must firms keep under the Money Laundering Regulations and for how long?",
         },
@@ -140,12 +168,12 @@ APPLE_DESIGN_CSS = """
         font-family: var(--font-sans) !important;
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
-        background-color: #0B0E14 !important;
-        color: #F4F6F9 !important;
+        background-color: #1C1D20 !important;
+        color: #F1F3F4 !important;
         letter-spacing: -0.012em;
     }
 
-    /* Main chat reading column: comfortable reading width on desktop (prevents text stretching) */
+    /* Main chat reading column: comfortable reading width on desktop */
     div[data-testid="stMainBlockContainer"],
     .main .block-container {
         max-width: 900px !important;
@@ -154,50 +182,56 @@ APPLE_DESIGN_CSS = """
         padding-bottom: 3.5rem !important;
     }
 
-    /* Apple HIG sidebar: dark slate surface with constrained responsive width */
+    /* Sidebar: 30% Storm Grey secondary surface with smooth slide transition */
     section[data-testid="stSidebar"] {
-        width: 300px !important;
+        width: 304px !important;
         min-width: 280px !important;
-        max-width: 320px !important;
-        background: linear-gradient(180deg, #141822 0%, #0B0E14 100%) !important;
-        border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
-        box-shadow: 2px 0 24px rgba(0, 0, 0, 0.5);
+        max-width: 328px !important;
+        background: linear-gradient(180deg, #26292E 0%, #1C1D20 100%) !important;
+        border-right: 1px solid #5A6068 !important;
+        box-shadow: 2px 0 24px rgba(0, 0, 0, 0.45);
+        transition: transform 0.28s var(--ease-spring), opacity 0.25s ease !important;
     }
 
-    /* Prevent sidebar buttons and session titles from wrapping horizontally */
-    section[data-testid="stSidebar"] button {
-        white-space: nowrap !important;
-        overflow: hidden !important;
-        text-overflow: ellipsis !important;
-        transition: all 0.16s var(--ease-spring) !important;
+    /* Allow starter and demo buttons to wrap cleanly instead of clipping text */
+    section[data-testid="stSidebar"] button,
+    div.stButton > button {
+        white-space: normal !important;
+        word-break: break-word !important;
+        overflow-wrap: anywhere !important;
+        height: auto !important;
+        min-height: 36px !important;
+        line-height: 1.32 !important;
+        transition: transform 0.18s var(--ease-spring), background-color 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease !important;
     }
-    section[data-testid="stSidebar"] button p {
-        white-space: nowrap !important;
-        overflow: hidden !important;
-        text-overflow: ellipsis !important;
+    section[data-testid="stSidebar"] button p,
+    div.stButton > button p {
+        white-space: normal !important;
+        overflow: visible !important;
+        text-overflow: clip !important;
+        text-align: left !important;
     }
 
-    /* Active session button highlight: subtle blue surface with left indicator */
+    /* Active session button highlight: Safety Orange accent rail */
     section[data-testid="stSidebar"] button[kind="primary"] {
-        background: rgba(10, 132, 255, 0.16) !important;
-        color: #F4F6F9 !important;
-        border: 1px solid rgba(10, 132, 255, 0.45) !important;
-        border-left: 3px solid #0A84FF !important;
+        background: rgba(255, 95, 0, 0.14) !important;
+        color: #F1F3F4 !important;
+        border: 1px solid rgba(255, 95, 0, 0.5) !important;
+        border-left: 3px solid #FF5F00 !important;
         font-weight: 600 !important;
-        box-shadow: 0 2px 8px rgba(10, 132, 255, 0.2) !important;
+        box-shadow: 0 2px 8px rgba(255, 95, 0, 0.16) !important;
     }
 
-    /* Primary submission buttons: Safety Orange (#FF5F00) with Matte Dark text */
+    /* Primary submission buttons: Safety Orange (#FF5F00) with Matte Black (#1C1D20) text */
     div.stFormSubmitButton > button,
     button[data-testid="baseButton-primary"]:not(section[data-testid="stSidebar"] button) {
         background-color: #FF5F00 !important;
-        color: #141822 !important;
+        color: #1C1D20 !important;
         border: 1px solid #FF5F00 !important;
         font-weight: 700 !important;
         border-radius: 8px !important;
         padding: 6px 14px !important;
         box-shadow: 0 2px 10px rgba(255, 95, 0, 0.25) !important;
-        transition: all 0.16s var(--ease-spring) !important;
     }
     div.stFormSubmitButton > button:hover,
     button[data-testid="baseButton-primary"]:not(section[data-testid="stSidebar"] button):hover {
@@ -206,30 +240,40 @@ APPLE_DESIGN_CSS = """
         transform: translateY(-1px);
     }
 
-    /* Secondary buttons: Frosted slate chips */
+    /* Secondary buttons: Storm Grey tinted chips */
     div.stButton > button[kind="secondary"],
     button[data-testid="baseButton-secondary"] {
-        background-color: rgba(255, 255, 255, 0.05) !important;
-        color: #F4F6F9 !important;
-        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        background-color: rgba(90, 96, 104, 0.18) !important;
+        color: #F1F3F4 !important;
+        border: 1px solid rgba(90, 96, 104, 0.55) !important;
         border-radius: 8px !important;
         padding: 6px 12px !important;
-        transition: all 0.16s var(--ease-spring) !important;
     }
     div.stButton > button[kind="secondary"]:hover,
     button[data-testid="baseButton-secondary"]:hover {
-        background-color: rgba(255, 255, 255, 0.09) !important;
-        border-color: rgba(255, 255, 255, 0.2) !important;
+        background-color: rgba(90, 96, 104, 0.32) !important;
+        border-color: #FF5F00 !important;
         transform: translateY(-1px);
     }
     div.stButton > button:active {
         transform: translateY(0) !important;
     }
 
-    /* High contrast accessible focus outline */
+    /* Clean select & input focus outlines without clipped browser rings */
     button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
-        outline: 2px solid #0A84FF !important;
+        outline: 2px solid #FF5F00 !important;
         outline-offset: 2px !important;
+    }
+    div[data-baseweb="select"] > div {
+        background-color: #26292E !important;
+        border: 1px solid #5A6068 !important;
+        border-radius: 8px !important;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease !important;
+    }
+    div[data-baseweb="select"] > div:focus-within {
+        border-color: #FF5F00 !important;
+        box-shadow: 0 0 0 2px rgba(255, 95, 0, 0.28) !important;
+        outline: none !important;
     }
 
     /* Chat message entrance motion */
@@ -320,22 +364,36 @@ APPLE_DESIGN_CSS = """
         animation: fadeInSlideUp 0.22s var(--ease-spring) forwards;
     }
 
-    /* Apple Inspector Citation Card — translucent glass with cursor spotlight */
+    /* Compliance Citation Card — staggered fade-and-rise + subtle CSS 3D hover tilt (4–6 deg max) */
+    @keyframes citeCardEnter {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
     .citation-card {
         position: relative;
         isolation: isolate;
         overflow: hidden;
-        background: rgba(20, 24, 34, 0.62);
-        -webkit-backdrop-filter: blur(14px);
-        backdrop-filter: blur(14px);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        border-left: 3px solid #0A84FF;
+        background: #26292E;
+        -webkit-backdrop-filter: blur(12px);
+        backdrop-filter: blur(12px);
+        border: 1px solid #5A6068;
+        border-left: 3px solid #FF5F00;
         border-radius: 10px;
         padding: 14px 16px;
         margin-top: 8px;
         margin-bottom: 10px;
-        transition: border-color 0.18s ease, box-shadow 0.18s ease;
-        color: #F4F6F9;
+        color: #F1F3F4;
+        transform-style: preserve-3d;
+        will-change: transform;
+        animation: citeCardEnter 0.34s var(--ease-spring) both;
+        animation-delay: calc(var(--card-index, 1) * 65ms);
+        transition: transform 0.24s var(--ease-spring), border-color 0.18s ease, box-shadow 0.24s ease;
     }
     .citation-card::before {
         content: "";
@@ -345,9 +403,9 @@ APPLE_DESIGN_CSS = """
         pointer-events: none;
         background: radial-gradient(
             240px circle at var(--mouse-x, 50%) var(--mouse-y, 50%),
-            rgba(10, 132, 255, 0.12) 0%,
-            rgba(10, 132, 255, 0.04) 35%,
-            transparent 60%
+            rgba(255, 95, 0, 0.14) 0%,
+            rgba(255, 95, 0, 0.04) 38%,
+            transparent 64%
         );
         opacity: 0;
         transition: opacity 0.18s ease;
@@ -360,8 +418,110 @@ APPLE_DESIGN_CSS = """
         z-index: 1;
     }
     .citation-card:hover {
-        border-color: rgba(255, 255, 255, 0.18);
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+        transform: perspective(900px) rotateX(2.5deg) rotateY(-4deg) translateY(-2px);
+        border-color: #FF5F00;
+        box-shadow: 0 10px 24px rgba(0, 0, 0, 0.42);
+    }
+
+    /* Live Pipeline Stepper: Route > Retrieve > Re-rank > Grade > Answer */
+    @keyframes stepperReveal {
+        from {
+            opacity: 0;
+            transform: translateX(-6px);
+        }
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+    .pipeline-stepper {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 6px;
+        margin: 8px 0 10px 0;
+        padding: 8px 10px;
+        background: #26292E;
+        border: 1px solid rgba(90, 96, 104, 0.65);
+        border-radius: 10px;
+    }
+    .pipeline-step {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 4px 9px;
+        border-radius: 6px;
+        font-size: 0.73rem;
+        font-weight: 600;
+        background: rgba(255, 95, 0, 0.12);
+        border: 1px solid rgba(255, 95, 0, 0.45);
+        color: #F1F3F4;
+        animation: stepperReveal 0.3s var(--ease-spring) both;
+        animation-delay: calc(var(--step-idx, 0) * 85ms);
+    }
+    .pipeline-step.skipped {
+        background: rgba(90, 96, 104, 0.18);
+        border: 1px dashed #5A6068;
+        color: #A0A6B0;
+    }
+    .pipeline-step-lat {
+        font-family: var(--font-mono);
+        font-size: 0.68rem;
+        color: #FF5F00;
+    }
+    .pipeline-step.skipped .pipeline-step-lat {
+        color: #8E93A0;
+    }
+    .pipeline-arrow {
+        color: #5A6068;
+        font-size: 0.78rem;
+        user-select: none;
+    }
+
+    /* CSS 3D Sidebar Layer Stack */
+    .layer-stack-3d {
+        perspective: 720px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        margin: 6px 0 10px 0;
+    }
+    .layer-card-3d {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 4px 8px;
+        border-radius: 6px;
+        font-size: 0.73rem;
+        font-weight: 600;
+        background: #26292E;
+        border: 1px solid rgba(90, 96, 104, 0.7);
+        border-left: 3px solid #FF5F00;
+        color: #F1F3F4;
+        transform: rotateX(10deg) translateZ(0);
+        transition: transform 0.22s var(--ease-spring), border-color 0.16s ease;
+    }
+    .layer-card-3d.off {
+        border-left-color: #5A6068;
+        color: #8E93A0;
+        opacity: 0.75;
+    }
+    .layer-stack-3d:hover .layer-card-3d {
+        transform: rotateX(0deg);
+    }
+
+    /* Typing / Skeleton Loading Shimmer */
+    @keyframes shimmerSweep {
+        0% { background-position: 200% 0; }
+        100% { background-position: -200% 0; }
+    }
+    .typing-skeleton {
+        border-radius: 8px;
+        height: 14px;
+        margin: 6px 0;
+        background: linear-gradient(90deg, #26292E 25%, rgba(255, 95, 0, 0.18) 50%, #26292E 75%);
+        background-size: 200% 100%;
+        animation: shimmerSweep 1.3s ease-in-out infinite;
     }
 
     .quote-snippet {
@@ -672,13 +832,22 @@ APPLE_DESIGN_CSS = """
             transition-duration: 0.01ms !important;
             scroll-behavior: auto !important;
         }
-        /* Blur can trigger vestibular discomfort; drop the glass, keep the surfaces legible. */
+        /* Blur & 3D transforms can trigger vestibular discomfort; drop both and keep crisp surfaces. */
         .apple-card,
         .citation-card,
         .refusal-card,
         div[data-testid="stChatMessage"] {
             -webkit-backdrop-filter: none !important;
             backdrop-filter: none !important;
+        }
+        .citation-card,
+        .citation-card:hover,
+        .pipeline-step,
+        .layer-card-3d,
+        .layer-stack-3d:hover .layer-card-3d,
+        .typing-skeleton {
+            animation: none !important;
+            transform: none !important;
         }
         .citation-card::before {
             display: none !important;
@@ -739,20 +908,22 @@ def _render_profile_badge(profile: str, model: str = "") -> str:
     """Render profile pill badge; displays warning styling when not demo."""
     meta = profile_badge_meta(profile)
     label = html.escape(meta["label"])
-    model_str = f" • {html.escape(model)}" if model else ""
+    model_str = f" · {html.escape(model)}" if model else ""
     is_demo = (profile or "").strip().lower() == "demo"
     if not is_demo:
+        icon_svg = get_svg_icon("alert", color="#FF5F00", size=13)
         return (
             f'<span class="pill-badge" style="background:rgba(255,95,0,0.12);'
             f'color:#FF5F00;border:1px solid rgba(255,95,0,0.4);font-weight:700;" '
             f'title="Non-demo profile active: evaluation or dev tier">'
-            f'⚠️ {label}{model_str}</span>'
+            f'{icon_svg} {label}{model_str}</span>'
         )
+    icon_svg = get_svg_icon("check", color="#1C1D20", size=13)
     return (
         f'<span class="pill-badge" style="background:#FF5F00;color:#1C1D20;'
         f'border:1px solid #FF5F00;font-weight:700;" '
         f'title="Live production demo profile">'
-        f'🟢 {label}{model_str}</span>'
+        f'{icon_svg} {label}{model_str}</span>'
     )
 
 
@@ -1075,7 +1246,7 @@ def render_sidebar(client: ComplianceAPIClient, token: str, user: dict[str, Any]
                         st.session_state["last_error"] = str(exc)
                     st.rerun()
             with col_del:
-                if st.button("✕", key=f"del_{sid}", help=f"Delete session {title}"):
+                if st.button("×", key=f"del_{sid}", help=f"Delete session {title}"):
                     try:
                         client.delete_session(token, sid)
                         remaining = client.list_sessions(token)
@@ -1092,7 +1263,7 @@ def render_sidebar(client: ComplianceAPIClient, token: str, user: dict[str, Any]
         st.divider()
 
         # 2-Minute Demo Presets Section (Housed in collapsed expander for compact layout)
-        with st.expander("⚡ 2-Min Demo Showcase (Viva)", expanded=False):
+        with st.expander("2-Min Demo Showcase (Viva)", expanded=False):
             st.markdown(
                 """
                 <div style="font-size:0.78rem;color:#9AA0AE;margin-bottom:8px;">
@@ -1125,7 +1296,7 @@ def render_sidebar(client: ComplianceAPIClient, token: str, user: dict[str, Any]
         # Document Upload Section (Role-gated: Manager & Auditor tiers)
         if role in settings.UPLOAD_ALLOWED_ROLES:
             st.divider()
-            with st.expander("📄 Ingest Regulatory Document", expanded=False):
+            with st.expander("Ingest Regulatory Document", expanded=False):
                 st.markdown(
                     "<div style='font-size:0.8rem;color:#8E93A0;margin-bottom:8px;'>"
                     "Upload and index regulatory policies (.md, .txt, .pdf, .html). "
@@ -1198,9 +1369,20 @@ def render_sidebar(client: ComplianceAPIClient, token: str, user: dict[str, Any]
                             break
             if isinstance(layers, dict):
                 st.markdown("**Architecture Layers:**")
+                stack_cards: list[str] = []
                 for layer_name, enabled in layers.items():
                     status_icon = "ON" if enabled else "OFF"
+                    cls_state = "on" if enabled else "off"
+                    stack_cards.append(
+                        f"<div class='layer-card-3d {cls_state}'>"
+                        f"<span>{html.escape(str(layer_name))}</span>"
+                        f"<span>{status_icon}</span></div>"
+                    )
                     st.markdown(f"- `{layer_name}`: **{status_icon}**")
+                st.markdown(
+                    f"<div class='layer-stack-3d' aria-label='Active pipeline layer stack'>{''.join(stack_cards)}</div>",
+                    unsafe_allow_html=True,
+                )
             caps = cfg.get("spend_caps", {})
             run_budget = st.session_state.get("run_spend")
             if isinstance(run_budget, dict) and active_id and run_budget.get("run_id") not in (None, f"session:{active_id}"):
@@ -1532,6 +1714,48 @@ def _render_stretch_tool_panels(payload: dict[str, Any]) -> None:
             )
 
 
+def render_pipeline_stepper_html(turn_data: dict[str, Any]) -> str:
+    """Render an animated 5-stage pipeline stepper (Route > Retrieve > Re-rank > Grade > Answer)."""
+    layers = turn_data.get("active_layers") if isinstance(turn_data.get("active_layers"), dict) else {}
+    router_info = turn_data.get("router") if isinstance(turn_data.get("router"), dict) else {}
+    grader_info = turn_data.get("grader") if isinstance(turn_data.get("grader"), dict) else {}
+    timings = turn_data.get("timings") if isinstance(turn_data.get("timings"), dict) else {}
+
+    route_name = str(turn_data.get("route") or turn_data.get("route_taken") or "SINGLE_SEARCH").upper()
+    resp_type = str(turn_data.get("response_type") or ("general_chat" if route_name == "GENERAL_CHAT" else "rag"))
+    is_non_rag = resp_type in ("direct", "general_chat", "system_info") or route_name in ("DIRECT", "GENERAL_CHAT")
+
+    route_active = bool(layers.get("adaptive_router", router_info.get("enabled", False))) or is_non_rag
+    retrieve_active = not is_non_rag
+    rerank_active = not is_non_rag
+    grade_active = (not is_non_rag) and bool(
+        layers.get("corrective_grader", grader_info.get("enabled", bool(turn_data.get("grader_path"))))
+    )
+    answer_active = True
+
+    stages = [
+        ("Route", route_active, float(router_info.get("latency_ms", 0.0) or 0.0)),
+        ("Retrieve", retrieve_active, float(timings.get("retrieval_ms", 0.0) or 0.0)),
+        ("Re-rank", rerank_active, float(timings.get("rerank_ms", 0.0) or 0.0)),
+        ("Grade", grade_active, float(grader_info.get("latency_ms", 0.0) or 0.0)),
+        ("Answer", answer_active, float(timings.get("generation_ms", turn_data.get("latency_ms", 0.0)) or 0.0)),
+    ]
+
+    parts: list[str] = []
+    for idx, (label, active, lat_ms) in enumerate(stages):
+        cls = "pipeline-step" if active else "pipeline-step skipped"
+        stat_txt = f"{lat_ms:.1f} ms" if active else "skipped"
+        icon_html = get_svg_icon("check" if active else "sliders", color="#FF5F00" if active else "#8E93A0", size=12)
+        parts.append(
+            f'<span class="{cls}" style="--step-idx:{idx};">'
+            f'{icon_html}<span>{html.escape(label)}</span>'
+            f'<span class="pipeline-step-lat">{stat_txt}</span></span>'
+        )
+        if idx < len(stages) - 1:
+            parts.append('<span class="pipeline-arrow" aria-hidden="true">&rsaquo;</span>')
+    return f'<div class="pipeline-stepper" role="region" aria-label="Execution pipeline stages">{"".join(parts)}</div>'
+
+
 def _render_citations_and_trace(
     turn_data: dict[str, Any], msg_id: int = 0, role: str = "", query: str = ""
 ) -> None:
@@ -1544,13 +1768,16 @@ def _render_citations_and_trace(
     citations: list[dict[str, Any]] = turn_data.get("citations") or []
     follow_ups: list[str] = turn_data.get("suggested_follow_ups") or []
 
+    st.markdown(render_pipeline_stepper_html(turn_data), unsafe_allow_html=True)
+
     # 1. Non-grounded / Open AI knowledge / System Info: NO citation/source/trace clutter
     if not grounded or response_type == "general_chat":
+        globe_svg = get_svg_icon("globe", color="#FF5F00", size=13)
         st.markdown(
             f"""
             <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px;margin-bottom:6px;">
-                <span class="pill-badge" style="background:rgba(10,132,255,0.12);color:#0A84FF;border:1px solid rgba(10,132,255,0.3);font-weight:600;">
-                    🌐 Open AI Knowledge • Not grounded in company documents
+                <span class="pill-badge" style="background:rgba(255,95,0,0.12);color:#FF5F00;border:1px solid rgba(255,95,0,0.35);font-weight:600;">
+                    {globe_svg} Open AI Knowledge · Not grounded in company documents
                 </span>
                 <span class="pill-badge">Latency: {latency_ms:.1f} ms</span>
             </div>
@@ -1558,13 +1785,14 @@ def _render_citations_and_trace(
             unsafe_allow_html=True,
         )
     elif response_type == "system_info":
+        sliders_svg = get_svg_icon("sliders", color="#34C759", size=13)
         st.markdown(
             f"""
             <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px;margin-bottom:6px;">
                 <span class="pill-badge" style="background:rgba(52,199,89,0.12);color:#34C759;border:1px solid rgba(52,199,89,0.3);font-weight:600;">
-                    ⚙️ System Environment & Security Configuration
+                    {sliders_svg} System Environment & Security Configuration
                 </span>
-                <span class="pill-badge">Direct • Zero Retrieval</span>
+                <span class="pill-badge">Direct · Zero Retrieval</span>
                 <span class="pill-badge">Latency: {latency_ms:.1f} ms</span>
             </div>
             """,
@@ -1633,9 +1861,10 @@ def _render_citations_and_trace(
 
     # 3. Suggested Follow-Up Chips
     if follow_ups:
+        sparkles_svg = get_svg_icon("sparkles", color="#FF5F00", size=13)
         st.markdown(
-            "<div style='font-size:0.78rem;font-weight:600;color:#8E93A0;text-transform:uppercase;letter-spacing:0.03em;margin-top:10px;margin-bottom:6px;'>"
-            "💡 Suggested Inquiries</div>",
+            "<div style='font-size:0.78rem;font-weight:600;color:#8E93A0;text-transform:uppercase;letter-spacing:0.03em;margin-top:10px;margin-bottom:6px;display:flex;align-items:center;gap:5px;'>"
+            f"{sparkles_svg} Suggested Inquiries</div>",
             unsafe_allow_html=True,
         )
         chip_cols = st.columns(len(follow_ups))
@@ -1654,8 +1883,16 @@ def _submit_question(
     response_mode: str = "compliance",
     intent_mode: str = "auto",
 ) -> None:
-    """Execute a chat query and update session state."""
+    """Execute a chat query and update session state with typing skeleton feedback."""
     st.session_state["last_error"] = None
+    skeleton = st.empty()
+    skeleton.markdown(
+        '<div class="apple-card" aria-live="polite" aria-label="Generating compliance response">'
+        '<div class="typing-skeleton" style="width:72%;"></div>'
+        '<div class="typing-skeleton" style="width:94%;"></div>'
+        '<div class="typing-skeleton" style="width:54%;"></div></div>',
+        unsafe_allow_html=True,
+    )
     with st.spinner("Verifying role permissions, retrieving clauses, and validating citations..."):
         try:
             res = client.ask_chat_query(
@@ -1671,8 +1908,10 @@ def _submit_question(
             if st.session_state["messages"]:
                 last_msg_id = st.session_state["messages"][-1]["id"]
                 st.session_state["turn_details"][last_msg_id] = res
+            skeleton.empty()
             st.rerun()
         except UIApiError as exc:
+            skeleton.empty()
             if exc.status_code == 401:
                 _clear_auth_state()
             st.session_state["last_error"] = str(exc)
@@ -1680,206 +1919,45 @@ def _submit_question(
 
 
 RAG_TOPOLOGY_CANVAS_HTML = """
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    background: transparent;
-    overflow: hidden;
-    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
-    user-select: none;
-  }
-  #canvas-container {
-    position: relative;
-    width: 100%;
-    height: 130px;
-    border-radius: 12px;
-    background: linear-gradient(180deg, rgba(20, 24, 34, 0.75) 0%, rgba(11, 14, 20, 0.85) 100%);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  canvas {
-    display: block;
-    width: 100%;
-    height: 100%;
-  }
-  .overlay-badge {
-    position: absolute;
-    bottom: 8px;
-    right: 12px;
-    font-size: 10px;
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    color: #9AA0AE;
-    background: rgba(0, 0, 0, 0.4);
-    padding: 2px 8px;
-    border-radius: 980px;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    pointer-events: none;
-  }
-</style>
-</head>
-<body>
-<div id="canvas-container">
-  <canvas id="rag-canvas"></canvas>
-  <div class="overlay-badge">INTERACTIVE RAG TOPOLOGY • 0.00% LEAKAGE RBAC</div>
+<div class="apple-card" style="padding:14px 18px;margin-bottom:16px;background:#26292E;border:1px solid #5A6068;">
+  <svg role="img" aria-label="Role-enforced hybrid RAG architecture flow" viewBox="0 0 820 112" width="100%" height="106" xmlns="http://www.w3.org/2000/svg" style="display:block;font-family:-apple-system,BlinkMacSystemFont,sans-serif;">
+    <defs>
+      <marker id="rag-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M 0 1 L 10 5 L 0 9 z" fill="#FF5F00"/>
+      </marker>
+    </defs>
+    <g stroke="#5A6068" stroke-width="1.6" fill="none" marker-end="url(#rag-arrow)">
+      <line x1="128" y1="54" x2="176" y2="30"/>
+      <line x1="128" y1="54" x2="176" y2="78"/>
+      <line x1="306" y1="30" x2="354" y2="54"/>
+      <line x1="306" y1="78" x2="354" y2="54"/>
+      <line x1="486" y1="54" x2="534" y2="54"/>
+      <line x1="654" y1="54" x2="696" y2="54"/>
+    </g>
+    <rect x="12" y="34" width="116" height="40" rx="8" fill="#1C1D20" stroke="#FF5F00" stroke-width="1.4"/>
+    <text x="70" y="51" text-anchor="middle" fill="#F1F3F4" font-size="11" font-weight="700">RBAC Filter</text>
+    <text x="70" y="65" text-anchor="middle" fill="#FF5F00" font-size="9">Qdrant + BM25</text>
+    <rect x="178" y="12" width="128" height="36" rx="8" fill="#1C1D20" stroke="#5A6068" stroke-width="1.2"/>
+    <text x="242" y="34" text-anchor="middle" fill="#F1F3F4" font-size="11" font-weight="600">Dense Vector</text>
+    <rect x="178" y="60" width="128" height="36" rx="8" fill="#1C1D20" stroke="#5A6068" stroke-width="1.2"/>
+    <text x="242" y="82" text-anchor="middle" fill="#F1F3F4" font-size="11" font-weight="600">BM25 Sparse</text>
+    <rect x="356" y="34" width="130" height="40" rx="8" fill="#1C1D20" stroke="#5A6068" stroke-width="1.2"/>
+    <text x="421" y="51" text-anchor="middle" fill="#F1F3F4" font-size="11" font-weight="700">RRF + Re-Rank</text>
+    <text x="421" y="65" text-anchor="middle" fill="#A0A6B0" font-size="9">Local CPU</text>
+    <rect x="536" y="34" width="118" height="40" rx="8" fill="#1C1D20" stroke="#5A6068" stroke-width="1.2"/>
+    <text x="595" y="51" text-anchor="middle" fill="#F1F3F4" font-size="11" font-weight="700">Grader Gate</text>
+    <text x="595" y="65" text-anchor="middle" fill="#A0A6B0" font-size="9">Evidence Check</text>
+    <rect x="698" y="34" width="110" height="40" rx="8" fill="#FF5F00" stroke="#FF5F00" stroke-width="1.2"/>
+    <text x="753" y="51" text-anchor="middle" fill="#1C1D20" font-size="11" font-weight="700">Verified XAI</text>
+    <text x="753" y="65" text-anchor="middle" fill="#1C1D20" font-size="9" font-weight="700">Citations</text>
+  </svg>
 </div>
-<script>
-(function() {
-  const canvas = document.getElementById('rag-canvas');
-  if (!canvas) return;
-  const ctx = canvas.getContext('2d');
-  const container = document.getElementById('canvas-container');
-  
-  function resize() {
-    canvas.width = container.clientWidth * (window.devicePixelRatio || 1);
-    canvas.height = container.clientHeight * (window.devicePixelRatio || 1);
-    ctx.scale(window.devicePixelRatio || 1, window.devicePixelRatio || 1);
-  }
-  resize();
-  window.addEventListener('resize', resize);
-  
-  const prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-  const nodes = [
-    { label: "BCBS Basel III", x: 0.14, y: 0.35, color: "#0A84FF", r: 5 },
-    { label: "UK MLR 2017", x: 0.14, y: 0.68, color: "#0A84FF", r: 5 },
-    { label: "FCA BCOBS", x: 0.28, y: 0.22, color: "#0A84FF", r: 5 },
-    { label: "Hybrid RRF", x: 0.38, y: 0.52, color: "#BF5AF2", r: 6 },
-    { label: "Qdrant Dense", x: 0.50, y: 0.28, color: "#30D158", r: 6 },
-    { label: "BM25 Plus", x: 0.50, y: 0.74, color: "#30D158", r: 6 },
-    { label: "RBAC Enclave", x: 0.65, y: 0.50, color: "#30D158", r: 7 },
-    { label: "Internal POL", x: 0.76, y: 0.25, color: "#FF9F0A", r: 5 },
-    { label: "Audit Findings", x: 0.76, y: 0.75, color: "#FF9F0A", r: 5 },
-    { label: "Verified XAI Citations", x: 0.88, y: 0.50, color: "#FF5F00", r: 6 }
-  ];
-
-  const links = [
-    [0, 3], [1, 3], [2, 3], [3, 4], [3, 5], [4, 6], [5, 6],
-    [6, 7], [6, 8], [6, 9], [7, 9], [8, 9]
-  ];
-
-  let mouseX = -100, mouseY = -100;
-  container.addEventListener('mousemove', function(e) {
-    const rect = container.getBoundingClientRect();
-    mouseX = e.clientX - rect.left;
-    mouseY = e.clientY - rect.top;
-  });
-  container.addEventListener('mouseleave', function() {
-    mouseX = -100; mouseY = -100;
-  });
-
-  let t = 0;
-  function draw() {
-    const cw = container.clientWidth;
-    const ch = container.clientHeight;
-    ctx.clearRect(0, 0, cw, ch);
-
-    if (!prefersReduced) t += 0.02;
-
-    // Page-scroll parallax. The canvas is embedded in a same-origin iframe, so
-    // read the host page's scroll offset and fall back to the local document.
-    // Bounded to keep every node inside the 135px canvas band.
-    let scrollDrift = 0;
-    if (!prefersReduced) {
-      let pageScroll = 0;
-      try {
-        const hostDoc = window.parent.document;
-        const scrollHost = hostDoc.querySelector(
-          'section[data-testid="stMain"], section.main, .main'
-        );
-        pageScroll = (scrollHost && scrollHost.scrollTop) || window.parent.scrollY || 0;
-        if (!pageScroll && hostDoc.scrollingElement) {
-          pageScroll = hostDoc.scrollingElement.scrollTop || 0;
-        }
-      } catch (e) {
-        pageScroll = window.scrollY || 0;
-      }
-      scrollDrift = Math.max(-18, Math.min(18, pageScroll * 0.05));
-    }
-
-    links.forEach(([i, j]) => {
-      const n1 = nodes[i];
-      const n2 = nodes[j];
-      const x1 = n1.x * cw + (prefersReduced ? 0 : Math.sin(t + i) * 2);
-      const y1 = n1.y * ch + (prefersReduced ? 0 : Math.cos(t + i) * 2) + scrollDrift;
-      const x2 = n2.x * cw + (prefersReduced ? 0 : Math.sin(t + j) * 2);
-      const y2 = n2.y * ch + (prefersReduced ? 0 : Math.cos(t + j) * 2) + scrollDrift;
-
-      const d1 = Math.hypot(mouseX - x1, mouseY - y1);
-      const d2 = Math.hypot(mouseX - x2, mouseY - y2);
-      const near = d1 < 50 || d2 < 50;
-
-      ctx.beginPath();
-      ctx.moveTo(x1, y1);
-      ctx.lineTo(x2, y2);
-      ctx.strokeStyle = near ? "rgba(10, 132, 255, 0.45)" : "rgba(255, 255, 255, 0.09)";
-      ctx.lineWidth = near ? 1.5 : 1;
-      ctx.stroke();
-
-      if (!prefersReduced) {
-        const prog = (t * 0.4 + (i * 0.3)) % 1;
-        const px = x1 + (x2 - x1) * prog;
-        const py = y1 + (y2 - y1) * prog;
-        ctx.beginPath();
-        ctx.arc(px, py, 1.8, 0, Math.PI * 2);
-        ctx.fillStyle = n2.color;
-        ctx.fill();
-      }
-    });
-
-    nodes.forEach((n, idx) => {
-      const nx = n.x * cw + (prefersReduced ? 0 : Math.sin(t + idx) * 2);
-      const ny = n.y * ch + (prefersReduced ? 0 : Math.cos(t + idx) * 2) + scrollDrift;
-      const dist = Math.hypot(mouseX - nx, mouseY - ny);
-      const isHovered = dist < 22;
-
-      if (isHovered) {
-        ctx.beginPath();
-        ctx.arc(nx, ny, n.r + 6, 0, Math.PI * 2);
-        ctx.fillStyle = "rgba(10, 132, 255, 0.22)";
-        ctx.fill();
-      }
-
-      ctx.beginPath();
-      ctx.arc(nx, ny, isHovered ? n.r + 2 : n.r, 0, Math.PI * 2);
-      ctx.fillStyle = n.color;
-      ctx.fill();
-      ctx.lineWidth = 1.5;
-      ctx.strokeStyle = "#0B0E14";
-      ctx.stroke();
-
-      ctx.font = isHovered ? "600 11px -apple-system, sans-serif" : "500 9.5px -apple-system, sans-serif";
-      ctx.fillStyle = isHovered ? "#FFFFFF" : "#9AA0AE";
-      ctx.textAlign = "center";
-      ctx.fillText(n.label, nx, ny + n.r + 11);
-    });
-
-    if (!prefersReduced) {
-      requestAnimationFrame(draw);
-    }
-  }
-
-  draw();
-})();
-</script>
-</body>
-</html>
 """
 
 
 def _render_rag_topology_canvas() -> None:
-    """Render lightweight, interactive Apple-style RAG flow topology mesh."""
-    try:
-        import streamlit.components.v1 as components
-        components.html(RAG_TOPOLOGY_CANVAS_HTML, height=135)
-    except Exception:
-        pass
+    """Render lightweight pure-SVG compliance RAG flow diagram."""
+    st.markdown(RAG_TOPOLOGY_CANVAS_HTML, unsafe_allow_html=True)
 
 
 def _render_citation_spotlight_bridge() -> None:
@@ -2000,9 +2078,9 @@ def render_chat_view(client: ComplianceAPIClient, token: str, user: dict[str, An
         cur_intent = st.session_state.get("intent_mode", "auto")
         scope_options = ["auto", "rag", "general"]
         scope_labels = {
-            "auto": "⚡ Auto (Smart Intent)",
-            "rag": "🏛️ Company Docs (RAG)",
-            "general": "🌐 General Chat",
+            "auto": "Auto (Smart Intent)",
+            "rag": "Company Docs (RAG)",
+            "general": "General Chat",
         }
         selected_intent = st.selectbox(
             "Knowledge Scope",
@@ -2018,8 +2096,8 @@ def render_chat_view(client: ComplianceAPIClient, token: str, user: dict[str, An
         cur_mode = st.session_state.get("response_mode", "compliance")
         mode_options = ["compliance", "explain"]
         mode_labels = {
-            "compliance": "🛡️ Strict Compliance",
-            "explain": "💬 Explain & Discuss",
+            "compliance": "Strict Compliance",
+            "explain": "Explain & Discuss",
         }
         selected_mode = st.selectbox(
             "Response Style",
@@ -2039,8 +2117,8 @@ def render_chat_view(client: ComplianceAPIClient, token: str, user: dict[str, An
         st.markdown(
             f"""
             <div class="apple-card" style="border-left: 4px solid #FF5F00;">
-                <div style="font-size:0.8rem;font-weight:700;color:#FF5F00;text-transform:uppercase;letter-spacing:0.04em;">
-                    ⚡ Staged Preset Query Ready to Run
+                <div style="font-size:0.8rem;font-weight:700;color:#FF5F00;text-transform:uppercase;letter-spacing:0.04em;display:flex;align-items:center;gap:6px;">
+                    {get_svg_icon("zap", color="#FF5F00", size=14)} Staged Preset Query Ready to Run
                 </div>
                 <div style="margin-top: 6px; font-size: 0.96rem; font-weight: 500;">{html.escape(staged_query)}</div>
             </div>
@@ -2065,7 +2143,7 @@ def render_chat_view(client: ComplianceAPIClient, token: str, user: dict[str, An
         st.markdown(
             f"""
             <div class="hero-banner">
-                <div class="hero-icon">🏛️</div>
+                <div class="hero-icon">{get_svg_icon("bank", color="#FF5F00", size=38)}</div>
                 <div class="hero-title">Banking Regulatory Compliance Assistant</div>
                 <div class="hero-subtitle">
                     Ask compliance, policy, and audit questions. Every response enforces strict
@@ -2091,7 +2169,7 @@ def render_chat_view(client: ComplianceAPIClient, token: str, user: dict[str, An
                 st.markdown(
                     f"""
                     <div class="starter-card-box">
-                        <div style="font-size:1.3rem;margin-bottom:4px;">{item['icon']}</div>
+                        <div style="margin-bottom:6px;">{get_svg_icon(item['icon'], color='#FF5F00', size=20)}</div>
                         <div style="font-weight:700;font-size:0.92rem;color:#F1F3F4;margin-bottom:6px;">{item['title']}</div>
                         <div style="font-size:0.82rem;color:#8E93A0;line-height:1.4;">{html.escape(item['query'])}</div>
                     </div>
@@ -2164,13 +2242,26 @@ def render_chat_view(client: ComplianceAPIClient, token: str, user: dict[str, An
                     mode_lbl = "Explain & Discuss" if resp_mode == "explain" else "Strict Compliance"
                     is_grounded = meta.get("grounded", route_used != "GENERAL_CHAT" and bool(chunk_ids))
                     resp_type = meta.get("response_type", "general_chat" if route_used == "GENERAL_CHAT" else ("rag" if chunk_ids else "direct"))
+                    cfg_layers = (st.session_state.get("admin_config") or {}).get("layers") or {}
+
+                    stepper_html = render_pipeline_stepper_html(
+                        {
+                            **meta,
+                            "route": route_used,
+                            "response_type": resp_type,
+                            "timings": meta.get("timings") or {},
+                            "active_layers": cfg_layers,
+                        }
+                    )
+                    if stepper_html:
+                        st.markdown(stepper_html, unsafe_allow_html=True)
 
                     if not is_grounded or resp_type == "general_chat":
                         st.markdown(
                             f"""
                             <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px;margin-bottom:6px;">
-                                <span class="pill-badge" style="background:rgba(10,132,255,0.12);color:#0A84FF;border:1px solid rgba(10,132,255,0.3);font-weight:600;">
-                                    🌐 Open AI Knowledge • Not grounded in company documents
+                                <span class="pill-badge" style="background:rgba(10,132,255,0.12);color:#0A84FF;border:1px solid rgba(10,132,255,0.3);font-weight:600;display:inline-flex;align-items:center;gap:5px;">
+                                    {get_svg_icon("globe", color="#0A84FF", size=12)} Open AI Knowledge · Not grounded in company documents
                                 </span>
                                 <span class="pill-badge">Latency: {float(lat):.1f} ms</span>
                             </div>
@@ -2181,8 +2272,8 @@ def render_chat_view(client: ComplianceAPIClient, token: str, user: dict[str, An
                         st.markdown(
                             f"""
                             <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px;margin-bottom:6px;">
-                                <span class="pill-badge" style="background:rgba(52,199,89,0.12);color:#34C759;border:1px solid rgba(52,199,89,0.3);font-weight:600;">
-                                    ⚙️ System Configuration
+                                <span class="pill-badge" style="background:rgba(52,199,89,0.12);color:#34C759;border:1px solid rgba(52,199,89,0.3);font-weight:600;display:inline-flex;align-items:center;gap:5px;">
+                                    {get_svg_icon("sliders", color="#34C759", size=12)} System Configuration
                                 </span>
                                 <span class="pill-badge">Latency: {float(lat):.1f} ms</span>
                             </div>
@@ -2206,8 +2297,8 @@ def render_chat_view(client: ComplianceAPIClient, token: str, user: dict[str, An
                     meta_followups = meta.get("suggested_follow_ups") or []
                     if meta_followups:
                         st.markdown(
-                            "<div style='font-size:0.78rem;font-weight:600;color:#8E93A0;text-transform:uppercase;letter-spacing:0.03em;margin-top:10px;margin-bottom:6px;'>"
-                            "💡 Suggested Inquiries</div>",
+                            f"<div style='font-size:0.78rem;font-weight:600;color:#8E93A0;text-transform:uppercase;letter-spacing:0.03em;margin-top:10px;margin-bottom:6px;display:flex;align-items:center;gap:5px;'>"
+                            f"{get_svg_icon('sparkles', color='#FF5F00', size=13)} Suggested Inquiries</div>",
                             unsafe_allow_html=True,
                         )
                         chip_cols = st.columns(len(meta_followups))
@@ -2328,7 +2419,7 @@ def render_auditor_view(client: ComplianceAPIClient, token: str, user: dict[str,
 def main() -> None:
     st.set_page_config(
         page_title="Enterprise Banking Regulatory Compliance Assistant",
-        page_icon="🏛️",
+        page_icon=None,
         layout="wide",
         initial_sidebar_state="expanded",
     )

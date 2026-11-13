@@ -791,3 +791,69 @@ def test_phase8c_pipeline_ui_and_audit_persistence(tmp_path):
     assert callable(_render_stretch_tool_panels)
 
 
+def test_phase8d_ui_polish_svg_stepper_3d_and_reduced_motion() -> None:
+    """Phase 8D: verify inline SVG icons, zero emojis/CDNs, 60/30/10 tokens, 3D tilt, reduced motion, and pipeline stepper."""
+    from pathlib import Path
+    from src.ui.app import APPLE_DESIGN_CSS, get_svg_icon, render_pipeline_stepper_html
+
+    app_text = Path("src/ui/app.py").read_text(encoding="utf-8")
+
+    # 1. Zero UI emoji codepoints and zero external fonts/CDNs/WebGL
+    emoji_hits = [
+        ch for ch in app_text if (0x2600 <= ord(ch) <= 0x27BF) or ord(ch) >= 0x1F000
+    ]
+    assert emoji_hits == [], f"Unexpected emoji characters in src/ui/app.py: {emoji_hits}"
+    lowered = app_text.lower()
+    for forbidden in ("fonts.googleapis", "fonts.gstatic", "unpkg.com", "jsdelivr", "three.js", "<canvas"):
+        assert forbidden not in lowered
+
+    # 2. Inline SVG helper returns clean <svg> markup
+    svg = get_svg_icon("shield", color="#FF5F00", size=18)
+    assert "<svg" in svg and "</svg>" in svg
+    assert "#FF5F00" in svg
+
+    # 3. 60/30/10 palette + citation card 3D hover/stagger + reduced motion rules exist in CSS
+    for token in (
+        "#1C1D20",
+        "#26292E",
+        "#5A6068",
+        "#FF5F00",
+        "#F1F3F4",
+        "citeCardEnter",
+        "perspective(900px) rotateX(2.5deg) rotateY(-4deg)",
+        ".layer-stack-3d",
+        ".pipeline-stepper",
+        "@media (prefers-reduced-motion: reduce)",
+    ):
+        assert token in APPLE_DESIGN_CSS, f"Missing CSS token: {token}"
+
+    # 4. Pipeline stepper distinguishes active vs skipped stages with latencies
+    active_html = render_pipeline_stepper_html(
+        {
+            "route": "MULTI_SEARCH",
+            "response_type": "rag",
+            "active_layers": {"adaptive_router": True, "corrective_grader": True},
+            "router": {"enabled": True, "latency_ms": 4.2},
+            "timings": {"retrieval_ms": 11.5, "rerank_ms": 18.0, "generation_ms": 24.0},
+            "grader": {"enabled": True, "latency_ms": 6.1},
+        }
+    )
+    for stage in ("Route", "Retrieve", "Re-rank", "Grade", "Answer"):
+        assert stage in active_html
+    assert "4.2 ms" in active_html
+    assert "skipped" not in active_html
+
+    skipped_html = render_pipeline_stepper_html(
+        {
+            "route": "GENERAL_CHAT",
+            "response_type": "general_chat",
+            "active_layers": {"adaptive_router": True, "corrective_grader": True},
+            "router": {"enabled": True, "latency_ms": 2.0},
+            "timings": {"generation_ms": 9.0},
+        }
+    )
+    assert "pipeline-step skipped" in skipped_html
+    assert "skipped" in skipped_html
+
+
+

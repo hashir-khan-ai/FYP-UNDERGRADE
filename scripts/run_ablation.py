@@ -270,7 +270,7 @@ def run_ablation_suite(
 
         now_utc = datetime.now(timezone.utc)
         harness_banner = (
-            "MOCK, not evidence"
+            "MOCK, not evidence — HARNESS CHECK ONLY (mock)"
             if active_profile == "mock"
             else f"LIVE ({active_profile})"
         )

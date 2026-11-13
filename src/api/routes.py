@@ -219,9 +219,9 @@ def _spend_stats_from_snapshot(snap: Any) -> SpendStats:
     """Convert a SpendGuardStatus snapshot into a sanitized API SpendStats payload."""
     return SpendStats(
         calls_used=snap.calls,
-        calls_limit=snap.calls_limit,
+        calls_limit=snap.calls_limit or int(settings.LLM_MAX_CALLS_PER_RUN),
         tokens_used=snap.tokens,
-        tokens_limit=snap.tokens_limit,
+        tokens_limit=snap.tokens_limit or int(settings.LLM_MAX_TOKENS_PER_RUN),
         exhausted=snap.exhausted,
         calls_remaining=snap.calls_remaining,
         tokens_remaining=snap.tokens_remaining,
@@ -1064,10 +1064,10 @@ def admin_config(
     )
     spend_caps_payload: dict[str, int] = {
         "calls_used": snap.calls,
-        "calls_limit": snap.calls_limit,
+        "calls_limit": snap.calls_limit or int(settings.LLM_MAX_CALLS_PER_RUN),
         "calls_remaining": snap.calls_remaining,
         "tokens_used": snap.tokens,
-        "tokens_limit": snap.tokens_limit,
+        "tokens_limit": snap.tokens_limit or int(settings.LLM_MAX_TOKENS_PER_RUN),
         "tokens_remaining": snap.tokens_remaining,
         "session_calls": snap.session_calls,
         "session_calls_limit": snap.session_calls_limit,

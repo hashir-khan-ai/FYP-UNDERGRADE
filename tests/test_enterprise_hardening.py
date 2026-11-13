@@ -8,6 +8,8 @@ from fastapi.testclient import TestClient
 from src.api.main import app
 from src.config import ResolvedLLM, settings
 from src.core.telemetry import CorrelationLogFilter
+from src.ingestion.embeddings import FakeEmbeddingGenerator
+from src.ingestion.indexer import QdrantIndexer, SearchResult
 from src.rag.baseline import baseline_pipeline
 from tests.conftest import TEST_AUTH_PASSWORD
 
@@ -81,86 +83,103 @@ def test_request_correlation_headers_and_sanitized_logs(
         api_logger.removeFilter(filt)
 
 
-def test_readiness_probe_healthy_and_degraded(monkeypatch) -> None:
+def test_readiness_probe_healthy_and_degraded(monkeypatch, tmp_path) -> None:
     """GET /ready returns 200 when dependencies pass and 503 if LLM configuration fails."""
-    with TestClient(app) as client:
-        ok = client.get("/ready")
-        assert ok.status_code == 200
-        body = ok.json()
-        assert body["status"] == "ready"
-        assert body["checks"]["database"] is True
-        assert body["checks"]["llm_config"] is True
+    isolated_qdrant = QdrantIndexer(
+        storage_path=str(tmp_path / "qdrant"),
+        embedder=FakeEmbeddingGenerator(),
+    )
+    isolated_qdrant.ensure_collection(vector_dim=384)
+    monkeypatch.setattr(baseline_pipeline, "qdrant", isolated_qdrant)
 
-        def _broken_ready() -> ResolvedLLM:
-            raise ValueError("Simulated missing provider API key")
+    try:
+        with TestClient(app) as client:
+            ok = client.get("/ready")
+            assert ok.status_code == 200
+            body = ok.json()
+            assert body["status"] == "ready"
+            assert body["checks"]["database"] is True
+            assert body["checks"]["llm_config"] is True
+            assert body["checks"]["vector_store"] is True
 
-        monkeypatch.setattr(settings, "ensure_llm_ready", _broken_ready)
-        fail = client.get("/ready")
-        assert fail.status_code == 503
-        fail_body = fail.json()
-        assert fail_body["status"] == "not_ready"
-        assert fail_body["checks"]["llm_config"] is False
-        assert "Simulated missing provider API key" not in fail.text
+            def _broken_ready() -> ResolvedLLM:
+                raise ValueError("Simulated missing provider API key")
+
+            monkeypatch.setattr(type(settings), "ensure_llm_ready", lambda self: _broken_ready())
+            fail = client.get("/ready")
+            assert fail.status_code == 503
+            fail_body = fail.json()
+            assert fail_body["status"] == "not_ready"
+            assert fail_body["checks"]["llm_config"] is False
+            assert "Simulated missing provider API key" not in fail.text
+    finally:
+        isolated_qdrant.close()
 
 
 def test_fallback_offline_preserves_response_contract_and_audit(
     seeded_auth_users,
     monkeypatch,
+    tmp_path,
 ) -> None:
     """Explicit fallback_offline=True executes under offline mock profile with identical contract."""
+    isolated_qdrant = QdrantIndexer(
+        storage_path=str(tmp_path / "qdrant"),
+        embedder=FakeEmbeddingGenerator(),
+    )
+    isolated_qdrant.ensure_collection(vector_dim=384)
+    monkeypatch.setattr(baseline_pipeline, "qdrant", isolated_qdrant)
     monkeypatch.setattr(
         baseline_pipeline.bm25,
         "search",
-        lambda query, top_k=20, role=None: type(
-            "SR",
-            (),
-            {
-                "hits": [
-                    {
-                        "chunk_id": "CH-OFFLINE-001",
-                        "doc_id": "DOC-OFFLINE",
-                        "doc_title": "AML Offline Compliance Standard",
-                        "section_title": "Section 4.1",
-                        "heading_path": "AML Policy > Customer Due Diligence",
-                        "clause_id": "4.1",
-                        "page_number": 3,
-                        "snippet": "Enhanced due diligence applies to high-risk accounts.",
-                        "text": "Enhanced due diligence applies to high-risk accounts.",
-                        "allowed_roles": ["analyst", "manager", "auditor"],
-                        "score": 0.91,
-                    }
-                ],
-                "total_candidates": 1,
-                "filtered_by_role": 0,
-            },
-        )(),
+        lambda query, top_k=20, role=None: SearchResult(
+            hits=[
+                {
+                    "chunk_id": "CH-OFFLINE-001",
+                    "doc_id": "DOC-OFFLINE",
+                    "doc_title": "AML Offline Compliance Standard",
+                    "section_title": "Section 4.1",
+                    "heading_path": "AML Policy > Customer Due Diligence",
+                    "clause_id": "4.1",
+                    "page_number": 3,
+                    "snippet": "Enhanced due diligence applies to high-risk accounts.",
+                    "text": "Enhanced due diligence applies to high-risk accounts.",
+                    "allowed_roles": ["analyst", "manager", "auditor"],
+                    "score": 0.91,
+                }
+            ],
+            considered=1,
+            filtered=0,
+        ),
     )
 
-    with TestClient(app) as client:
-        headers = _login_headers(client, "analyst_user")
-        sess = client.post("/api/v1/sessions", headers=headers, json={"title": "Offline parity"})
-        assert sess.status_code == 201
-        session_id = sess.json()["id"]
+    try:
+        with TestClient(app) as client:
+            headers = _login_headers(client, "analyst_user")
+            sess = client.post("/api/v1/sessions", headers=headers, json={"title": "Offline parity"})
+            assert sess.status_code == 201
+            session_id = sess.json()["id"]
 
-        resp = client.post(
-            "/api/v1/chat/query",
-            headers=headers,
-            json={
-                "session_id": session_id,
-                "query": "When is enhanced due diligence required under AML policy?",
-                "fallback_offline": True,
-            },
-        )
-        assert resp.status_code == 200, resp.text
-        data = resp.json()
-        assert data["llm_stats"]["profile"] == "mock"
-        assert data["llm_stats"]["model"] == "mock-offline-fallback"
-        assert data["spend"]["scope"] == "offline"
-        assert data["spend"]["is_paid"] is False
-        assert data["audit_id"] > 0
-        assert isinstance(data["answer"], str) and len(data["answer"]) > 0
-        assert isinstance(data["citations"], list) and len(data["citations"]) >= 1
-        assert data["citations"][0]["doc_id"] == "DOC-OFFLINE"
+            resp = client.post(
+                "/api/v1/chat/query",
+                headers=headers,
+                json={
+                    "session_id": session_id,
+                    "query": "When is enhanced due diligence required under AML policy?",
+                    "fallback_offline": True,
+                },
+            )
+            assert resp.status_code == 200, resp.text
+            data = resp.json()
+            assert data["llm_stats"]["profile"] == "mock"
+            assert data["llm_stats"]["model"] == "mock-offline-fallback"
+            assert data["spend"]["scope"] == "offline"
+            assert data["spend"]["is_paid"] is False
+            assert data["audit_id"] > 0
+            assert isinstance(data["answer"], str) and len(data["answer"]) > 0
+            assert isinstance(data["citations"], list) and len(data["citations"]) >= 1
+            assert data["citations"][0]["doc_id"] == "DOC-OFFLINE"
+    finally:
+        isolated_qdrant.close()
 
 
 def test_admin_metrics_and_queryable_audit_filters(seeded_auth_users) -> None:
@@ -180,9 +199,10 @@ def test_admin_metrics_and_queryable_audit_filters(seeded_auth_users) -> None:
         turn = client.post(
             "/api/v1/chat/query",
             headers=analyst_headers,
-            json={"session_id": session_id, "query": "Hello!"},
+            json={"session_id": session_id, "query": "What LLM model is active?"},
         )
         assert turn.status_code == 200, turn.text
+        assert turn.json()["route"] == "DIRECT_REPLY"
 
         metrics_resp = client.get(
             f"/api/v1/admin/metrics?session_id={session_id}",
@@ -200,13 +220,13 @@ def test_admin_metrics_and_queryable_audit_filters(seeded_auth_users) -> None:
         assert "LLM_API_KEY" not in metrics_resp.text
 
         filtered_logs = client.get(
-            "/api/v1/audit/logs?limit=20&user_role=analyst&route=DIRECT",
+            "/api/v1/audit/logs?limit=20&user_role=analyst&route=DIRECT_REPLY",
             headers=auditor_headers,
         )
         assert filtered_logs.status_code == 200, filtered_logs.text
         rows = filtered_logs.json()
         assert len(rows) >= 1
-        assert all(r["user_role"] == "analyst" and r["final_route"] == "DIRECT" for r in rows)
+        assert all(r["user_role"] == "analyst" and r["final_route"] == "DIRECT_REPLY" for r in rows)
 
         # Injection attempt in filter value returns empty results cleanly via parameterized SQL.
         sqli = client.get(

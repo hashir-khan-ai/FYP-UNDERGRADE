@@ -680,3 +680,28 @@ in LaTeX thesis documents without manual transcription errors.
 
 **Why:** Eliminates offline HTTP 429 deadlocks, stops cross-session state bleed on multi-user API servers, prevents concurrency overshoot or wasted paid completions, and guarantees offline `mock`/local `dev` behave structurally identically to online runs.
 
+---
+
+## Part L — Phase 8A–8D Integrity Hardening, Citation Redesign, Stretch Tools & Visual Polish
+
+### 62. Dual Ingestion & Render Sanitization for Chunks and Citation Cards (Phase 8A.1 & 8B)
+**Decision:** Strip HTML tags and leading Markdown `#` heading markers at chunk creation (`src/ingestion/chunker.py`), HTML-escape all rendered citation fields (`html.escape`) inside `render_citation_card_html`, enforce strict top-to-bottom citation card hierarchy (title, deduplicated breadcrumb, role-derived `Internal · visible to <Roles>` / `Public · verifiable` pill, highlighted blockquote, collapsed `Technical details`), and connect inline `[1]`/`[2]` markers via delegated pointer events.
+
+**Why:** Prevents raw `<div class="internal-badge">` markup or document tags from leaking inside verbatim blockquotes and gives regulatory reviewers clean, navigable, non-repetitive source cards.
+
+### 63. Per-Query Live Budget vs Unmetered Mock & Runtime Telemetry Truth (Phase 8A.2–8A.4)
+**Decision:** Keep `mock` unmetered (`"estimated tokens"` in UI), pair live per-query budgets with separate session call limits plus a sidebar `"Reset budget"` action, suppress XAI traces/panels whenever `xai_output` is `OFF`, read the login leakage KPI directly from `reports/leakage_*.json` (`"not yet measured"` if absent), and render quick-fill persona buttons only when `DEMO_MODE=true`.
+
+**Why:** Ensures transparent runtime honesty between demo, evaluation, and live deployments while keeping mock/offline test cycles completely immune to quota exhaustion.
+
+### 64. Config-Gated RBAC-Safe Stretch Tools & Gold v2 Ablations (Phase 8C)
+**Decision:** Implement `claim_check` (`src/core/claim_check.py`) and AST-whitelisted deterministic `calculator` (`src/core/calculator.py`, rejecting non-whitelisted calls/nodes with zero `eval`/`exec`) strictly behind `ENABLE_CLAIM_CHECK` and `ENABLE_CALCULATOR` (default `false`), filter all candidate passages through `enforce_role_visibility()` before either module executes, create `data/gold_v2.jsonl` by keeping all 100 `gold_set.jsonl` items intact and appending 15 numeric/multi-claim items (`GS-101..GS-115`), and add `A6_claim_check` / `A7_calculator` with `unsupported_claim_rate` and `numeric_exact_match`. All mock ablation runs remain explicitly labelled `"MOCK, not evidence"`.
+
+**Why:** Satisfies optional stretch objectives safely without altering baseline defaults, risking arbitrary code execution, or weakening server-side RBAC guarantees.
+
+### 65. Pure CSS/SVG 60/30/10 UI Polish & Headless Console Verification (Phase 8D)
+**Decision:** Replace all UI emoji characters with inline SVG helpers (`get_svg_icon`), convert the empty-state `<canvas>` diagram into a pure inline SVG (`RAG_TOPOLOGY_CANVAS_HTML` with compact blank-line-free HTML), add an animated 5-stage pipeline stepper, subtle CSS 3D hover tilt / sidebar layer stack, wrapping buttons, and `@media (prefers-reduced-motion: reduce)` fallbacks under the `DESIGN.md` 60/30/10 palette (`#1C1D20`, `#26292E`/`#5A6068`, `#FF5F00`, `#F1F3F4`) without WebGL, heavy JS libraries, external CDNs, or network fonts. Verified in headless Chrome CDP (`0` console errors, `0` page exceptions).
+
+**Why:** Delivers an auditable, zero-network, accessible institutional compliance interface that passes both automated AppTest checks and live browser console verification.
+
+
