@@ -188,6 +188,7 @@ class ChatQueryResponse(BaseModel):
     response_type: str = "rag"
     grounded: bool = True
     suggested_follow_ups: list[str] = Field(default_factory=list)
+    active_layers: dict[str, bool] = Field(default_factory=dict)
 
 
 class SessionCreateRequest(BaseModel):

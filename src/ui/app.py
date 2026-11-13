@@ -1041,6 +1041,15 @@ def render_sidebar(client: ComplianceAPIClient, token: str, user: dict[str, Any]
             st.markdown(f"**Active Model:** `{model}`")
             st.markdown(f"**Prompt Version:** `{cfg.get('prompt_version', 'v1')}`")
             layers = cfg.get("layers", {})
+            turn_details = st.session_state.get("turn_details") or {}
+            if isinstance(turn_details, dict) and turn_details:
+                for _mid in sorted(turn_details.keys(), reverse=True):
+                    _tdata = turn_details.get(_mid)
+                    if isinstance(_tdata, dict) and (not active_id or _tdata.get("session_id") in (None, active_id)):
+                        _t_layers = _tdata.get("active_layers")
+                        if isinstance(_t_layers, dict) and _t_layers:
+                            layers = _t_layers
+                            break
             if isinstance(layers, dict):
                 st.markdown("**Architecture Layers:**")
                 for layer_name, enabled in layers.items():
@@ -1131,6 +1140,16 @@ def _render_citations_and_trace(
         )
     else:
         # 2. Grounded RAG Response
+        cfg = st.session_state.get("admin_config") or {}
+        cfg_layers = cfg.get("layers") if isinstance(cfg.get("layers"), dict) else {}
+        turn_layers = turn_data.get("active_layers") if isinstance(turn_data.get("active_layers"), dict) else {}
+        if "xai_output" in turn_layers:
+            xai_enabled = bool(turn_layers["xai_output"])
+        elif "xai_output" in cfg_layers:
+            xai_enabled = bool(cfg_layers["xai_output"])
+        else:
+            xai_enabled = bool(turn_data.get("xai_output", True))
+
         grader_path = turn_data.get("grader_path") or (
             turn_data.get("grader", {}).get("path")
             if isinstance(turn_data.get("grader"), dict)
@@ -1146,7 +1165,7 @@ def _render_citations_and_trace(
             f"<span class='pill-badge'>Sources: {len(citations)}</span>",
             f"<span class='pill-badge'>Mode: {html.escape(mode_label)}</span>",
         ]
-        if dropped > 0:
+        if xai_enabled and dropped > 0:
             pills.append(
                 f"<span class='pill-badge' style='color:#FF5F00;border-color:rgba(255,95,0,0.3);'>"
                 f"Dropped Invalid Citations: {dropped}</span>"
@@ -1247,7 +1266,7 @@ def _render_citations_and_trace(
                     st.markdown(card_html, unsafe_allow_html=True)
 
         trace: list[str] = turn_data.get("reasoning_trace") or []
-        if trace:
+        if xai_enabled and trace:
             with st.expander("How this answer was produced — Reasoning Trace & Verification Steps", expanded=False):
                 for step_line in trace:
                     st.markdown(f"- {step_line}")

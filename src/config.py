@@ -261,6 +261,14 @@ class Settings(BaseSettings):
         default=False,
         description="Enable local SQLite knowledge-graph cross-reference augmentation in hybrid retrieval",
     )
+    ENABLE_CLAIM_CHECK: bool = Field(
+        default=False,
+        description="Phase 8C: Verify atomic answer claims against retrieved role-permitted passages",
+    )
+    ENABLE_CALCULATOR: bool = Field(
+        default=False,
+        description="Phase 8C: Deterministic AST-whitelisted compliance calculator with cited operands",
+    )
 
     # Phase 3 security and memory flags. RBAC is on by default and may only be
     # disabled in tests or in an explicitly labelled baseline ablation.

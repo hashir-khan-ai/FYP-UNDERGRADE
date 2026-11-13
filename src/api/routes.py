@@ -10,7 +10,7 @@ import logging
 import time
 import uuid
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, File, Form, Query, Request, UploadFile, status
 
@@ -941,6 +941,16 @@ def _execute_chat_turn(
         response_type=response_type,
         grounded=grounded,
         suggested_follow_ups=suggested_follow_ups,
+        active_layers={
+            "adaptive_router": settings.ENABLE_ADAPTIVE_ROUTER,
+            "corrective_grader": settings.ENABLE_CORRECTIVE_GRADER,
+            "rbac": settings.rbac_enabled,
+            "memory": settings.ENABLE_MEMORY,
+            "xai_output": settings.ENABLE_XAI_OUTPUT,
+            "heading_path": settings.ENABLE_HEADING_PATH,
+            "claim_check": settings.ENABLE_CLAIM_CHECK,
+            "calculator": settings.ENABLE_CALCULATOR,
+        },
     )
 
 
@@ -961,12 +971,12 @@ def _percentile(sorted_vals: list[float], pct: float) -> float:
 
 @router.get("/api/v1/audit/logs", response_model=list[AuditLogEntry])
 def audit_logs(
-    limit: int = Query(default=50, ge=1, le=200),
-    offset: int = Query(default=0, ge=0),
-    user_id: int | None = Query(default=None),
-    start_date: str | None = Query(default=None),
-    route: str | None = Query(default=None),
-    user_role: str | None = Query(default=None),
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    offset: Annotated[int, Query(ge=0)] = 0,
+    user_id: Annotated[int | None, Query()] = None,
+    start_date: Annotated[str | None, Query()] = None,
+    route: Annotated[str | None, Query()] = None,
+    user_role: Annotated[str | None, Query()] = None,
     user: CurrentUser = Depends(require_role("auditor")),
 ) -> list[AuditLogEntry]:
     """Return audit *summaries*. Restricted to the auditor role.
@@ -1079,6 +1089,8 @@ def admin_config(
             "memory": settings.ENABLE_MEMORY,
             "xai_output": settings.ENABLE_XAI_OUTPUT,
             "heading_path": settings.ENABLE_HEADING_PATH,
+            "claim_check": settings.ENABLE_CLAIM_CHECK,
+            "calculator": settings.ENABLE_CALCULATOR,
         },
         spend_caps=spend_caps_payload,
         token_ttl_minutes=settings.AUTH_TOKEN_TTL_MINUTES,

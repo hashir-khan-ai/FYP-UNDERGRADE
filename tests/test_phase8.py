@@ -222,3 +222,87 @@ def test_8a2_ui_renders_human_budget_reset_and_estimated_mock_tokens() -> None:
 
     assert not at.exception
     client.reset_session_run.assert_called_with("tok-analyst", "sess-001")
+
+
+# ==============================================================================
+# Phase 8A.3 — Profile Truth & XAI Flag Gating
+# ==============================================================================
+def test_8a3_ui_sidebar_flags_equal_loaded_config_and_hide_xai_when_off(
+    auth_headers,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """UI sidebar displays the exact loaded config flags; XAI OFF hides trace and XAI-only fields."""
+    from fastapi.testclient import TestClient
+
+    from src.api.main import app
+    from src.config import settings
+
+    monkeypatch.setattr(settings, "ENABLE_ADAPTIVE_ROUTER", True)
+    monkeypatch.setattr(settings, "ENABLE_CORRECTIVE_GRADER", False)
+    monkeypatch.setattr(settings, "ENABLE_MEMORY", True)
+    monkeypatch.setattr(settings, "ENABLE_XAI_OUTPUT", False)
+    monkeypatch.setattr(settings, "ENABLE_HEADING_PATH", True)
+    monkeypatch.setattr(settings, "ENABLE_CLAIM_CHECK", False)
+    monkeypatch.setattr(settings, "ENABLE_CALCULATOR", False)
+
+    api = TestClient(app)
+    headers = auth_headers("analyst")
+    cfg_resp = api.get("/api/v1/admin/config", headers=headers)
+    assert cfg_resp.status_code == 200
+    loaded_cfg = cfg_resp.json()
+    expected_layers = {
+        "adaptive_router": True,
+        "corrective_grader": False,
+        "rbac": True,
+        "memory": True,
+        "xai_output": False,
+        "heading_path": True,
+        "claim_check": False,
+        "calculator": False,
+    }
+    assert loaded_cfg["layers"] == expected_layers
+
+    # Verify /api/v1/chat/query also echoes exact active_layers
+    sess_id = api.post("/api/v1/sessions", json={"title": "Flag Truth"}, headers=headers).json()["id"]
+    q_resp = api.post(
+        "/api/v1/chat/query",
+        json={"session_id": sess_id, "query": "What is CET1 under Basel III?"},
+        headers=headers,
+    )
+    assert q_resp.status_code == 200
+    q_body = q_resp.json()
+    assert q_body["active_layers"] == expected_layers
+
+    # Feed exact loaded config + response into UI AppTest and verify parity
+    client = _make_mock_client("analyst")
+    client.get_admin_config.return_value = loaded_cfg
+    at = AppTest.from_file("src/ui/app.py")
+    at.session_state["api_client"] = client
+    at.session_state["access_token"] = "tok-analyst"
+    at.session_state["user"] = {"id": 1, "username": "analyst_user", "role": "analyst", "full_name": "Alex Analyst"}
+    at.session_state["sessions"] = [{"id": sess_id, "title": "Flag Truth"}]
+    at.session_state["active_session_id"] = sess_id
+    at.session_state["messages"] = [
+        {"id": 1, "sender": "user", "content": "What is CET1 under Basel III?"},
+        {"id": 2, "sender": "assistant", "content": q_body["answer"]},
+    ]
+    at.session_state["turn_details"] = {
+        2: {
+            **q_body,
+            "citations_dropped": 2,
+            "reasoning_trace": ["Step 1: Should NOT be visible when xai_output is OFF."],
+        }
+    }
+    at.run()
+
+    assert not at.exception
+    rendered = _collect_all_markdowns(at)
+    for layer_name, enabled in expected_layers.items():
+        expected_state = "ON" if enabled else "OFF"
+        assert f"`{layer_name}`: **{expected_state}**" in rendered
+
+    # XAI OFF -> trace expander label & XAI-only fields must not be rendered
+    assert "Should NOT be visible when xai_output is OFF" not in rendered
+    assert "Dropped Invalid Citations" not in rendered
+    expander_labels = [exp.label for exp in at.expander]
+    assert not any("Reasoning Trace" in lbl for lbl in expander_labels)
