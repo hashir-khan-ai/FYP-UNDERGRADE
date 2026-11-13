@@ -15,7 +15,7 @@
 Compliance Managers must submit a formal Suspicious Transaction and Order Report (STOR) to the FCA via the Connect portal without delay, and no later than 2 business days following the identification of reasonable suspicion of insider dealing, market manipulation, or attempted market abuse for orders exceeding €250,000.
 
 ### Clause POL-MAR-1.4 (Insider List Protocol 'Project Kronos')
-Whenever the bank advises on confidential price-sensitive corporate transactions, the Compliance Manager must establish an Event-Based Insider List (designated internally under the 'Project Kronos' protocol). All listed individuals must provide written acknowledgment of their legal insider duties within 24 hours of list addition.
+Whenever the bank advises on confidential price-sensitive corporate transactions, the Compliance Manager must establish an Event-Based Insider List (designated internally under the 'Project Kronos' protocol). All listed individuals must provide written acknowledgment of their legal insider duties within 24 hours of list addition. Canary Verification Identifier: CANARY-MGT-KRONOS-55412.
 
 ---
 

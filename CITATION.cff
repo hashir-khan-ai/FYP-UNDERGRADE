@@ -1,0 +1,22 @@
+cff-version: 1.2.0
+message: "If you use or reference this software, please cite it as below."
+authors:
+  - family-names: "Khan"
+    given-names: "Hashir"
+title: "Enterprise RAG Assistant for Banking Regulatory Compliance"
+version: 1.0.0
+date-released: 2026-05-01
+url: "https://github.com/hashir-khan/FYP-UNDERGRADE"
+repository-code: "https://github.com/hashir-khan/FYP-UNDERGRADE"
+keywords:
+  - "retrieval-augmented generation"
+  - "regulatory compliance"
+  - "role-based access control"
+  - "banking supervision"
+  - "explainable ai"
+  - "security hardening"
+license: "MIT"
+type: "software"
+institution:
+  name: "Department of Computer Science"
+

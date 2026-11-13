@@ -2,6 +2,7 @@
 
 import atexit
 import logging
+import os
 import pickle
 import re
 import shutil
@@ -55,6 +56,25 @@ def build_indexable_text(chunk: DocumentChunk) -> str:
     return chunk.text_content
 
 
+def check_storage_lock(storage_path: str | Path) -> None:
+    """Verify that local embedded Qdrant storage lock is not held by a stale process."""
+    path = Path(storage_path)
+    if not path.exists():
+        return
+    lock_file = path / ".lock"
+    if not lock_file.exists():
+        return
+    try:
+        with open(lock_file, "r+"):
+            pass
+    except (IOError, PermissionError, OSError) as exc:
+        raise RuntimeError(
+            f"Local Qdrant storage at '{path}' is locked by another running process or stale server "
+            f"({type(exc).__name__}: {exc}). Please stop any active uvicorn, background, or test "
+            "processes holding the store, or configure an isolated QDRANT_STORAGE_PATH."
+        ) from exc
+
+
 def _close_qdrant_quietly(client: Any) -> None:
     """Close an embedded Qdrant client without raising during teardown."""
     try:
@@ -89,8 +109,20 @@ class QdrantIndexer:
             if self._client is None:
                 from qdrant_client import QdrantClient
 
-                Path(self.storage_path).mkdir(parents=True, exist_ok=True)
-                self._client = QdrantClient(path=self.storage_path)
+                storage_dir = Path(self.storage_path)
+                storage_dir.mkdir(parents=True, exist_ok=True)
+                check_storage_lock(storage_dir)
+
+                try:
+                    self._client = QdrantClient(path=self.storage_path)
+                except Exception as exc:
+                    if "lock" in str(exc).lower():
+                        raise RuntimeError(
+                            f"Local Qdrant storage at '{self.storage_path}' lock acquisition failed ({exc}). "
+                            "Ensure no concurrent processes are using this directory."
+                        ) from exc
+                    raise
+
                 if not self._atexit_registered:
                     # Safety net for scripts and tests that forget an explicit close.
                     atexit.register(_close_qdrant_quietly, self._client)
@@ -218,7 +250,11 @@ class QdrantIndexer:
         Raises:
             InvalidRoleError: if a non-None role is not in the frozen role model.
         """
-        role_filter = get_role_filter(role) if role is not None else None
+        # Positive control: Mutant (c) disables pre-fusion vector RBAC filter
+        if os.environ.get("MUTANT_DISABLE_PRE_FUSION_RBAC") == "1":
+            role_filter = None
+        else:
+            role_filter = get_role_filter(role) if role is not None else None
         with self._lock:
             client = self._get_client()
             try:
@@ -381,7 +417,13 @@ class BM25Indexer:
             self.chunks = data.get("chunks", [])
             return self.bm25 is not None
 
-    def search(self, query: str, top_k: int, role: str | None) -> SearchResult:
+    def search(
+        self,
+        query: str,
+        top_k: int,
+        role: str | None,
+        strict_match: bool | None = None,
+    ) -> SearchResult:
         """Return the top-k positively scored chunks visible to ``role``.
 
         Role filtering happens on candidate metadata before fusion, so a
@@ -392,6 +434,8 @@ class BM25Indexer:
             query: User query text.
             top_k: Maximum number of hits.
             role: Authenticated user role.
+            strict_match: If True, enforce strict query term presence in candidate docs.
+                Defaults to settings.BM25_STRICT_MATCH (False = plain BM25Plus library).
 
         Raises:
             InvalidRoleError: if a non-None role is not in the frozen role model.
@@ -409,8 +453,24 @@ class BM25Indexer:
             return SearchResult()
 
         scores = bm25_ref.get_scores(tokenized_query)
-        positive = [index for index in range(len(scores)) if float(scores[index]) > 0.0]
-        if role is None:
+
+        is_strict = settings.BM25_STRICT_MATCH if strict_match is None else strict_match
+        if is_strict:
+            matching_indices = {
+                index
+                for q in tokenized_query
+                for index, doc in enumerate(getattr(bm25_ref, "doc_freqs", []))
+                if doc.get(q, 0) > 0
+            }
+            if not matching_indices and not hasattr(bm25_ref, "doc_freqs"):
+                positive = [index for index in range(len(scores)) if float(scores[index]) > 0.0]
+            else:
+                positive = [index for index in matching_indices if float(scores[index]) > 0.0]
+        else:
+            # Plain library BM25Plus baseline behavior
+            positive = [index for index in range(len(scores)) if float(scores[index]) > 0.0]
+        # Positive control: Mutant (c) disables pre-fusion BM25 role filter
+        if role is None or os.environ.get("MUTANT_DISABLE_PRE_FUSION_RBAC") == "1":
             eligible = positive
         else:
             eligible = [

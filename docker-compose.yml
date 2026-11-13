@@ -1,0 +1,22 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: compliance-rag-api
+    ports:
+      - "8000:8000"
+    environment:
+      - APP_ENV=production
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+      - LLM_PROFILE=mock
+      - SQLITE_DB_PATH=data/app.db
+      - QDRANT_PATH=data/qdrant
+    volumes:
+      - app-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  app-data:
+

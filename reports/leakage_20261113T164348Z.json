@@ -1,0 +1,15 @@
+{
+  "timestamp": "2026-11-13T16:43:48.652316+00:00",
+  "mode": "real_index",
+  "index_description": "real_index (Qdrant 101 chunks + BM25 101 chunks + CPU BGE/MiniLM)",
+  "qdrant_storage": "D:\\FYP-UNDERGRADE\\data\\qdrant",
+  "bm25_index": "D:\\FYP-UNDERGRADE\\data\\sqlite\\bm25_index.pkl",
+  "cells_checked": 141,
+  "leaked_cells": 0,
+  "leakage_rate": 0.0,
+  "leakage_rate_pct": 0.0,
+  "rbac_enabled": true,
+  "profile": "mock",
+  "adversarial_cases_count": 32,
+  "failures": []
+}

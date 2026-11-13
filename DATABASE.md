@@ -324,7 +324,7 @@ INSERT OR IGNORE INTO users (id, username, password_hash, role_id, full_name, em
 
 ### Assumptions Made
 - Single-instance local SQLite is sufficient for the scale of this project; concurrent reads are handled smoothly by WAL mode.
-- User authentication can be simulated locally via user token/header selection in the Streamlit UI, calling the backend with validated user credentials.
+- User authentication can be simulated locally via user token/header selection in the Web UI, calling the backend with validated user credentials.
 - Document and chunk identifiers (`DOC-XXX`, `CH-XXX`) follow a deterministic numbering scheme generated at ingestion.
 
 ### Open Decisions Flagged for User

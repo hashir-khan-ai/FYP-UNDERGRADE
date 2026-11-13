@@ -11,7 +11,7 @@
 ```mermaid
 graph TD
     subgraph UI_Layer ["Presentation Layer (Localhost)"]
-        UI[Streamlit Web UI<br/>Multi-Role Selector & Chat Session]
+        UI[Next.js Web Client (Compliance Desk)<br/>Multi-Role Selector & Chat Session]
     end
 
     subgraph API_Layer ["API Layer (FastAPI)"]

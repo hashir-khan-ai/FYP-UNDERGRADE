@@ -4,6 +4,8 @@ import json
 import sqlite3
 from typing import Any
 
+from src.core.audit_chain import GENESIS_PREV_HASH, compute_audit_hash
+
 
 class Repository:
     """Encapsulates parameterized CRUD operations over the SQLite schema."""
@@ -130,14 +132,21 @@ class Repository:
     # --------------------------------------------------------------------------
     # Sessions
     # --------------------------------------------------------------------------
-    def create_session(self, session_id: str, user_id: int, title: str = "New Compliance Session") -> str:
+    def create_session(
+        self,
+        session_id: str,
+        user_id: int,
+        title: str = "New Compliance Session",
+        title_source: str = "default",
+        title_locked: int = 0,
+    ) -> str:
         cur = self.conn.cursor()
         cur.execute(
             """
-            INSERT INTO sessions (id, user_id, title)
-            VALUES (?, ?, ?);
+            INSERT INTO sessions (id, user_id, title, title_source, title_locked)
+            VALUES (?, ?, ?, ?, ?);
             """,
-            (session_id, user_id, title),
+            (session_id, user_id, title, title_source, title_locked),
         )
         return session_id
 
@@ -181,16 +190,31 @@ class Repository:
         )
         return cur.rowcount > 0
 
-    def rename_session_for_user(self, session_id: str, user_id: int, title: str) -> sqlite3.Row | None:
+    def rename_session_for_user(
+        self,
+        session_id: str,
+        user_id: int,
+        title: str,
+        title_source: str = "user",
+        title_locked: int = 1,
+        force: bool = False,
+    ) -> sqlite3.Row | None:
         """Rename a session owned by ``user_id``; return the updated row or None."""
         cur = self.conn.cursor()
+        existing = self.get_session_for_user(session_id, user_id)
+        if not existing:
+            return None
+        existing_locked = bool(existing["title_locked"] if "title_locked" in existing.keys() else 0)
+        if existing_locked and not force and title_source == "auto":
+            return existing
+
         cur.execute(
             """
             UPDATE sessions
-            SET title = ?, updated_at = CURRENT_TIMESTAMP
+            SET title = ?, title_source = ?, title_locked = ?, updated_at = CURRENT_TIMESTAMP
             WHERE id = ? AND user_id = ?;
             """,
-            (title, session_id, user_id),
+            (title, title_source, title_locked, session_id, user_id),
         )
         if cur.rowcount == 0:
             return None
@@ -323,6 +347,57 @@ class Repository:
         calc_str = json.dumps(calculator_json) if isinstance(calculator_json, dict) else calculator_json
 
         cur = self.conn.cursor()
+        cur.execute("SELECT entry_hash FROM audit_log ORDER BY id DESC LIMIT 1;")
+        prev_row = cur.fetchone()
+        prev_hash = str(prev_row[0]) if prev_row and prev_row[0] else GENESIS_PREV_HASH
+
+        entry_values = (
+            session_id,
+            user_id,
+            user_role,
+            query_text,
+            final_route,
+            chunks_str,
+            scores_str,
+            retry_count,
+            rewritten_query,
+            response_text,
+            trace_str,
+            cites_str,
+            latency_ms,
+            tokens_prompt,
+            tokens_completion,
+            llm_profile,
+            llm_calls,
+            cached_calls,
+            spend_guard_hit,
+            prompt_version,
+            llm_model,
+            candidates_retrieved,
+            candidates_filtered,
+            router_confidence,
+            router_fallback_reason,
+            subs_str,
+            timings_str,
+            grader_path,
+            grader_relevant_count,
+            grader_ambiguous_count,
+            grader_irrelevant_count,
+            grader_rewrite_used,
+            grader_rewritten_query,
+            grader_refused,
+            grader_refusal_reason,
+            grader_calls,
+            grader_tokens,
+            grader_latency_ms,
+            citation_count,
+            citations_dropped,
+            heading_path_enabled,
+            claim_str,
+            calc_str,
+        )
+        entry_hash = compute_audit_hash(prev_hash, entry_values)
+
         cur.execute(
             """
             INSERT INTO audit_log (
@@ -337,8 +412,8 @@ class Repository:
                 grader_irrelevant_count, grader_rewrite_used, grader_rewritten_query,
                 grader_refused, grader_refusal_reason, grader_calls, grader_tokens,
                 grader_latency_ms, citation_count, citations_dropped, heading_path_enabled,
-                claim_check_json, calculator_json
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                claim_check_json, calculator_json, prev_hash, entry_hash
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
             """,
             (
                 session_id,
@@ -384,6 +459,8 @@ class Repository:
                 1 if heading_path_enabled else (0 if heading_path_enabled is not None else None),
                 claim_str,
                 calc_str,
+                prev_hash,
+                entry_hash,
             ),
         )
         return cur.lastrowid

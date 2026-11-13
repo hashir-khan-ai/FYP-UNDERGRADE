@@ -63,6 +63,7 @@ def _configure_test_pipeline() -> Generator[None, None, None]:
 
     yield
 
+    baseline_pipeline.qdrant.close()
     baseline_pipeline.qdrant.embedder = orig_embedder
     baseline_pipeline.reranker = orig_reranker
     login_throttle.reset()

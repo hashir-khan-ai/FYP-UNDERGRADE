@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    env:
+      APP_ENV: test
+      LLM_PROFILE: mock
+      SEED_DEFAULT_PASSWORD: ci-test-password-only
+      HF_HUB_OFFLINE: "1"
+      TRANSFORMERS_OFFLINE: "1"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pytest pytest-cov
+
+      - name: Verify zero committed secrets
+        run: |
+          python scripts/scan_secrets.py
+
+      - name: Seed database and build indices
+        run: |
+          python scripts/seed_data.py
+          python -m src.ingestion.run --rebuild
+
+      - name: Run test suite (Mock profile, $0 spend)
+        run: |
+          pytest -v --durations=10
+
+      - name: Verify zero unauthorized data leakage (0.00% target)
+        run: |
+          python scripts/leakage_check.py --real-index
+
+      - name: Run adversarial red team evaluation
+        run: |
+          python scripts/eval_redteam.py
+
+      - name: Verify audit log cryptographic hash chain and external anchor
+        run: |
+          python scripts/verify_audit.py
+          python scripts/export_audit_anchor.py
+          python scripts/verify_audit.py --anchor reports/audit_anchor_latest.json
+

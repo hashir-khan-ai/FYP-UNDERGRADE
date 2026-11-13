@@ -6,6 +6,7 @@ current server-side role, so history can never widen what a user may retrieve.
 """
 
 import logging
+import os
 from dataclasses import dataclass
 from typing import Any
 
@@ -57,8 +58,10 @@ def load_recent_turns(
     """
     if limit <= 0:
         return []
-    if repo.get_session_for_user(session_id, user_id) is None:
-        return []
+    # Positive control: Mutant (e) shares session memory across roles/users
+    if os.environ.get("MUTANT_SHARED_MEMORY") != "1":
+        if repo.get_session_for_user(session_id, user_id) is None:
+            return []
 
     rows = repo.get_recent_messages(session_id, limit)
     turns: list[dict[str, str]] = []

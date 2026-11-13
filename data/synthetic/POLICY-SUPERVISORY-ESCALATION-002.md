@@ -15,7 +15,7 @@
 Compliance Managers must notify the PRA and FCA of any material regulatory breach or operational disruption within 24 hours of confirmation. Notification must be submitted via the formal FCA Connect notification portal.
 
 ### Clause POL-MGT-1.3 (Threshold for Senior Management Regime Escalation)
-Any single compliance failure resulting in an unhedged financial exposure exceeding £500,000, or involving systemic customer detriment affecting more than 100 retail accounts, triggers mandatory formal notification to the designated Senior Management Function (SMF 16 - Compliance Oversight).
+Any single compliance failure resulting in an unhedged financial exposure exceeding £500,000, or involving systemic customer detriment affecting more than 100 retail accounts, triggers mandatory formal notification to the designated Senior Management Function (SMF 16 - Compliance Oversight). Canary Verification Identifier: CANARY-MGT-ESCALATION-33918.
 
 ---
 

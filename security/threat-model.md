@@ -29,7 +29,7 @@
 ## 2. Trust Boundaries
 
 ```
-[Untrusted Client / Browser / Streamlit UI]
+[Untrusted Client / Browser / Web UI]
       │
 ──────┼───────────────────────────────────────────── Trust Boundary 1: Network Ingress (HTTP / CORS)
       ▼
@@ -158,7 +158,7 @@
 #### 1. Public Synthetic User Directory Endpoint in Development Mode
 - **Severity:** Low
 - **Evidence:** `src/api/routes.py` lines 133–149 exposes `GET /api/v1/auth/users` without authentication when `APP_ENV in PUBLIC_USER_LIST_ENVS` (`development`, `dev`, `test`, `local`).
-- **Risk:** Discloses valid usernames, full names, and assigned roles. While intended for the Streamlit demo user switcher, accidental exposure in staging or production leaks directory enumeration data.
+- **Risk:** Discloses valid usernames, full names, and assigned roles. While intended for the demo user switcher, accidental exposure in staging or production leaks directory enumeration data.
 - **Affected Location:** `src/api/routes.py:133-149`
 - **Why It Matters:** Information disclosure aids targeted credential brute-forcing.
 - **Recommended Fix:** Require administrative authentication for user enumeration or strictly gate the route to `APP_ENV == "local"` with an explicit demo flag.

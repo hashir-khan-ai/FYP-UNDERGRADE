@@ -1,5 +1,7 @@
 # Design Specification — Enterprise Banking Regulatory Compliance RAG Assistant
 
+> **Status: Historical.** The Streamlit client has been retired in favor of the Next.js client ("Compliance Desk"). For active UI specifications, design tokens, and components, see [docs/WEB_UI_DESIGN_SYSTEM.md](docs/WEB_UI_DESIGN_SYSTEM.md).
+
 **Module:** COM6301 (BSc Final Year Project)  
 **Phase:** 8 — Integrity, Citation Redesign, Stretch Panels & UI Polish  
 **Status:** Authoritative UI & Accessibility Contract  

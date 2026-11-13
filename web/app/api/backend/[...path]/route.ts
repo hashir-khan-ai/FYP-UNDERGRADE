@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { NextResponse } from "next/server";
 
 import { SESSION_COOKIE } from "@/lib/auth";
 import { backendBaseUrl } from "@/lib/server/session";

@@ -114,6 +114,10 @@ class RetrievalStats(BaseModel):
 class ChatQueryRequest(BaseModel):
     session_id: UUID4 = Field(..., description="UUIDv4 session identifier")
     query: str = Field(..., min_length=2, max_length=2000)
+    role: str | None = Field(
+        default=None,
+        description="Client-supplied role (ignored in production, used only in mutant testing)",
+    )
     config_overrides: ConfigOverrides | None = None
     response_mode: Literal["compliance", "explain"] = Field(
         default="compliance",
@@ -191,6 +195,7 @@ class ChatQueryResponse(BaseModel):
     active_layers: dict[str, bool] = Field(default_factory=dict)
     claim_check: dict[str, Any] | None = None
     calculator: dict[str, Any] | None = None
+    session_title: str | None = None
 
 
 class SessionCreateRequest(BaseModel):
@@ -206,6 +211,8 @@ class SessionRenameRequest(BaseModel):
 class SessionSummary(BaseModel):
     id: str
     title: str
+    title_source: str = "default"
+    title_locked: bool = False
     created_at: str | None = None
     updated_at: str | None = None
 

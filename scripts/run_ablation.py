@@ -218,6 +218,8 @@ def run_ablation_suite(
 
                 config_results: list[dict[str, Any]] = []
                 baseline_a0_ci: dict[str, dict[str, Any]] | None = None
+                prev_spec_rows: list[dict[str, Any]] | None = None
+                prev_spec: Any | None = None
                 interrupted_by_spend_guard = False
 
                 for spec in specs_to_run:
@@ -257,7 +259,11 @@ def run_ablation_suite(
                         spec=spec,
                         rows=rows_for_spec,
                         baseline_ci=baseline_a0_ci,
+                        previous_rows=prev_spec_rows,
+                        previous_spec=prev_spec,
                     )
+                    prev_spec_rows = rows_for_spec
+                    prev_spec = spec
                     if spec.name == "A0_baseline":
                         baseline_a0_ci = agg["ci_95"]
                     config_results.append(agg)
@@ -306,12 +312,16 @@ def run_ablation_suite(
             "configurations": config_results,
         }
 
-        out_dir.mkdir(parents=True, exist_ok=True)
+        effective_out_dir = out_dir
+        if str(out_dir) == "evaluation/results":
+            effective_out_dir = Path("reports/mock") if active_profile == "mock" else Path("reports/real")
+
+        effective_out_dir.mkdir(parents=True, exist_ok=True)
         ts_slug = now_utc.strftime("%Y%m%d_%H%M%S")
         paths = [
-            out_dir / f"ablation_{active_profile}_{ts_slug}.json",
-            out_dir / f"ablation_{active_profile}_latest.json",
-            out_dir / "ablation_latest.json",
+            effective_out_dir / f"ablation_{active_profile}_{ts_slug}.json",
+            effective_out_dir / f"ablation_{active_profile}_latest.json",
+            effective_out_dir / "ablation_latest.json",
         ]
         for p in paths:
             with open(p, "w", encoding="utf-8") as handle:
@@ -389,9 +399,33 @@ def main() -> int:
         default=DEFAULT_MIN_REVIEWED,
         help=f"Minimum reviewed questions for --require-reviewed (default: {DEFAULT_MIN_REVIEWED}).",
     )
+    parser.add_argument(
+        "--allow-unreviewed",
+        action="store_true",
+        help="Allow running a real/live LLM profile on unreviewed draft items.",
+    )
     args = parser.parse_args()
 
     questions = load_gold_set(args.gold_set)
+    human_reviewed_count = sum(
+        1 for q in questions if getattr(q, "status", None) == "reviewed" and getattr(q, "reviewed_by", None) == "human"
+    )
+    total_reviewed_count = sum(
+        1 for q in questions if getattr(q, "status", None) == "reviewed" and getattr(q, "reviewed_by", None) in ("human", "student")
+    )
+    unreviewed_count = len(questions) - human_reviewed_count
+
+    # Real-profile gate: refuse real LLM profile on unreviewed items unless --allow-unreviewed
+    if args.profile != "mock" and not args.allow_unreviewed and not args.require_reviewed:
+        if unreviewed_count > 0:
+            print(
+                f"[REFUSED] Real profile '{args.profile}' run cannot proceed on {unreviewed_count} unreviewed items "
+                f"(reviewed_by=human: {human_reviewed_count}).\n"
+                f"Pass --require-reviewed to evaluate the {human_reviewed_count} reviewed items only, "
+                "or pass --allow-unreviewed to explicitly override."
+            )
+            return 2
+
     if args.require_reviewed:
         try:
             questions = enforce_reviewed_gate(args.gold_set, questions, args.min_reviewed)
@@ -418,6 +452,7 @@ def main() -> int:
     print(f"ABLATION RUN SUMMARY | Profile: {payload['llm_profile']} ({payload['llm_model']})")
     print(f"Execution Label     : {payload['harness_mode_banner']}")
     print(f"Questions per config: {payload['questions_evaluated']} ({payload['gold_set_status_note']})")
+    print(f"Gold Set Review     : reviewed_by=human: {human_reviewed_count} | unreviewed_draft: {unreviewed_count}")
     print("========================================================================================================================")
     header = (
         f"{'Config':<16} {'Rec@5 (95% CI)':>20} {'nDCG@5 (95% CI)':>20} {'AnsF1':>7} {'CitVal':>7} {'CRR':>7} "
@@ -439,6 +474,16 @@ def main() -> int:
         if r5_overlap and cfg["config_name"] != "A0_baseline":
             r5_str += "†"
             overlap_notes.append(f"{cfg['config_name']} Recall@5 95% CI overlaps A0_baseline (no statistical difference)")
+
+        vs_adj = cfg.get("vs_adjacent_prev")
+        if vs_adj:
+            p_name = vs_adj.get("previous_config_name", "")
+            r5_m = vs_adj.get("metrics", {}).get("recall@5", {})
+            if r5_m.get("null_result"):
+                overlap_notes.append(
+                    f"{cfg['config_name']} vs adjacent {p_name}: Recall@5 delta {r5_m.get('mean_delta', 0.0):+.3f} "
+                    f"95% CI [{r5_m.get('ci_low', 0.0):+.3f}, {r5_m.get('ci_high', 0.0):+.3f}] (null result: no statistically significant difference)"
+                )
 
         tag = " [DEMO ONLY]" if cfg.get("is_demonstration_only") else ""
         route_str = "n/a" if m["routing_accuracy"] is None else f"{m['routing_accuracy']:.4f}"

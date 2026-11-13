@@ -218,3 +218,51 @@ def test_rename_session_rejects_blank_and_overlong_titles(auth_headers) -> None:
     )
     assert too_long.status_code == 422
     assert too_long.json()["error"]["code"] == "VALIDATION_ERROR"
+
+
+def test_new_session_auto_titles_on_first_query_and_preserves_custom_title(auth_headers) -> None:
+    headers = auth_headers("analyst")
+    session_id = _create_session(headers, "New Compliance Session")
+
+    first_turn = client.post(
+        "/api/v1/chat/query",
+        json={
+            "session_id": session_id,
+            "query": "What are the KYC verification requirements under MLR 2017 for high-risk clients?",
+        },
+        headers=headers,
+    )
+    assert first_turn.status_code == 200
+    body = first_turn.json()
+    auto_title = body.get("session_title")
+    assert isinstance(auto_title, str) and auto_title
+    assert auto_title != "New Compliance Session"
+    assert "KYC" in auto_title
+    assert len(auto_title) <= 56
+
+    listing = client.get("/api/v1/sessions", headers=headers).json()["sessions"]
+    assert next(item for item in listing if item["id"] == session_id)["title"] == auto_title
+
+    # Custom user rename must be preserved on subsequent queries.
+    renamed = client.patch(
+        f"/api/v1/sessions/{session_id}",
+        json={"title": "Custom Auditor Review"},
+        headers=headers,
+    )
+    assert renamed.status_code == 200
+
+    second_turn = client.post(
+        "/api/v1/chat/query",
+        json={
+            "session_id": session_id,
+            "query": "How should adverse media checks be documented?",
+        },
+        headers=headers,
+    )
+    assert second_turn.status_code == 200
+    assert second_turn.json().get("session_title") == "Custom Auditor Review"
+
+    listing_after = client.get("/api/v1/sessions", headers=headers).json()["sessions"]
+    assert next(item for item in listing_after if item["id"] == session_id)["title"] == (
+        "Custom Auditor Review"
+    )

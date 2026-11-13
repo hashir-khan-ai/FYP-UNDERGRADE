@@ -30,14 +30,14 @@ def is_local_provider_url(base_url: str | None) -> bool:
 class ResolvedLLM(BaseModel):
     """Fully resolved LLM provider settings for the active profile."""
 
-    profile: Literal["mock", "dev", "demo"]
+    profile: Literal["mock", "dev", "demo", "local"]
     model: str
     base_url: str | None = None
     api_key: str | None = None
     temperature: float = 0.0
     timeout_seconds: float = 15.0
     max_retries: int = 3
-    max_rpm: int = 20
+    max_rpm: int = 30  # Groq free tier limit: 30 RPM (https://console.groq.com/docs/rate-limits)
     is_mock: bool = False
     is_local: bool = False
     has_paid_quota: bool = False
@@ -46,7 +46,7 @@ class ResolvedLLM(BaseModel):
     def _derive_quota_flags(self) -> "ResolvedLLM":
         """Derive single-source-of-truth local and paid-quota flags on resolved settings."""
         if "is_local" not in self.model_fields_set:
-            if self.profile == "mock" or self.is_mock:
+            if self.profile in ("mock", "local") or self.is_mock:
                 self.is_local = True
             elif self.profile == "dev":
                 self.is_local = is_local_provider_url(self.base_url)
@@ -78,7 +78,7 @@ class Settings(BaseSettings):
     API_HOST: str = Field(default="127.0.0.1", description="FastAPI bind address")
     API_PORT: int = Field(default=8000, description="FastAPI port")
     CORS_ORIGINS: str = Field(
-        default="http://localhost:3000,http://127.0.0.1:3000,http://localhost:8501,http://127.0.0.1:8501",
+        default="http://localhost:3000,http://127.0.0.1:3000",
         description="Comma-separated permitted CORS origins",
     )
     SECRET_KEY: str = Field(
@@ -87,7 +87,7 @@ class Settings(BaseSettings):
     )
 
     # LLM Profile: "mock" (no network, for tests), "dev" (free provider), "demo" (paid)
-    LLM_PROFILE: Literal["mock", "dev", "demo"] = Field(
+    LLM_PROFILE: Literal["mock", "dev", "demo", "local"] = Field(
         default="dev",
         description="Active LLM profile; tests force 'mock' via tests/conftest.py",
     )
@@ -204,6 +204,10 @@ class Settings(BaseSettings):
         default="cross-encoder/ms-marco-MiniLM-L-6-v2",
         description="Local CPU Cross-Encoder re-ranking model",
     )
+    LOCAL_LLM_MODEL: str = Field(
+        default="sshleifer/tiny-gpt2",
+        description="Local CPU transformer causal LM for $0 live profile",
+    )
 
     # Storage Directories
     DATABASE_PATH: str = Field(
@@ -268,6 +272,10 @@ class Settings(BaseSettings):
     ENABLE_CALCULATOR: bool = Field(
         default=False,
         description="Phase 8C: Deterministic AST-whitelisted compliance calculator with cited operands",
+    )
+    BM25_STRICT_MATCH: bool = Field(
+        default=False,
+        description="Phase 12: Enforce strict query term-presence filtering on BM25 candidates",
     )
 
     # Phase 3 security and memory flags. RBAC is on by default and may only be
@@ -467,6 +475,19 @@ class Settings(BaseSettings):
                 max_retries=self.LLM_MAX_RETRIES,
                 max_rpm=self.LLM_MAX_RPM,
                 is_mock=True,
+            )
+
+        if profile == "local":
+            return ResolvedLLM(
+                profile="local",
+                model=getattr(self, "LOCAL_LLM_MODEL", "sshleifer/tiny-gpt2"),
+                base_url="local://transformers",
+                temperature=0.0,
+                timeout_seconds=self.LLM_TIMEOUT_SECONDS,
+                max_retries=1,
+                max_rpm=1000,
+                is_mock=False,
+                is_local=True,
             )
 
         if profile == "dev":

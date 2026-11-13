@@ -12,7 +12,7 @@
 ## Section 1: Severity Matrix and Supervisory Reporting
 
 ### Clause POL-CYBER-1.1 (Severity 1 Incident Criteria - Project Boreas Framework)
-A cyber event is classified as a Severity 1 Critical Incident under the bank's internal 'Project Boreas' crisis framework if it involves unauthorized exfiltration of customer records exceeding 5,000 accounts, ransomware encryption of payment engines, or financial loss exceeding £750,000.
+A cyber event is classified as a Severity 1 Critical Incident under the bank's internal 'Project Boreas' crisis framework if it involves unauthorized exfiltration of customer records exceeding 5,000 accounts, ransomware encryption of payment engines, or financial loss exceeding £750,000. Canary Verification Identifier: CANARY-MGT-BOREAS-77201.
 
 ### Clause POL-CYBER-1.2 (Mandatory 4-Hour PRA/FCA Regulatory Notification)
 For any confirmed Severity 1 incident, the designated Incident Manager must submit a formal notification to the PRA and FCA via the emergency supervisory hotline within 4 hours of confirmation, followed by an initial Incident Impact Assessment within 24 hours.

@@ -1,0 +1,15 @@
+{
+  "timestamp": "2026-11-13T14:18:10.859219+00:00",
+  "mode": "mock_fixtures",
+  "index_description": "mock_fixtures (FakeEmbeddingGenerator + MockCrossEncoderReranker)",
+  "qdrant_storage": "C:\\Users\\hp\\AppData\\Local\\Temp\\leakage_check_1l39xlmx\\qdrant",
+  "bm25_index": "C:\\Users\\hp\\AppData\\Local\\Temp\\leakage_check_1l39xlmx\\bm25.pkl",
+  "cells_checked": 141,
+  "leaked_cells": 0,
+  "leakage_rate": 0.0,
+  "leakage_rate_pct": 0.0,
+  "rbac_enabled": true,
+  "profile": "mock",
+  "adversarial_cases_count": 32,
+  "failures": []
+}

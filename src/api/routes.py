@@ -7,6 +7,8 @@ Client-supplied role or user identifiers are ignored by construction.
 import inspect
 import json
 import logging
+import os
+import re
 import time
 import uuid
 from pathlib import Path
@@ -96,6 +98,12 @@ from src.rag.baseline import (
 logger = logging.getLogger(__name__)
 router = APIRouter()
 PUBLIC_USER_LIST_ENVS = {"development", "test"}
+from src.core.session_title import (
+    DEFAULT_SESSION_TITLES,
+    generate_session_title,
+    sanitize_title,
+)
+
 SINGLE_SEARCH_API = ROUTE_API_NAMES["single_search"]
 
 
@@ -207,9 +215,12 @@ def logout(user: CurrentUser = Depends(get_current_user)) -> LogoutResponse:
 # Sessions
 # ==============================================================================
 def _session_summary(row: Any) -> SessionSummary:
+    keys = row.keys() if hasattr(row, "keys") else ()
     return SessionSummary(
         id=str(row["id"]),
         title=str(row["title"]),
+        title_source=str(row["title_source"]) if "title_source" in keys else "default",
+        title_locked=bool(row["title_locked"]) if "title_locked" in keys else False,
         created_at=str(row["created_at"]) if row["created_at"] is not None else None,
         updated_at=str(row["updated_at"]) if row["updated_at"] is not None else None,
     )
@@ -360,8 +371,21 @@ def rename_session(
     title = payload.title.strip()
     if not title:
         raise ApiError(400, "EMPTY_TITLE", "Session title cannot be empty.")
+    # Strip markup and control characters while preserving user casing
+    clean_title = re.sub(r"<[^>]+>", "", title)
+    clean_title = re.sub(r"[\r\n\t]", " ", clean_title).strip()
+    if len(clean_title) > 120:
+        clean_title = clean_title[:120].strip()
+
     with get_db_connection() as conn:
-        row = Repository(conn).rename_session_for_user(session_id, user.id, title)
+        row = Repository(conn).rename_session_for_user(
+            session_id,
+            user.id,
+            clean_title,
+            title_source="user",
+            title_locked=1,
+            force=True,
+        )
     if row is None:
         raise ApiError(404, "SESSION_NOT_FOUND", "Session not found.")
     return _session_summary(row)
@@ -420,6 +444,12 @@ def _execute_chat_turn(
     session_id = str(payload.session_id)
     query = payload.query.strip()
     response_mode = getattr(payload, "response_mode", "compliance")
+
+    # Positive control: Mutant (g) allows client request body to forge/override authenticated role
+    active_role = user.role
+    if os.environ.get("MUTANT_ROLE_FROM_BODY") == "1" and getattr(payload, "role", None):
+        active_role = payload.role
+
     if len(query) < 2:
         raise ApiError(400, "EMPTY_QUERY", "Query string cannot be empty.")
 
@@ -464,7 +494,7 @@ def _execute_chat_turn(
         router_kwargs: dict[str, Any] = {
             "session_id": session_id,
             "intent_mode": intent_mode,
-            "user_role": user.role,
+            "user_role": active_role,
         }
         try:
             sig = inspect.signature(classify_question)
@@ -482,7 +512,7 @@ def _execute_chat_turn(
         route = decision.api_route
     else:
         # Check rule pre-check for safety invariants even if adaptive LLM router is off
-        prechecked = rule_precheck(memory.standalone_question, role=user.role)
+        prechecked = rule_precheck(memory.standalone_question, role=active_role)
         if prechecked is not None and prechecked.direct_category in ("injection", "unsafe", "system_info"):
             decision = prechecked
             route = decision.api_route
@@ -556,7 +586,7 @@ def _execute_chat_turn(
             result = baseline_pipeline.ask_split(
                 memory.standalone_question,
                 list(decision.sub_questions),
-                role=user.role,
+                role=active_role,
                 session_id=session_id,
                 response_mode=response_mode,
                 history=turns,
@@ -565,7 +595,7 @@ def _execute_chat_turn(
         else:
             result = baseline_pipeline.ask(
                 query,
-                role=user.role,
+                role=active_role,
                 rewritten_query=memory.standalone_question if memory.rewritten else None,
                 session_id=session_id,
                 response_mode=response_mode,
@@ -794,6 +824,23 @@ def _execute_chat_turn(
     with get_db_connection() as conn:
         repo = Repository(conn)
         usage = repo.get_llm_usage_since(usage_floor, session_id)
+        sess_row = repo.get_session_for_user(session_id, user.id)
+        current_title = str(sess_row["title"] or "").strip() if sess_row else "Compliance Session"
+        title_locked = bool(sess_row["title_locked"] if sess_row and "title_locked" in sess_row.keys() else 0)
+        if (not title_locked) and current_title.lower() in DEFAULT_SESSION_TITLES:
+            auto_title = generate_session_title(
+                query,
+                router_label=route,
+                llm_client=baseline_pipeline.llm,
+            )
+            renamed_row = repo.rename_session_for_user(
+                session_id,
+                user.id,
+                auto_title,
+                title_source="auto",
+                title_locked=0,
+            )
+            current_title = str(renamed_row["title"]) if renamed_row else auto_title
 
         repo.add_message(
             session_id=session_id,
@@ -957,6 +1004,7 @@ def _execute_chat_turn(
         },
         claim_check=result.claim_check if result is not None else None,
         calculator=result.calculator if result is not None else None,
+        session_title=current_title,
     )
 
 

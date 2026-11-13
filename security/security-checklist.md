@@ -16,7 +16,7 @@
 | 3 | **Session / Token Security** | Pass | Stateless HS256 JWT with `jti`, expiration timestamps, and database revocation table (`revoked_tokens`). |
 | 4 | **Input Validation** | Pass | Pydantic v2 schemas (`ChatQueryRequest`, `SessionCreateRequest`), length bounds, `extra="forbid"`. |
 | 5 | **Injection (SQL & Prompts)** | Pass | Parameterized SQL queries exclusively. Prompt injection safety with `<authoritative_documents>` boundaries. |
-| 6 | **XSS & CSRF** | Pass | JSON-only API contracts; CORS origin restriction limited strictly to localhost Streamlit origins. |
+| 6 | **XSS & CSRF** | Pass | JSON-only API contracts; CORS origin restriction limited strictly to localhost Web UI origins. |
 | 7 | **API Security** | Pass | Bearer token authentication required for all business endpoints. Uniform refusal and 404 responses. |
 | 8 | **Rate Limiting & Abuse** | Partial | Dedicated login throttle per username; global authenticated route rate limiter recommended. |
 | 9 | **File Uploads** | Pass | No public or client file upload endpoints exist. Ingestion is offline and strictly file-system local. |

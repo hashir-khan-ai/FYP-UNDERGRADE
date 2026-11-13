@@ -29,9 +29,6 @@ sentence-transformers==3.3.1  # In-process CPU inference for BGE-small embedding
 langchain-core==0.3.29    # Core abstractions for prompts, messages, and output parsers
 langgraph==0.2.60         # Directed state graph for cyclical corrective retries and ablation toggles
 
-# Presentation UI
-streamlit==1.41.1         # Interactive local web UI for multi-role compliance chat
-
 # Document Parsing
 pypdf==5.1.0              # Pure-Python PDF extraction for raw regulatory texts
 beautifulsoup4==4.12.3    # Clean HTML document parsing and table extraction

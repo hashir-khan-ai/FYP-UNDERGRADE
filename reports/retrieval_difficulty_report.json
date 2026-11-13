@@ -1,0 +1,243 @@
+{
+  "gold_benchmark_file": "data\\eval\\gold_set.jsonl",
+  "total_gold_items": 100,
+  "difficulty_counts": {
+    "easy": 45,
+    "medium": 24,
+    "hard": 31
+  },
+  "metrics_per_bucket": {
+    "easy": {
+      "total_items": 45,
+      "answerable_items": 45,
+      "recall_at_5": {
+        "mean": 1.0,
+        "ci_95": [
+          1.0,
+          1.0
+        ]
+      },
+      "mrr": {
+        "mean": 0.9889,
+        "ci_95": [
+          0.9667,
+          1.0
+        ]
+      },
+      "ndcg_at_5": {
+        "mean": 0.9941,
+        "ci_95": [
+          0.9822,
+          1.0
+        ]
+      }
+    },
+    "medium": {
+      "total_items": 24,
+      "answerable_items": 24,
+      "recall_at_5": {
+        "mean": 0.9792,
+        "ci_95": [
+          0.9375,
+          1.0
+        ]
+      },
+      "mrr": {
+        "mean": 0.9792,
+        "ci_95": [
+          0.9375,
+          1.0
+        ]
+      },
+      "ndcg_at_5": {
+        "mean": 0.9425,
+        "ci_95": [
+          0.8926,
+          0.9831
+        ]
+      }
+    },
+    "hard": {
+      "total_items": 31,
+      "answerable_items": 1,
+      "recall_at_5": {
+        "mean": 1.0,
+        "ci_95": [
+          1.0,
+          1.0
+        ]
+      },
+      "mrr": {
+        "mean": 1.0,
+        "ci_95": [
+          1.0,
+          1.0
+        ]
+      },
+      "ndcg_at_5": {
+        "mean": 1.0,
+        "ci_95": [
+          1.0,
+          1.0
+        ]
+      }
+    },
+    "overall": {
+      "total_items": 100,
+      "answerable_items": 70,
+      "recall_at_5": {
+        "mean": 0.9929,
+        "ci_95": [
+          0.9786,
+          1.0
+        ]
+      },
+      "mrr": {
+        "mean": 0.9857,
+        "ci_95": [
+          0.9643,
+          1.0
+        ]
+      },
+      "ndcg_at_5": {
+        "mean": 0.9765,
+        "ci_95": [
+          0.9552,
+          0.9909
+        ]
+      }
+    }
+  },
+  "ceiling_effect_warnings": [
+    "Recall@5 in 'easy' bucket is 1.0000 > 0.95 (Ceiling Effect)",
+    "MRR in 'easy' bucket is 0.9889 > 0.95 (Ceiling Effect)",
+    "Recall@5 in 'medium' bucket is 0.9792 > 0.95 (Ceiling Effect)",
+    "MRR in 'medium' bucket is 0.9792 > 0.95 (Ceiling Effect)",
+    "Recall@5 in 'hard' bucket is 1.0000 > 0.95 (Ceiling Effect)",
+    "MRR in 'hard' bucket is 1.0000 > 0.95 (Ceiling Effect)",
+    "Recall@5 in 'overall' bucket is 0.9929 > 0.95 (Ceiling Effect)",
+    "MRR in 'overall' bucket is 0.9857 > 0.95 (Ceiling Effect)"
+  ],
+  "tagged_items_sample": [
+    {
+      "id": "GS-001",
+      "question": "What is the minimum Common Equity Tier 1 (CET1) capital ratio required under Basel III?",
+      "type": "single_fact",
+      "role_asking": "analyst",
+      "gold_chunk_ids": [
+        "DOC-BASEL-III-2023_BASEL-CAP-1.1"
+      ],
+      "gold_doc": "DOC-BASEL-III-2023",
+      "clause": "Clause BASEL-CAP-1.1 (Common Equity Tier 1 - CET1 Minimum)",
+      "gold_answer": "Institutions must maintain at all times a minimum Common Equity Tier 1 (CET1) capital ratio of 4.5% of total risk-weighted assets (RWA).",
+      "expected_behaviour": "answer",
+      "status": "unreviewed_draft",
+      "source_chunk_id": null,
+      "paired_id": null,
+      "expected_route": "SINGLE_SEARCH",
+      "unauthorized_keywords": [],
+      "reviewed_by": null,
+      "reviewed_on": null,
+      "review_status": "unreviewed_draft",
+      "reviewed_at": null,
+      "lexical_overlap": 0.7,
+      "difficulty": "easy"
+    },
+    {
+      "id": "GS-002",
+      "question": "Under Basel III Clause BASEL-CAP-1.2, what is the minimum Tier 1 capital ratio of total risk-weighted assets?",
+      "type": "single_fact",
+      "role_asking": "analyst",
+      "gold_chunk_ids": [
+        "DOC-BASEL-III-2023_BASEL-CAP-1.2"
+      ],
+      "gold_doc": "DOC-BASEL-III-2023",
+      "clause": "Clause BASEL-CAP-1.2 (Tier 1 and Total Capital Requirements)",
+      "gold_answer": "Institutions must maintain a minimum Tier 1 capital ratio of 6.0% and a minimum Total Capital ratio of 8.0% of total risk-weighted assets (RWA).",
+      "expected_behaviour": "answer",
+      "status": "unreviewed_draft",
+      "source_chunk_id": null,
+      "paired_id": null,
+      "expected_route": "SINGLE_SEARCH",
+      "unauthorized_keywords": [],
+      "reviewed_by": null,
+      "reviewed_on": null,
+      "review_status": "unreviewed_draft",
+      "reviewed_at": null,
+      "lexical_overlap": 0.8182,
+      "difficulty": "easy"
+    },
+    {
+      "id": "GS-003",
+      "question": "What is the minimum Total Capital ratio required under Basel III Clause BASEL-CAP-1.2?",
+      "type": "single_fact",
+      "role_asking": "manager",
+      "gold_chunk_ids": [
+        "DOC-BASEL-III-2023_BASEL-CAP-1.2"
+      ],
+      "gold_doc": "DOC-BASEL-III-2023",
+      "clause": "Clause BASEL-CAP-1.2 (Tier 1 and Total Capital Requirements)",
+      "gold_answer": "Institutions must maintain a minimum Total Capital ratio of 8.0% and a minimum Tier 1 capital ratio of 6.0% of total risk-weighted assets (RWA).",
+      "expected_behaviour": "answer",
+      "status": "unreviewed_draft",
+      "source_chunk_id": null,
+      "paired_id": null,
+      "expected_route": "SINGLE_SEARCH",
+      "unauthorized_keywords": [],
+      "reviewed_by": null,
+      "reviewed_on": null,
+      "review_status": "unreviewed_draft",
+      "reviewed_at": null,
+      "lexical_overlap": 0.6667,
+      "difficulty": "easy"
+    },
+    {
+      "id": "GS-004",
+      "question": "What percentage of risk-weighted assets is required for the Basel III Capital Conservation Buffer (CCB), and what automatic constraints apply if it is depleted?",
+      "type": "single_fact",
+      "role_asking": "analyst",
+      "gold_chunk_ids": [
+        "DOC-BASEL-III-2023_BASEL-CAP-2.1"
+      ],
+      "gold_doc": "DOC-BASEL-III-2023",
+      "clause": "Clause BASEL-CAP-2.1 (Capital Conservation Buffer - CCB)",
+      "gold_answer": "The Capital Conservation Buffer (CCB) is 2.5% of total risk-weighted assets comprised of CET1 capital; depletion triggers constraints on dividends, share buybacks, and discretionary bonuses.",
+      "expected_behaviour": "answer",
+      "status": "unreviewed_draft",
+      "source_chunk_id": null,
+      "paired_id": null,
+      "expected_route": "SINGLE_SEARCH",
+      "unauthorized_keywords": [],
+      "reviewed_by": null,
+      "reviewed_on": null,
+      "review_status": "unreviewed_draft",
+      "reviewed_at": null,
+      "lexical_overlap": 0.6429,
+      "difficulty": "easy"
+    },
+    {
+      "id": "GS-005",
+      "question": "Over what stress scenario horizon and at what minimum percentage must the Liquidity Coverage Ratio (LCR) be maintained under Basel III?",
+      "type": "single_fact",
+      "role_asking": "analyst",
+      "gold_chunk_ids": [
+        "DOC-BASEL-III-2023_BASEL-LIQ-3.1"
+      ],
+      "gold_doc": "DOC-BASEL-III-2023",
+      "clause": "Clause BASEL-LIQ-3.1 (Liquidity Coverage Ratio - LCR)",
+      "gold_answer": "Institutions must maintain high-quality liquid assets (HQLA) covering net cash outflows over a 30-day severe stress scenario, keeping the LCR at or above 100% daily.",
+      "expected_behaviour": "answer",
+      "status": "unreviewed_draft",
+      "source_chunk_id": null,
+      "paired_id": null,
+      "expected_route": "SINGLE_SEARCH",
+      "unauthorized_keywords": [],
+      "reviewed_by": null,
+      "reviewed_on": null,
+      "review_status": "unreviewed_draft",
+      "reviewed_at": null,
+      "lexical_overlap": 0.6154,
+      "difficulty": "easy"
+    }
+  ]
+}

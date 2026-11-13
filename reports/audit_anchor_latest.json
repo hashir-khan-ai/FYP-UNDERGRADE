@@ -1,0 +1,11 @@
+{
+  "schema_version": "1.0",
+  "exported_at": "2026-11-13T16:23:03.245003+00:00",
+  "database_file": "data\\sqlite\\app.db",
+  "total_entries": 66,
+  "head_id": 66,
+  "head_hash": "312e04defe10ae7e0b2d618df366c50946f50791cb182c5c04eaf574dd57c81f",
+  "prev_hash": "acd3a8385e136e1c08b419f7218d37436a869ef7b7cb801c520dd7801e6b12c7",
+  "last_entry_timestamp": "2026-11-13 13:03:49",
+  "genesis_hash": "GENESIS"
+}

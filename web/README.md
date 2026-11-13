@@ -1,8 +1,7 @@
 # Compliance Desk — Next.js Workspace
 
 Local-first web client for the Enterprise Banking Regulatory Compliance RAG
-Assistant. It talks to the existing FastAPI backend and keeps the Streamlit app
-(`src/ui/app.py`) fully runnable as the legacy client.
+Assistant. It talks to the existing FastAPI backend.
 
 ## Stack
 

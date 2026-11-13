@@ -43,6 +43,11 @@ async def lifespan(app: FastAPI):
     except Exception:
         logger.exception("Database initialisation failed at startup.")
     try:
+        from src.ingestion.indexer import check_storage_lock
+        check_storage_lock(settings.QDRANT_STORAGE_PATH)
+    except Exception as exc:
+        logger.warning("Vector storage startup check: %s", exc)
+    try:
         yield
     finally:
         baseline_pipeline.close()

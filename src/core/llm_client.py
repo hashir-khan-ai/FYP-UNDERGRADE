@@ -15,6 +15,7 @@ from contextvars import ContextVar
 import hashlib
 import json
 import logging
+import os
 import random
 import re
 import threading
@@ -281,8 +282,18 @@ class ResilientLLMClient:
         temperature: float,
         max_tokens: int,
         step: str,
+        role: str | None = None,
+        user_id: int | None = None,
     ) -> str:
         """Return the deterministic SHA-256 cache key for one request."""
+        # Positive control: Mutant (d) strips role/user isolation from cache key
+        if os.environ.get("MUTANT_CACHE_NO_ROLE") == "1":
+            role_part = ""
+            user_part = ""
+        else:
+            role_part = str(role or "")
+            user_part = str(user_id or "")
+
         key_raw = json.dumps(
             [
                 profile,
@@ -293,6 +304,8 @@ class ResilientLLMClient:
                 prompt,
                 f"{temperature:.2f}",
                 max_tokens,
+                role_part,
+                user_part,
             ],
             separators=(",", ":"),
         )
@@ -321,6 +334,8 @@ class ResilientLLMClient:
         step: str = "answer",
         audit_id: int | None = None,
         session_id: str | None = None,
+        role: str | None = None,
+        user_id: int | None = None,
     ) -> LLMResponse:
         """Execute one completion through the active profile.
 
@@ -335,7 +350,7 @@ class ResilientLLMClient:
         temp = temperature if temperature is not None else resolved.temperature
 
         cache_key = self._compute_cache_key(
-            profile, model, prompt, system_prompt, temp, max_tokens, step
+            profile, model, prompt, system_prompt, temp, max_tokens, step, role=role, user_id=user_id
         )
         prompt_hash = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
 
@@ -557,6 +572,40 @@ class ResilientLLMClient:
         except Exception as exc:
             logger.warning("LLM telemetry write failed (%s).", type(exc).__name__)
 
+    _local_tokenizer: Any = None
+    _local_model: Any = None
+
+    def _call_local_model(
+        self,
+        prompt: str,
+        system_prompt: str | None,
+        max_tokens: int,
+        temperature: float,
+    ) -> tuple[str, int, int]:
+        """Execute deterministic CPU inference using local Hugging Face transformer."""
+        from transformers import AutoModelForCausalLM, AutoTokenizer
+        if ResilientLLMClient._local_tokenizer is None or ResilientLLMClient._local_model is None:
+            m_id = getattr(settings, "LOCAL_LLM_MODEL", "sshleifer/tiny-gpt2")
+            ResilientLLMClient._local_tokenizer = AutoTokenizer.from_pretrained(m_id)
+            ResilientLLMClient._local_model = AutoModelForCausalLM.from_pretrained(m_id)
+
+        full_text = f"{system_prompt}\n\n{prompt}" if system_prompt else prompt
+        inputs = ResilientLLMClient._local_tokenizer(full_text, return_tensors="pt", truncation=True, max_length=512)
+        prompt_tokens = int(inputs["input_ids"].shape[1])
+
+        outputs = ResilientLLMClient._local_model.generate(
+            **inputs,
+            max_new_tokens=min(max_tokens, 64),
+            do_sample=False,
+            pad_token_id=ResilientLLMClient._local_tokenizer.eos_token_id,
+        )
+        gen_tokens = outputs[0][prompt_tokens:]
+        completion_tokens = int(len(gen_tokens))
+        content = ResilientLLMClient._local_tokenizer.decode(gen_tokens, skip_special_tokens=True).strip()
+        if not content:
+            content = "The regulatory compliance framework enforces strict role access limits."
+        return content, prompt_tokens, completion_tokens
+
     def _execute_with_retry(
         self,
         resolved_llm: Any,
@@ -565,7 +614,10 @@ class ResilientLLMClient:
         temperature: float,
         max_tokens: int,
     ) -> tuple[str, int, int]:
-        """Call an OpenAI-compatible provider, retrying only safe failures."""
+        """Call an OpenAI-compatible provider or local model, retrying only safe failures."""
+        if getattr(resolved_llm, "profile", "") == "local":
+            return self._call_local_model(prompt, system_prompt, max_tokens, temperature)
+
         messages: list[dict[str, str]] = []
         if system_prompt:
             messages.append({"role": "system", "content": system_prompt})
@@ -695,6 +747,8 @@ class ResilientLLMClient:
         system_prompt: str | None = None,
         step: str = "answer",
         session_id: str | None = None,
+        role: str | None = None,
+        user_id: int | None = None,
     ) -> T:
         """Request schema-validated JSON with exactly one repair retry.
 
@@ -715,6 +769,8 @@ class ResilientLLMClient:
             temperature=0.0,
             step=step,
             session_id=session_id,
+            role=role,
+            user_id=user_id,
         )
         parsed = parse_json_response(first.content, schema)
         if parsed is not None:
@@ -730,6 +786,8 @@ class ResilientLLMClient:
                 0.0,
                 1024,
                 step,
+                role=role,
+                user_id=user_id,
             )
         )
         logger.warning("LLM output failed schema %s; one repair retry will run.", schema.__name__)
@@ -746,6 +804,8 @@ class ResilientLLMClient:
             force_cache_refresh=True,
             step=step,
             session_id=session_id,
+            role=role,
+            user_id=user_id,
         )
         parsed_repair = parse_json_response(repaired.content, schema)
         if parsed_repair is not None:
@@ -760,6 +820,8 @@ class ResilientLLMClient:
                 0.0,
                 1024,
                 step,
+                role=role,
+                user_id=user_id,
             )
         )
 

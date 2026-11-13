@@ -29,7 +29,7 @@ This live demonstration proves that an Enterprise Retrieval-Augmented Generation
 ### Minute 1 (0:00 – 1:00): Startup, Architecture & Analyst Authentication
 
 #### Physical Action
-1. Open browser to `http://127.0.0.1:8501`.
+1. Open browser to `http://localhost:3000`.
 2. Point out the header:
    - System title: *Enterprise Banking Regulatory Compliance Assistant*
    - Active Profile badge: `OFFLINE MOCK` (or `DEV PROVIDER` / `DEMO LIVE`)
@@ -182,12 +182,13 @@ If unexpected technical issues occur during the live presentation, execute these
   ```
 - Refresh the browser (`F5`).
 
-### 3. If Streamlit UI Session Crashes
-- **Action:** Run the automated headless AppTest suite to demonstrate all 11 UI workflows via terminal:
+### 3. If Web Client Crashes or Disconnects
+- **Action:** Restart the Next.js development server:
   ```powershell
-  $env:HF_HUB_OFFLINE="1"; .\.venv\Scripts\python.exe -m pytest tests/test_ui_app.py -v
+  cd web
+  npm run dev
   ```
-  *(All 11 tests pass in $\approx 5$ seconds, verifying login, RBAC block, refusal cards, audit KPIs, and preset executions).*
+  Then reload `http://localhost:3000` (`F5`).
 
 ### 4. Zero-Data-Loss Invariant
 - Under no circumstance modify `.env` or delete `data/qdrant/` during the presentation. All databases and indices remain read-only during demo execution.

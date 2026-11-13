@@ -110,11 +110,11 @@ def test_localhost_cors_headers() -> None:
     response = client.options(
         "/ask",
         headers={
-            "Origin": "http://localhost:8501",
+            "Origin": "http://localhost:3000",
             "Access-Control-Request-Method": "POST",
         },
     )
-    assert response.headers.get("access-control-allow-origin") == "http://localhost:8501"
+    assert response.headers.get("access-control-allow-origin") == "http://localhost:3000"
 
 
 def test_non_localhost_origin_is_rejected() -> None:

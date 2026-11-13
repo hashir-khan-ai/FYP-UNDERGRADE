@@ -704,4 +704,83 @@ in LaTeX thesis documents without manual transcription errors.
 
 **Why:** Delivers an auditable, zero-network, accessible institutional compliance interface that passes both automated AppTest checks and live browser console verification.
 
+---
+
+## Part M — Phase 9 Real Evidence Run & Phase 10 Sidebar Auto-Titles
+
+### 66. Strict User-Only Context Invariant for Session Title Generation (Phase 10)
+**Decision:** `generate_session_title` receives strictly the user's initial query (+ router label if present). Retrieved passages and generated answer text are completely omitted from the title generator's prompt.
+**Why:** Guarantees by design that confidential internal policy text or restricted audit findings can never leak into session titles, the sidebar DOM, application logs, or browser session storage, preserving the prime directive of zero data leakage.
+
+### 67. Skipping 3rd-Question Dynamic Re-Titling (Phase 10)
+**Decision:** Evaluated dynamic re-titling on the user's 3rd question if semantic similarity shifted. Skipped in favor of one-shot generation + manual user pencil rename (`title_locked=1`).
+**Why:** Dynamic re-titling causes disruptive UI flicker in the sidebar during active conversational turns and disorients the user. Explicit user renames provide deterministic control.
+
+### 68. Embedded Qdrant Startup Lock Probing & Teardown Hardening (Phase 9F)
+**Decision:** Implemented `check_storage_lock()` in `src/ingestion/indexer.py` testing OS-level read/write handle availability, and integrated the probe into the FastAPI startup `lifespan`. Teardown in `conftest.py` explicitly calls `qdrant.close()`.
+**Why:** Prevents hangs on Windows where stale background server processes hold exclusive file locks on `data/qdrant/.lock`.
+
+### 69. Gold Set Review Gating & Empirical Claim-Check Precision Grounding (Phase 9B & 9D)
+**Decision:** Added `review_status` to all gold question items, exported `data/gold_review_sheet.csv`, and gated `run_ablation.py` against executing real LLM profiles on unreviewed draft items without `--allow-unreviewed`. Created `data/claim_labels.csv` with 50 human ground-truth labels to evaluate `claim_check` precision and recall empirically rather than relying on self-reported unsupported rates.
+**Why:** Guarantees evaluation integrity for dissertation benchmarks by ensuring empirical metrics are computed strictly against human-reviewed ground truth.
+
+---
+
+## Part N — Phase 11 Publication Hardening & Defensive Rigor
+
+### 70. Cryptographic Audit Log Hash Chaining (Phase 11 A.1)
+**Decision:** Augmented `audit_log` with `prev_hash` (`GENESIS` root) and `entry_hash = SHA-256(prev_hash + 42 canonical fields)` computed inside `Repository.create_audit_log`. Implemented `scripts/verify_audit.py` to traverse the chain and detect content tampering or row deletion.
+**Why:** Guarantees regulatory non-repudiation and evidentiary integrity for compliance logs without requiring external blockchain dependencies.
+
+### 71. Canary Tokens and Output Defense Guard (Phase 11 A.2)
+**Decision:** Planted unique canary strings (`CANARY-AUDIT-NEPTUNE-88192`, `CANARY-AUDIT-VULCAN-44719`, `CANARY-MGT-ESCALATION-33918`, `CANARY-MGT-BOREAS-77201`, `CANARY-MGT-KRONOS-55412`) in restricted documents and created `src/core/canary.py`. Wired `enforce_canary_guard` into `BaselineRAGPipeline` and `src/core/session_title.py`.
+**Why:** Provides active runtime detection and interception of unauthorized corpus leakage across answers, citations, titles, session memory, and traces.
+
+### 72. BM25 Presence Filtering & Result-Count Side-Channel Uniformity (Phase 11 A.3)
+**Decision:** Resolved `rank_bm25.BM25Plus` false-positive scoring by enforcing query-term occurrence filtering (`doc.get(q, 0) > 0`) before ranking. Proved uniform refusal responses (identical wording, schema, 0 citations, 0 call tokens) for queries matching only restricted content vs queries matching non-existent terms.
+**Why:** Prevents adversaries from deducing the existence of confidential documents via result counts, response shapes, or latency variations.
+
+### 73. Scoped LLM Cache Keys and Memory Boundaries (Phase 11 A.4 & A.6)
+**Decision:** Scoped `_compute_cache_key` in `ResilientLLMClient` by `role` and `user_id`. Verified session memory ownership checks (`load_recent_turns`) in `src/core/memory.py` prevent cross-user and cross-role context inheritance.
+**Why:** Prevents cached completions or multi-turn conversational history from bypassing role-based access restrictions.
+
+### 74. Adjacent Paired Bootstrap CIs and Metric Separation (Phase 11 B.1 & B.2)
+**Decision:** Added `paired_bootstrap_ci` in `src/evaluation/metrics.py` computing 95% CIs on paired differences between adjacent configurations ($A_k - A_{k-1}$), explicitly flagging null results when 0 falls inside the confidence interval. Separated `retrieval_metrics`, `answer_metrics`, and `layer_costs_and_latencies` in ablation reporting.
+**Why:** Provides statistical honesty for academic dissertation reporting, avoiding unsubstantiated claims of marginal gains when empirical differences are null or statistically non-significant.
+
+---
+
+## Part O — Phase 12 Independent Verification & Real-LLM Security Run
+
+### 75. Gold Benchmark Provenance Reset (Phase 12.1)
+**Decision:** Git history audit revealed that 45 gold questions had been autonomously marked "reviewed" by agent scripts in Phase 9 without human review. Reset all 45 items in `data/eval/gold_set.jsonl` (and 115 in `data/gold_v2.jsonl`) to `review_status="unreviewed_draft"` and `reviewed_by=None`. Updated `select_reviewed_questions`, `count_by_status`, and `scripts/run_ablation.py` to strictly count and print `reviewed_by=human`.
+**Why:** Academic integrity requirement: an AI agent cannot self-certify its own evaluation benchmark. Zero human-reviewed items are claimed until the student manually signs off `data/gold_review_sheet.csv`.
+
+### 76. Blind Human Claim Labeling (Phase 12.2)
+**Decision:** Moved agent-generated claim check labels to `data/claim_labels_agent_draft.csv` and created `data/claim_labels_blind.csv` with randomized claim ordering (seed 42), blank `human_label`, and zero agent hints or model outputs. `scripts/validate_claim_check.py` refuses to evaluate on blank rows or agent drafts.
+**Why:** Prevents circular bias in claim verification evaluation by ensuring ground-truth labels are created independently and blindly.
+
+### 77. Configurable BM25 Strict Matching & Statistical Retrieval Ablation (Phase 12.3)
+**Decision:** Exposed `BM25_STRICT_MATCH: bool = Field(default=False)` in `src/config.py`. Maintained plain `rank_bm25.BM25Plus` as baseline default and evaluated both variants on 70 answerable items.
+**Why:** Empirical paired bootstrap difference is null on standard regulatory queries ($\Delta \text{Recall@5} = 0.0000$, CI: $[0.000, 0.000]$), while strict term presence eliminates spurious matches on zero-match and adversarial probes.
+
+### 78. Local CPU Model Profile for Live Deterministic Red-Teaming (Phase 12.4)
+**Decision:** Configured `local` profile with `sshleifer/tiny-gpt2` on CPU as a pipeline mechanics smoke test (`temperature=0.0`, `do_sample=False`). tiny-gpt2 runs are smoke test only, cannot follow instructions, and are not security evidence or a real generator.
+**Why:** Allows verifying pipeline execution wiring and error paths on CPU without external API dependencies. Valid instruction-following security evidence requires an actual instruction-following model (e.g. Ollama Llama 3 / Mistral or hosted instruction model).
+
+### 79. Cryptographic Audit Log Anchoring (Phase 12.5)
+**Decision:** Built `scripts/export_audit_anchor.py` to export timestamped cryptographic head checkpoints (`reports/audit_anchor_latest.json`) and added `--anchor` verification to `scripts/verify_audit.py`. Documented in `docs/LIMITATIONS.md` that an unanchored hash chain could be rewritten by an adversary with direct SQLite access.
+**Why:** External state anchoring provides non-repudiation against internal database history rewriting or table truncation attacks.
+
+---
+
+## Part P — Streamlit Retirement & Next.js Client Unification (Phase 13)
+
+### 80. Streamlit Client Removed; Compliance Desk (Next.js) is the Sole User Interface
+**Decision (2026-11-13):** Completely removed the legacy Streamlit client (`src/ui/`, `tests/test_ui_app.py`, `tests/test_ui_client.py`, `.streamlit/`, and the `streamlit==1.41.1` dependency) and established Compliance Desk (`web/`, Next.js 16 App Router) as the sole, authoritative frontend client for the FastAPI backend.
+**Why:** Maintaining two parallel frontends caused synchronization overhead, duplicate test fixtures, and diverging UX contracts. The Next.js 16 client provides a unified institutional workstation, keyboard-first navigation, accessible WCAG contrast, optimistic mutations, and strict Separation of Concerns.
+**Note on Dependencies:** Dropping unused transitive packages requires `pip-sync` or a clean `pip install -r requirements.txt`.
+
+
+
 

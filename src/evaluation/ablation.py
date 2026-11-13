@@ -47,6 +47,7 @@ from src.evaluation.metrics import (
     intervals_overlap,
     ndcg_at_k,
     numeric_exact_match,
+    paired_bootstrap_ci,
     recall_at_k,
     reciprocal_rank,
 )
@@ -73,6 +74,7 @@ class AblationConfigSpec:
     enable_xai_output: bool
     enable_claim_check: bool = False
     enable_calculator: bool = False
+    bm25_strict_match: bool = False
     is_demonstration_only: bool = False
     warning_banner: str = ""
 
@@ -211,6 +213,7 @@ def apply_ablation_config(
         "ENABLE_XAI_OUTPUT": settings.ENABLE_XAI_OUTPUT,
         "ENABLE_CLAIM_CHECK": settings.ENABLE_CLAIM_CHECK,
         "ENABLE_CALCULATOR": settings.ENABLE_CALCULATOR,
+        "BM25_STRICT_MATCH": settings.BM25_STRICT_MATCH,
     }
     try:
         settings.ENABLE_HEADING_PATH = spec.enable_heading_path
@@ -222,6 +225,7 @@ def apply_ablation_config(
         settings.ENABLE_XAI_OUTPUT = spec.enable_xai_output
         settings.ENABLE_CLAIM_CHECK = spec.enable_claim_check
         settings.ENABLE_CALCULATOR = spec.enable_calculator
+        settings.BM25_STRICT_MATCH = spec.bm25_strict_match
         yield spec
     finally:
         for key, val in snapshot.items():
@@ -574,6 +578,8 @@ def aggregate_ablation_rows(
     spec: AblationConfigSpec,
     rows: list[dict[str, Any]],
     baseline_ci: dict[str, dict[str, Any]] | None = None,
+    previous_rows: list[dict[str, Any]] | None = None,
+    previous_spec: AblationConfigSpec | None = None,
 ) -> dict[str, Any]:
     """Aggregate per-question ablation rows into configuration summary metrics + 95% CIs.
 
@@ -666,6 +672,80 @@ def aggregate_ablation_rows(
                     "statistically_significant_diff": not overlaps,
                 }
 
+    # Paired bootstrap CI vs adjacent preceding configuration (Ak vs Ak-1)
+    vs_adjacent_prev: dict[str, Any] | None = None
+    if previous_rows and previous_spec:
+        prev_by_id = {r["id"]: r for r in previous_rows if "id" in r}
+        cur_by_id = {r["id"]: r for r in rows if "id" in r}
+        common_ids = [qid for qid in cur_by_id if qid in prev_by_id]
+        common_ans_ids = [qid for qid in common_ids if cur_by_id[qid]["expected_behaviour"] == "answer"]
+
+        r5_cur = [float(cur_by_id[qid]["recall@5"]) for qid in common_ans_ids]
+        r5_prev = [float(prev_by_id[qid]["recall@5"]) for qid in common_ans_ids]
+
+        ndcg_cur = [float(cur_by_id[qid]["ndcg@5"]) for qid in common_ans_ids]
+        ndcg_prev = [float(prev_by_id[qid]["ndcg@5"]) for qid in common_ans_ids]
+
+        ans_cur = [float(cur_by_id[qid]["answer_correctness"]) for qid in common_ans_ids]
+        ans_prev = [float(prev_by_id[qid]["answer_correctness"]) for qid in common_ans_ids]
+
+        cit_cur = [float(cur_by_id[qid]["citation_validity"]) for qid in common_ans_ids]
+        cit_prev = [float(prev_by_id[qid]["citation_validity"]) for qid in common_ans_ids]
+
+        lat_cur = [float(cur_by_id[qid]["latency_ms"]) for qid in common_ids]
+        lat_prev = [float(prev_by_id[qid]["latency_ms"]) for qid in common_ids]
+
+        vs_adjacent_prev = {
+            "previous_config_name": previous_spec.name,
+            "metrics": {
+                "recall@5": paired_bootstrap_ci(r5_cur, r5_prev),
+                "ndcg@5": paired_bootstrap_ci(ndcg_cur, ndcg_prev),
+                "answer_correctness": paired_bootstrap_ci(ans_cur, ans_prev),
+                "citation_validity": paired_bootstrap_ci(cit_cur, cit_prev),
+                "latency_ms": paired_bootstrap_ci(lat_cur, lat_prev),
+            },
+        }
+
+    retrieval_metrics = {
+        "recall@1": rec1_ci["mean"],
+        "recall@3": rec3_ci["mean"],
+        "recall@5": rec5_ci["mean"],
+        "mrr": mrr_ci["mean"],
+        "ndcg@5": ndcg5_ci["mean"],
+        "context_precision": ctx_prec_mean,
+    }
+
+    answer_metrics = {
+        "answer_correctness": ans_ci["mean"],
+        "faithfulness": faith_mean,
+        "citation_validity_rate": cit_val_ci["mean"],
+        "citation_support_rate": cit_sup_ci["mean"],
+        "unsupported_claim_rate": unsup_mean,
+        "numeric_exact_match": num_em_mean,
+        "correct_refusal_rate": crr_ci["mean"],
+        "false_refusal_rate": frr_ci["mean"],
+        "leakage_rate": leak_ci["mean"],
+        "routing_accuracy": routing_accuracy,
+    }
+
+    layer_costs_and_latencies = {
+        "latency_median_ms": _percentile(latencies, 50.0),
+        "latency_p95_ms": _percentile(latencies, 95.0),
+        "latency_uncached_median_ms": (
+            _percentile(uncached_latencies, 50.0) if uncached_latencies else None
+        ),
+        "latency_uncached_p95_ms": (
+            _percentile(uncached_latencies, 95.0) if uncached_latencies else None
+        ),
+        "live_calls_per_query": live_calls_pq,
+        "cached_calls_per_query": cached_calls_pq,
+        "refusals_without_llm": refusals_without_llm,
+        "live_tokens_per_query": live_tokens_pq,
+        "cached_tokens_per_query": cached_tokens_pq,
+    }
+
+    flat_metrics = {**retrieval_metrics, **answer_metrics, **layer_costs_and_latencies}
+
     return {
         "config_name": spec.name,
         "description": spec.description,
@@ -678,37 +758,11 @@ def aggregate_ablation_rows(
         "n_refusal": len(refusal_rows),
         "n_route_labelled": len(route_vals),
         "n_uncached_latency": len(uncached_latencies),
-        "metrics": {
-            "recall@1": rec1_ci["mean"],
-            "recall@3": rec3_ci["mean"],
-            "recall@5": rec5_ci["mean"],
-            "mrr": mrr_ci["mean"],
-            "ndcg@5": ndcg5_ci["mean"],
-            "answer_correctness": ans_ci["mean"],
-            "faithfulness": faith_mean,
-            "context_precision": ctx_prec_mean,
-            "citation_validity_rate": cit_val_ci["mean"],
-            "citation_support_rate": cit_sup_ci["mean"],
-            "unsupported_claim_rate": unsup_mean,
-            "numeric_exact_match": num_em_mean,
-            "correct_refusal_rate": crr_ci["mean"],
-            "false_refusal_rate": frr_ci["mean"],
-            "leakage_rate": leak_ci["mean"],
-            "routing_accuracy": routing_accuracy,
-            "latency_median_ms": _percentile(latencies, 50.0),
-            "latency_p95_ms": _percentile(latencies, 95.0),
-            "latency_uncached_median_ms": (
-                _percentile(uncached_latencies, 50.0) if uncached_latencies else None
-            ),
-            "latency_uncached_p95_ms": (
-                _percentile(uncached_latencies, 95.0) if uncached_latencies else None
-            ),
-            "live_calls_per_query": live_calls_pq,
-            "cached_calls_per_query": cached_calls_pq,
-            "refusals_without_llm": refusals_without_llm,
-            "live_tokens_per_query": live_tokens_pq,
-            "cached_tokens_per_query": cached_tokens_pq,
-        },
+        "retrieval_metrics": retrieval_metrics,
+        "answer_metrics": answer_metrics,
+        "layer_costs_and_latencies": layer_costs_and_latencies,
+        "metrics": flat_metrics,
         "ci_95": ci_map,
         "vs_baseline_A0": overlap_flags,
+        "vs_adjacent_prev": vs_adjacent_prev,
     }

@@ -13,7 +13,7 @@
 ### 1.1 Content Negotiation & Security
 - All requests and responses must use `Content-Type: application/json`.
 - Authentication via Bearer token: `Authorization: Bearer <jwt_or_user_token>`.
-- Cross-Origin Resource Sharing (CORS) is restricted strictly to `http://localhost:8501` and `http://127.0.0.1:8501` (Streamlit UI).
+- Cross-Origin Resource Sharing (CORS) is restricted strictly to `http://localhost:3000` and `http://127.0.0.1:3000` (Compliance Desk Web UI).
 - Sensitive headers and credentials are never reflected in error bodies or logged.
 
 ### 1.2 Error Response Format

@@ -47,12 +47,12 @@ LLM_PROFILE=mock
 - Health Check: `http://127.0.0.1:8000/health`
 - OpenAPI Docs: `http://127.0.0.1:8000/docs`
 
-### 2.2 Frontend UI (Streamlit)
+### 2.2 Frontend Web Client (Compliance Desk)
 ```bash
-# In active virtual environment:
-.\.venv\Scripts\streamlit.exe run src/ui/app.py --server.port 8501
+cd web
+npm run dev
 ```
-- Web Application: `http://localhost:8501`
+- Web Application: `http://localhost:3000`
 
 ---
 
@@ -79,7 +79,7 @@ Citations are grouped cleanly beneath each assistant response under:
 Clicking the expander reveals full heading paths, clause identifiers, page numbers, and verbatim source snippets. For non-grounded general chat and system info responses, source expanders and traces are completely hidden.
 
 ### 3.5 Dynamic Document Ingestion (Role-Gated)
-Authenticated users in authorized roles (Manager & Auditor) can dynamically upload regulatory documents (`.md`, `.txt`, `.pdf`, `.html`) from the Streamlit sidebar or API (`POST /api/v1/documents/upload`):
+Authenticated users in authorized roles (Manager & Auditor) can dynamically upload regulatory documents (`.md`, `.txt`, `.pdf`, `.html`) from the web client Documents view or API (`POST /api/v1/documents/upload`):
 - Automatically parsed with `DocumentLoader` and chunked with `ClauseAwareChunker`.
 - Indexed into Qdrant embedded vector store and BM25 index with assigned `allowed_roles` payload.
 - Registered in SQLite metadata table.
@@ -97,8 +97,5 @@ $env:HF_HUB_OFFLINE="1"
 
 # 2. Automated test suite:
 .\.venv\Scripts\python.exe -m pytest -q -m "not slow" -x
-
-# 3. Streamlit UI automated test suite:
-.\.venv\Scripts\python.exe -m pytest tests/test_ui_app.py -v
 ```
 

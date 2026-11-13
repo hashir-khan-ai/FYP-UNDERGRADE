@@ -1,0 +1,85 @@
+{
+  "total_mutants": 7,
+  "killed_count": 7,
+  "survived_count": 0,
+  "kill_rate_pct": 100.0,
+  "mutants": [
+    {
+      "id": "MUTANT-A",
+      "env_var": "MUTANT_DISABLE_CANARY_GUARD",
+      "description": "Output canary guard disabled (canaries not scrubbed/blocked)",
+      "target_defense": "Canary Output Guard",
+      "command": "D:\\FYP-UNDERGRADE\\.venv\\Scripts\\python.exe -m pytest tests/test_security_depth.py::TestCanaryTokens::test_output_guard_neutralizes_unauthorized_canary -q",
+      "returncode": 1,
+      "stdout": "F                                                                        [100%]\n================================== FAILURES ===================================\n_____ TestCanaryTokens.test_output_guard_neutralizes_unauthorized_canary ______\n\nself = <test_security_depth.TestCanaryTokens object at 0x000001E5C879B9E0>\n\n    def test_output_guard_neutralizes_unauthorized_canary(self):\n        from src.c",
+      "killed": true,
+      "status": "KILLED"
+    },
+    {
+      "id": "MUTANT-B",
+      "env_var": "MUTANT_DISABLE_POST_RERANK_RBAC",
+      "description": "Post-rerank RBAC defense-in-depth filter disabled",
+      "target_defense": "Post-Rerank Role Enforcement",
+      "command": "D:\\FYP-UNDERGRADE\\.venv\\Scripts\\python.exe -m pytest tests/test_security_depth.py::TestResultCountSideChannel::test_post_rerank_rbac_defense -q",
+      "returncode": 1,
+      "stdout": "F                                                                        [100%]\n================================== FAILURES ===================================\n__________ TestResultCountSideChannel.test_post_rerank_rbac_defense ___________\n\nself = <test_security_depth.TestResultCountSideChannel object at 0x00000150050818E0>\n\n    def test_post_rerank_rbac_defense(self):\n        \"\"\"Defense-in-depth:",
+      "killed": true,
+      "status": "KILLED"
+    },
+    {
+      "id": "MUTANT-C",
+      "env_var": "MUTANT_DISABLE_PRE_FUSION_RBAC",
+      "description": "Pre-fusion RBAC vector/lexical search payload filter disabled",
+      "target_defense": "Vector & Lexical Native RBAC",
+      "command": "D:\\FYP-UNDERGRADE\\.venv\\Scripts\\python.exe -m pytest tests/test_security_depth.py::TestResultCountSideChannel::test_pre_fusion_rbac_filter -q",
+      "returncode": 1,
+      "stdout": "F                                                                        [100%]\n================================== FAILURES ===================================\n___________ TestResultCountSideChannel.test_pre_fusion_rbac_filter ____________\n\nself = <test_security_depth.TestResultCountSideChannel object at 0x0000014A265B58E0>\n\n    def test_pre_fusion_rbac_filter(self):\n        \"\"\"Native engine RBAC:",
+      "killed": true,
+      "status": "KILLED"
+    },
+    {
+      "id": "MUTANT-D",
+      "env_var": "MUTANT_CACHE_NO_ROLE",
+      "description": "Cache key computed without user_role or user_id",
+      "target_defense": "Cache Role Partitioning",
+      "command": "D:\\FYP-UNDERGRADE\\.venv\\Scripts\\python.exe -m pytest tests/test_security_depth.py::TestCrossRoleCacheAndMemoryIsolation::test_cross_role_cache_keys_differ -q",
+      "returncode": 1,
+      "stdout": "F                                                                        [100%]\n================================== FAILURES ===================================\n___ TestCrossRoleCacheAndMemoryIsolation.test_cross_role_cache_keys_differ ____\n\nself = <test_security_depth.TestCrossRoleCacheAndMemoryIsolation object at 0x0000020FF2D14EC0>\n\n    def test_cross_role_cache_keys_differ(self):\n        from s",
+      "killed": true,
+      "status": "KILLED"
+    },
+    {
+      "id": "MUTANT-E",
+      "env_var": "MUTANT_SHARED_MEMORY",
+      "description": "Session memory shared across users/roles (ownership check bypassed)",
+      "target_defense": "Session Memory Boundary",
+      "command": "D:\\FYP-UNDERGRADE\\.venv\\Scripts\\python.exe -m pytest tests/test_security_depth.py::TestCrossRoleCacheAndMemoryIsolation::test_cross_user_memory_isolation -q",
+      "returncode": 1,
+      "stdout": "F                                                                        [100%]\n================================== FAILURES ===================================\n____ TestCrossRoleCacheAndMemoryIsolation.test_cross_user_memory_isolation ____\n\nself = <test_security_depth.TestCrossRoleCacheAndMemoryIsolation object at 0x000002E10B5B57C0>\ntest_db_conn = <sqlite3.Connection object at 0x000002E10B553E20>",
+      "killed": true,
+      "status": "KILLED"
+    },
+    {
+      "id": "MUTANT-F",
+      "env_var": "MUTANT_DISTINCT_REFUSAL",
+      "description": "Uniform refusal replaced by distinct 'ACCESS RESTRICTED' text",
+      "target_defense": "Side-Channel Refusal Uniformity",
+      "command": "D:\\FYP-UNDERGRADE\\.venv\\Scripts\\python.exe -m pytest tests/test_security_depth.py::TestResultCountSideChannel::test_refusal_uniformity_side_channel -q",
+      "returncode": 1,
+      "stdout": "F                                                                        [100%]\n================================== FAILURES ===================================\n_______ TestResultCountSideChannel.test_refusal_uniformity_side_channel _______\n\nself = <test_security_depth.TestResultCountSideChannel object at 0x000001BF95DB55B0>\n\n    def test_refusal_uniformity_side_channel(self):\n        \"\"\"Query matc",
+      "killed": true,
+      "status": "KILLED"
+    },
+    {
+      "id": "MUTANT-G",
+      "env_var": "MUTANT_ROLE_FROM_BODY",
+      "description": "Role taken from client request body rather than signed JWT",
+      "target_defense": "Signed Token Identity",
+      "command": "D:\\FYP-UNDERGRADE\\.venv\\Scripts\\python.exe -m pytest tests/test_security_depth.py::TestIdentityAuthentication::test_forged_role_in_request_ignored -q",
+      "returncode": 1,
+      "stdout": "F                                                                        [100%]\n================================== FAILURES ===================================\n_______ TestIdentityAuthentication.test_forged_role_in_request_ignored ________\n\nself = <test_security_depth.TestIdentityAuthentication object at 0x0000024D28C354C0>\ntest_db_conn = <sqlite3.Connection object at 0x0000024D28BD3F10>\nmonkeypat",
+      "killed": true,
+      "status": "KILLED"
+    }
+  ]
+}

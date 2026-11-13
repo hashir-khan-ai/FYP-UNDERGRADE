@@ -12,6 +12,7 @@ the grader; the grader never sees or reveals restricted content.
 import inspect
 import json
 import logging
+import os
 from pathlib import Path
 import re
 import threading
@@ -441,6 +442,9 @@ class BaselineRAGPipeline:
         start = time.perf_counter()
         top_k = settings.RETRIEVAL_TOP_K_HYBRID
         effective_role = normalize_role(role) if settings.rbac_enabled else None
+        # Positive control: Mutant (c) disables pre-fusion vector/lexical RBAC filter
+        if os.environ.get("MUTANT_DISABLE_PRE_FUSION_RBAC") == "1":
+            effective_role = None
 
         try:
             bm25_result = self.bm25.search(query, top_k=top_k, role=effective_role)
@@ -498,7 +502,8 @@ class BaselineRAGPipeline:
         """
         start = time.perf_counter()
         reranked = self.reranker.rerank(query, candidates, top_n=settings.RERANKER_TOP_N)
-        if settings.rbac_enabled:
+        # Positive control: Mutant (b) disables post-rerank RBAC defense-in-depth guard
+        if settings.rbac_enabled and os.environ.get("MUTANT_DISABLE_POST_RERANK_RBAC") != "1":
             permitted, dropped = enforce_role_visibility(reranked, role)
             if dropped:
                 # Count only: passage text is never written to logs.
@@ -581,7 +586,16 @@ class BaselineRAGPipeline:
         passage_ids = [passage["chunk_id"] for passage in passages if passage.get("chunk_id")]
 
         if not passages:
-            return REFUSAL_TEXT, [], False, 0.0, {
+            refusal_msg = REFUSAL_TEXT
+            # Positive control: Mutant (f) replaces uniform refusal with distinct restricted message
+            if os.environ.get("MUTANT_DISTINCT_REFUSAL") == "1":
+                try:
+                    unrestricted = self.bm25.search(query, top_k=1, role=None).hits
+                    if unrestricted:
+                        refusal_msg = "ACCESS RESTRICTED: Documents were found but are withheld due to your role permissions."
+                except Exception:
+                    pass
+            return refusal_msg, [], False, 0.0, {
                 "calls": 0,
                 "cached_calls": 0,
                 "prompt_tokens": 0,
@@ -617,6 +631,7 @@ class BaselineRAGPipeline:
             temperature=0.0,
             step=step_name,
             session_id=session_id,
+            role=role,
         )
         generation_ms = (time.perf_counter() - start) * 1000.0
         raw_text = response.content.strip()
@@ -922,6 +937,18 @@ class BaselineRAGPipeline:
             role=normalized_role,
             rbac_enabled=settings.rbac_enabled,
         )
+        # Phase 11 canary output guard
+        from src.core.canary import enforce_canary_guard
+        final_answer, _, _, canary_violation = enforce_canary_guard(
+            text=final_answer,
+            user_role=normalized_role,
+            citations=[p if isinstance(p, dict) else (p.model_dump() if hasattr(p, "model_dump") else str(p)) for p in source_passages],
+        )
+        if canary_violation:
+            source_passages = []
+            sources = []
+            cited_ids = []
+
         return BaselineRAGResponse(
             query=query,
             answer=final_answer,
@@ -1123,6 +1150,18 @@ class BaselineRAGPipeline:
             role=normalized_role,
             rbac_enabled=rbac_enabled,
         )
+        # Phase 11 canary output guard
+        from src.core.canary import enforce_canary_guard
+        final_answer, _, _, canary_violation = enforce_canary_guard(
+            text=final_answer,
+            user_role=normalized_role,
+            citations=[p if isinstance(p, dict) else (p.model_dump() if hasattr(p, "model_dump") else str(p)) for p in source_passages],
+        )
+        if canary_violation:
+            source_passages = []
+            sources = []
+            cited_ids = []
+
         return BaselineRAGResponse(
             query=query,
             answer=final_answer,

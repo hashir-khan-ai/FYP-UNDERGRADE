@@ -34,6 +34,8 @@ CREATE TABLE IF NOT EXISTS sessions (
     id TEXT PRIMARY KEY,                   -- UUIDv4 string
     user_id INTEGER NOT NULL,
     title TEXT NOT NULL DEFAULT 'New Compliance Session',
+    title_source TEXT NOT NULL DEFAULT 'default',
+    title_locked INTEGER NOT NULL DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
@@ -104,6 +106,8 @@ CREATE TABLE IF NOT EXISTS audit_log (
     heading_path_enabled INTEGER,
     claim_check_json TEXT,
     calculator_json TEXT,
+    prev_hash TEXT NOT NULL DEFAULT 'GENESIS',
+    entry_hash TEXT NOT NULL DEFAULT '',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (session_id) REFERENCES sessions (id) ON DELETE SET NULL,
     FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
@@ -218,11 +222,20 @@ _AUDIT_LOG_EXTRA_COLUMNS: dict[str, str] = {
     # Phase 8C stretch feature columns
     "claim_check_json": "TEXT",
     "calculator_json": "TEXT",
+    # Phase 11 hash-chained audit log columns
+    "prev_hash": "TEXT NOT NULL DEFAULT 'GENESIS'",
+    "entry_hash": "TEXT NOT NULL DEFAULT ''",
 }
 
 # Phase 3 messages column: the role used when each turn was produced.
 _MESSAGES_EXTRA_COLUMNS: dict[str, str] = {
     "user_role": "TEXT",
+}
+
+# Phase 10 sessions columns: automatic title source and manual rename lock
+_SESSIONS_EXTRA_COLUMNS: dict[str, str] = {
+    "title_source": "TEXT NOT NULL DEFAULT 'default'",
+    "title_locked": "INTEGER NOT NULL DEFAULT 0",
 }
 
 
@@ -251,11 +264,36 @@ def apply_migrations(conn: sqlite3.Connection) -> None:
     _add_missing_columns(conn, "llm_calls", _LLM_CALLS_EXTRA_COLUMNS)
     _add_missing_columns(conn, "audit_log", _AUDIT_LOG_EXTRA_COLUMNS)
     _add_missing_columns(conn, "messages", _MESSAGES_EXTRA_COLUMNS)
+    _add_missing_columns(conn, "sessions", _SESSIONS_EXTRA_COLUMNS)
 
     cur = conn.cursor()
     cur.execute("CREATE INDEX IF NOT EXISTS idx_llm_calls_step ON llm_calls(step);")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_llm_calls_profile ON llm_calls(llm_profile);")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_llm_calls_audit_id ON llm_calls(audit_id);")
+
+    # Backfill hash chain for any legacy audit_log entries lacking entry_hash
+    from src.core.audit_chain import AUDIT_HASH_COLUMNS, GENESIS_PREV_HASH, compute_audit_hash
+
+    cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='audit_log';")
+    if cur.fetchone():
+        cur.execute("SELECT * FROM audit_log ORDER BY id ASC;")
+        rows = cur.fetchall()
+        if rows:
+            col_names = [d[0] for d in cur.description]
+            prev_h = GENESIS_PREV_HASH
+            for row in rows:
+                row_dict = dict(zip(col_names, row))
+                entry_h = row_dict.get("entry_hash") or ""
+                prev_field = row_dict.get("prev_hash") or ""
+                if not entry_h:
+                    vals = tuple(row_dict.get(col) for col in AUDIT_HASH_COLUMNS)
+                    entry_h = compute_audit_hash(prev_h, vals)
+                    cur.execute(
+                        "UPDATE audit_log SET prev_hash = ?, entry_hash = ? WHERE id = ?",
+                        (prev_h, entry_h, row_dict["id"]),
+                    )
+                prev_h = entry_h
+            conn.commit()
 
 
 def init_db(db_path: str | None = None) -> None:

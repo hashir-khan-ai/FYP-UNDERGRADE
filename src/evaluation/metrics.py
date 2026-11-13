@@ -207,6 +207,66 @@ def bootstrap_ci(
     }
 
 
+def paired_bootstrap_ci(
+    values_a: list[float],
+    values_b: list[float],
+    n_boot: int = 1000,
+    confidence: float = 0.95,
+    seed: int = 42,
+) -> dict[str, Any]:
+    """Compute 95% bootstrap CI for paired difference (values_a - values_b).
+
+    When 0 is inside [ci_low, ci_high], the delta between adjacent configurations
+    is NOT statistically significant (null result).
+    """
+    if len(values_a) != len(values_b) or len(values_a) == 0:
+        return {
+            "n": 0,
+            "mean_delta": 0.0,
+            "ci_low": 0.0,
+            "ci_high": 0.0,
+            "is_significant": False,
+            "null_result": True,
+        }
+
+    diffs = [float(a) - float(b) for a, b in zip(values_a, values_b)]
+    n = len(diffs)
+    mean_val = sum(diffs) / float(n)
+    if n == 1 or n_boot <= 0:
+        rounded = round(mean_val, 4)
+        return {
+            "n": n,
+            "mean_delta": rounded,
+            "ci_low": rounded,
+            "ci_high": rounded,
+            "is_significant": rounded != 0.0,
+            "null_result": rounded == 0.0,
+        }
+
+    rng = random.Random(seed)
+    boot_means: list[float] = []
+    for _ in range(n_boot):
+        sample = [diffs[rng.randrange(n)] for _ in range(n)]
+        boot_means.append(sum(sample) / float(n))
+    boot_means.sort()
+
+    alpha = 1.0 - confidence
+    low_idx = max(0, min(n_boot - 1, int(math.floor((alpha / 2.0) * n_boot))))
+    high_idx = max(0, min(n_boot - 1, int(math.ceil((1.0 - alpha / 2.0) * n_boot)) - 1))
+    ci_low = round(boot_means[low_idx], 4)
+    ci_high = round(boot_means[high_idx], 4)
+    is_significant = not (ci_low <= 0.0 <= ci_high)
+
+    return {
+        "n": n,
+        "mean_delta": round(mean_val, 4),
+        "ci_low": ci_low,
+        "ci_high": ci_high,
+        "is_significant": is_significant,
+        "null_result": not is_significant,
+    }
+
+
 def intervals_overlap(
     ci_a: tuple[float, float] | dict[str, Any],
     ci_b: tuple[float, float] | dict[str, Any],

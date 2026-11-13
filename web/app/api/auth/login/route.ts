@@ -98,8 +98,8 @@ export async function POST(request: Request) {
     return errorResponse(502, "BAD_UPSTREAM_RESPONSE", "The compliance API returned an invalid session.");
   }
 
-  // Guarantee a session exists so the workspace never opens empty, matching
-  // the legacy Streamlit bootstrap. Failures here do not block sign-in.
+  // Guarantee a session exists so the workspace never opens empty, providing
+  // a guaranteed initial session. Failures here do not block sign-in.
   let warning: string | undefined;
   const authHeaders = {
     Authorization: `Bearer ${token}`,

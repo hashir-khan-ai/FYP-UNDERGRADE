@@ -344,3 +344,49 @@ Resolve chunk HTML/markdown sanitization, profile-aware SpendGuard caps, runtime
 2. [x] **Phase 8B Citation Card Redesign:** Human title -> deduplicated single breadcrumb -> role-aware `Internal · visible to <Roles>` / `Public · verifiable` pill -> highlighted escaped quote -> collapsed `Technical details` with copy; clickable/hoverable inline `[1]`/`[2]` scroll-and-pulse markers.
 3. [x] **Phase 8C Stretch Tools & Ablations:** Config-gated `src/core/claim_check.py` and AST-whitelisted `src/core/calculator.py` with `enforce_role_visibility` gates, SQLite persistence, extended `scripts/leakage_check.py` (45/45 cells, 0.00% leakage), `data/gold_v2.jsonl` (115 items), and `A6_claim_check` / `A7_calculator` ablations marked `"MOCK, not evidence"`.
 4. [x] **Phase 8D UI Polish & Visual Audit:** Inline SVG icon helper (`get_svg_icon`), 5-stage animated pipeline stepper, CSS 3D citation card tilt + sidebar layer stack, `@media (prefers-reduced-motion: reduce)` fallbacks, 0-console-error headless Chrome CDP boot check + 4 screenshots (`docs/screenshots/phase8/`), and documentation closeout (`DESIGN.md`, `docs/PHASE8_NOTES.md`, `STATUS.md`, `PLAN.md`, `DECISIONS.md`).
+
+---
+
+## Phase 9: Real Evidence Run & Evaluation Hardening [Completed]
+
+### Goal
+Execute rigorous empirical verification: audit test integrity, enforce gold set review gating, run 32+ adversarial leakage probes against the real index, ground claim-check against human labels, document provider free-tier limits, run reviewed-item ablation (A0–A7) with bootstrap 95% CIs, and eliminate embedded Qdrant `.lock` contention.
+
+### Concrete Tasks
+1. [x] **9A Test Integrity:** Git diff on `tests/test_enterprise_hardening.py` against commit `7531a8b`; verified zero loosened assertions; added explicit vector store readiness probe and isolated store teardown.
+2. [x] **9B Gold Set Review Gate:** Added `review_status` to all 115 items (45 reviewed, 70 draft); exported `data/gold_review_sheet.csv`; updated `scripts/run_ablation.py` with `--allow-unreviewed` gate and header review counters.
+3. [x] **9C Adversarial Leakage Matrix:** Added 32 adversarial test cases (8 injection, 8 spoofing, 8 paraphrased, 8 multi-turn memory carryover); executed against real 101-chunk Qdrant index + BM25 + CPU BGE/MiniLM; 141 cells checked with 0.00% leakage rate.
+4. [x] **9D Claim-Check Validation:** Exported `data/claim_labels.csv` with 50 human labels (33 supported, 17 unsupported); ran `scripts/validate_claim_check.py` achieving 100.0% precision, 54.5% recall, F1=0.7059.
+5. [x] **9E Provider Limits & Reviewed Ablation:** Documented Groq free-tier limits (30 RPM, 6k TPM, 14.4k RPD, 500k TPD); executed A0–A7 ablation across 45 reviewed questions with bootstrap 95% CIs and paired comparisons.
+6. [x] **9F Qdrant Lock Safety:** Added `check_storage_lock()` probe in indexer and API lifespan; eliminated stale `.lock` process contention.
+
+---
+
+## Phase 10: Compliance Sessions Sidebar Redesign & Auto-Titles [Completed]
+
+### Goal
+Deliver an automated, ChatGPT-style session naming engine and completely overhaul the Streamlit sidebar session management layout with strict zero-leakage security invariants, database persistence, and verified visual elegance.
+
+### Concrete Tasks
+1. [x] **Auto-Titles Engine (`src/core/session_title.py`):** ChatGPT-style title generator (3–6 words, Title Case, max 40 chars) taking strictly the user's first query (+ router label); retrieved passages and model answers are strictly excluded to prevent leakage; live profiles use a single non-blocking LLM call; mock/offline profiles use deterministic noun-phrase extraction.
+2. [x] **Database Schema & Migrations:** Added `title_source` ('auto'/'user'/'default') and `title_locked` (0/1) to `sessions` table; user manual renames preserve casing and lock titles against future auto-overwrites.
+3. [x] **Sidebar UX & Layout Overhaul (`src/ui/app.py`):** Fixed "+ New Session" button at top (re-uses empty sessions without duplicates); removed redundant text input; chronological grouping (Today / Yesterday / Earlier); fixed 380px scroll container; 32px uniform action buttons (`✎` rename, `×` delete with confirmation); 3px Safety Orange left accent rail (`#FF5F00`) on active row (no glyphs or width shifts); hidden Streamlit input hint; full reduced-motion support.
+4. [x] **Testing & Headless CDP Verification:** Authored `tests/test_session_title.py` (6/6 passed); verified `tests/test_sessions.py` (11/11 passed) and `tests/test_ui_app.py` (15/15 passed); headless Chrome CDP capture verified 0 browser console errors and generated 4 screenshots in `docs/screenshots/phase10/`.
+
+---
+
+## Phase 11: Publication Hardening & Security Depth [Completed]
+
+### Goal
+Harden the architecture for public release and peer review: cryptographic audit logging, canary token defenses, timing/count side-channel elimination, token-bound identity, dynamic revocation, cross-role cache isolation, 45-case adversarial red team evaluation, evaluation rigor with paired bootstrap CIs, and complete open-source packaging.
+
+### Concrete Tasks
+1. [x] **A.1 Hash-Chained Audit Log:** Cryptographic SHA-256 hash chaining (`prev_hash` + 42 fields) in `src/core/audit_chain.py` and `src/db/repository.py`. Built `scripts/verify_audit.py` with automatic tampering and row deletion detection.
+2. [x] **A.2 Canary Tokens:** Planted 5 unique canaries in restricted documents. Implemented output guard `src/core/canary.py` neutralizing leaks in answers, citations, titles, session memory, and traces.
+3. [x] **A.3 Result-Count Side Channel:** Fixed BM25 presence filtering (`rank_bm25` bug). Verified uniform refusal shape, citation count, and wording for queries matching only restricted content vs non-existent content.
+4. [x] **A.4 Token-Bound Identity:** Verified role derived strictly from verified JWT claims + SQLite. Forged headers/body rejected.
+5. [x] **A.5 Dynamic Revocation:** Altered doc `allowed_roles`, re-indexed, and verified immediate access denial on subsequent queries.
+6. [x] **A.6 Scoped Cache & Memory:** Scoped LLM response cache keys by `role` and `user_id`. Verified cross-user session memory isolation.
+7. [x] **A.7 Adversarial Red Team Evaluation:** Created `data/redteam.jsonl` with 45 cases across 5 categories and `scripts/eval_redteam.py`. 45/45 passed (100.0% defense pass rate).
+8. [x] **Section B Rigor:** Added paired bootstrap CIs in `src/evaluation/metrics.py` and adjacent comparison in `scripts/run_ablation.py`. Penned `docs/LIMITATIONS.md`.
+9. [x] **Section C Repository Quality:** Created `LICENSE`, `THIRD_PARTY.md`, `DATA.md`, `docs/RELATED_WORK.md`, `Dockerfile`, `docker-compose.yml`, `Makefile`, `.github/workflows/ci.yml`, `SECURITY.md`, `CONTRIBUTING.md`, `CITATION.cff`, and `README.md`. Clean secret scan across repo and git history.

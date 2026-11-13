@@ -11,13 +11,15 @@
     "clause": "Clause BASEL-CAP-1.1 (Common Equity Tier 1 - CET1 Minimum)",
     "gold_answer": "Institutions must maintain at all times a minimum Common Equity Tier 1 (CET1) capital ratio of 4.5% of total risk-weighted assets (RWA).",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SINGLE_SEARCH",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-002",
@@ -31,13 +33,15 @@
     "clause": "Clause BASEL-CAP-1.2 (Tier 1 and Total Capital Requirements)",
     "gold_answer": "Institutions must maintain a minimum Tier 1 capital ratio of 6.0% and a minimum Total Capital ratio of 8.0% of total risk-weighted assets (RWA).",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SINGLE_SEARCH",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-003",
@@ -51,13 +55,15 @@
     "clause": "Clause BASEL-CAP-1.2 (Tier 1 and Total Capital Requirements)",
     "gold_answer": "Institutions must maintain a minimum Total Capital ratio of 8.0% and a minimum Tier 1 capital ratio of 6.0% of total risk-weighted assets (RWA).",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SINGLE_SEARCH",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-004",
@@ -71,13 +77,15 @@
     "clause": "Clause BASEL-CAP-2.1 (Capital Conservation Buffer - CCB)",
     "gold_answer": "The Capital Conservation Buffer (CCB) is 2.5% of total risk-weighted assets comprised of CET1 capital; depletion triggers constraints on dividends, share buybacks, and discretionary bonuses.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SINGLE_SEARCH",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-005",
@@ -91,13 +99,15 @@
     "clause": "Clause BASEL-LIQ-3.1 (Liquidity Coverage Ratio - LCR)",
     "gold_answer": "Institutions must maintain high-quality liquid assets (HQLA) covering net cash outflows over a 30-day severe stress scenario, keeping the LCR at or above 100% daily.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SINGLE_SEARCH",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-006",
@@ -111,13 +121,15 @@
     "clause": "Clause BASEL-LIQ-3.4 (Net Stable Funding Ratio - NSFR)",
     "gold_answer": "Institutions must maintain a minimum Net Stable Funding Ratio (NSFR) of 100% over an ongoing annual horizon.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SINGLE_SEARCH",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-007",
@@ -131,13 +143,15 @@
     "clause": "Clause BCOBS-2.1.1R (Clear, Fair, and Not Misleading Communication)",
     "gold_answer": "Any communication or financial promotion to a retail banking customer must be fair, clear, and not misleading across all digital, printed, and spoken channels.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SINGLE_SEARCH",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-008",
@@ -151,13 +165,15 @@
     "clause": "Clause BCOBS-2.1.2G (Guidance on Clarity of Terms)",
     "gold_answer": "Firms should prominently display annual equivalent rates (AER) alongside gross rates and explain fee calculation methods before agreement execution.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SINGLE_SEARCH",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-009",
@@ -171,17 +187,19 @@
     "clause": "Clause BCOBS-4.1.1R (Pre-Contract Information Disclosure)",
     "gold_answer": "Pre-contract disclosure must detail withdrawal restrictions and early termination penalties, account maintenance and service charges, and Financial Services Compensation Scheme (FSCS) arrangements.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SINGLE_SEARCH",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-010",
-    "question": "How many days of advance written notice are required under BCOBS-4.1.2R for standard and significant interest rate reductions on deposit accounts over £100?",
+    "question": "How many days of advance written notice are required under BCOBS-4.1.2R for standard and significant interest rate reductions on deposit accounts over \u00a3100?",
     "type": "single_fact",
     "role_asking": "analyst",
     "gold_chunk_ids": [
@@ -189,15 +207,17 @@
     ],
     "gold_doc": "DOC-FCA-BCOBS-2024",
     "clause": "Clause BCOBS-4.1.2R (Notification of Interest Rate Changes)",
-    "gold_answer": "At least 14 calendar days advance written notice is required for a rate reduction on accounts over £100, or at least 30 calendar days if the reduction exceeds 0.50% within 12 months.",
+    "gold_answer": "At least 14 calendar days advance written notice is required for a rate reduction on accounts over \u00a3100, or at least 30 calendar days if the reduction exceeds 0.50% within 12 months.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SINGLE_SEARCH",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-011",
@@ -211,13 +231,15 @@
     "clause": "Clause BCOBS-4.2.4R (Post-Contract Statements)",
     "gold_answer": "A firm must provide each payment account holder with an account statement at least once per month, without charge, in an accessible electronic or physical format.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SINGLE_SEARCH",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-012",
@@ -231,13 +253,15 @@
     "clause": "Clause MLR-REG-27(1) (Application of Customer Due Diligence)",
     "gold_answer": "Customer due diligence must be applied for any occasional transaction amounting to 15,000 euros or more, whether in a single operation or linked operations.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SINGLE_SEARCH",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-013",
@@ -251,13 +275,15 @@
     "clause": "Clause MLR-REG-28(2) (Beneficial Ownership Threshold)",
     "gold_answer": "Beneficial ownership applies to any natural person who ultimately owns or controls more than 25% of the shares or voting rights in a corporate customer, or controls management.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SINGLE_SEARCH",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-014",
@@ -271,13 +297,15 @@
     "clause": "Clause MLR-REG-33(1) (Enhanced Customer Due Diligence - EDD)",
     "gold_answer": "EDD is required for relationships involving a high-risk third country, a Politically Exposed Person (PEP) or associate, or complex/unusually large transactions with no apparent economic purpose.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SINGLE_SEARCH",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-015",
@@ -291,13 +319,15 @@
     "clause": "Clause MLR-REG-35(5) (Approval for PEP Relationships)",
     "gold_answer": "A firm must obtain senior management approval before establishing or continuing a business relationship with a Politically Exposed Person (PEP).",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SINGLE_SEARCH",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-016",
@@ -311,13 +341,15 @@
     "clause": "Clause SOP-KYC-1.1 (Identity Verification Standards)",
     "gold_answer": "Analysts must verify identity using one government-issued photo ID (passport, UK driving licence, or EEA national ID) and one proof of address issued within the preceding 3 calendar months.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SINGLE_SEARCH",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-017",
@@ -331,13 +363,15 @@
     "clause": "Clause SOP-KYC-1.2 (Electronic Verification Matching)",
     "gold_answer": "Electronic verification (e-IDV) must achieve a minimum 2+2 matching score (two full name matches and two address matches across independent credit reference bureau databases).",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SINGLE_SEARCH",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-018",
@@ -351,13 +385,15 @@
     "clause": "Clause SOP-KYC-2.1 (Ultimate Beneficial Ownership Verification)",
     "gold_answer": "Analysts must obtain the certificate of incorporation, memorandum and articles of association, and register of members, and verify individuals with over 25% ownership or voting rights.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SINGLE_SEARCH",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-019",
@@ -371,13 +407,15 @@
     "clause": "Clause SOP-KYC-2.4 (Sanctions and Adverse Media Screening)",
     "gold_answer": "Applicants, directors, and beneficial owners must be screened against the UK HM Treasury OFSI Consolidated List, UN Sanctions List, and EU Sanctions List prior to account activation.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SINGLE_SEARCH",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-020",
@@ -391,13 +429,15 @@
     "clause": "Clause SOP-KYC-2.4 (Sanctions and Adverse Media Screening)",
     "gold_answer": "Any potential positive sanctions hit requires immediate suspension of the onboarding workflow prior to account activation.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SINGLE_SEARCH",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-021",
@@ -412,13 +452,15 @@
     "clause": "BASEL-CAP-1.1 & BASEL-CAP-1.2",
     "gold_answer": "Minimum CET1 is 4.5% of RWA, minimum Tier 1 capital is 6.0% of RWA, and minimum Total Capital is 8.0% of RWA.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SPLIT",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-022",
@@ -433,13 +475,15 @@
     "clause": "BASEL-CAP-1.1 & BASEL-CAP-2.1",
     "gold_answer": "Minimum CET1 is 4.5% of RWA, and the Capital Conservation Buffer requires an additional 2.5% of RWA comprised entirely of CET1 capital.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SPLIT",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-023",
@@ -454,13 +498,15 @@
     "clause": "BASEL-LIQ-3.1 & BASEL-LIQ-3.4",
     "gold_answer": "Both LCR and NSFR require a minimum ratio of 100%; LCR covers a 30-day severe stress scenario monitored daily, whereas NSFR applies over an ongoing annual horizon.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SPLIT",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-024",
@@ -475,13 +521,15 @@
     "clause": "BASEL-CAP-1.2 & BASEL-LIQ-3.1",
     "gold_answer": "Total Capital must be at least 8.0% of RWA (with Tier 1 at 6.0%), and the LCR must be maintained at or above 100% over a 30-day stress scenario.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SPLIT",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-025",
@@ -496,13 +544,15 @@
     "clause": "BASEL-CAP-2.1 & BASEL-LIQ-3.4",
     "gold_answer": "Depleting the 2.5% CCB triggers constraints on dividends, share buybacks, and bonuses; BASEL-LIQ-3.4 requires a minimum 100% NSFR over an annual horizon.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SPLIT",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-026",
@@ -517,13 +567,15 @@
     "clause": "BCOBS-2.1.1R & BCOBS-2.1.2G",
     "gold_answer": "Communications must be fair, clear, and not misleading across all channels, and firms should prominently display AER alongside gross rates and explain fee calculations before execution.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SPLIT",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-027",
@@ -536,15 +588,17 @@
     ],
     "gold_doc": "DOC-FCA-BCOBS-2024",
     "clause": "BCOBS-4.1.1R & BCOBS-4.1.2R",
-    "gold_answer": "Pre-contract disclosure covers withdrawal penalties, service charges, and FSCS protection; rate reductions on balances over £100 require 14 days notice, or 30 days if exceeding 0.50% in 12 months.",
+    "gold_answer": "Pre-contract disclosure covers withdrawal penalties, service charges, and FSCS protection; rate reductions on balances over \u00a3100 require 14 days notice, or 30 days if exceeding 0.50% in 12 months.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SPLIT",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-028",
@@ -557,15 +611,17 @@
     ],
     "gold_doc": "DOC-FCA-BCOBS-2024",
     "clause": "BCOBS-4.1.2R & BCOBS-4.2.4R",
-    "gold_answer": "Interest rate cuts on balances over £100 require 14 days (or 30 days if >0.50%) advance written notice, and post-contract statements must be provided monthly free of charge.",
+    "gold_answer": "Interest rate cuts on balances over \u00a3100 require 14 days (or 30 days if >0.50%) advance written notice, and post-contract statements must be provided monthly free of charge.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SPLIT",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-029",
@@ -580,13 +636,15 @@
     "clause": "BCOBS-2.1.2G & BCOBS-4.1.1R",
     "gold_answer": "AER must be displayed alongside gross rates with fee explanations prior to execution, and pre-contract information must detail withdrawal penalties, charges, and FSCS compensation.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SPLIT",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-030",
@@ -601,13 +659,15 @@
     "clause": "BCOBS-2.1.1R & BCOBS-4.2.4R",
     "gold_answer": "BCOBS-2.1.1R applies across all digital, printed, and spoken channels, and BCOBS-4.2.4R requires monthly statements without charge in an accessible electronic or physical format.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SPLIT",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-031",
@@ -622,13 +682,15 @@
     "clause": "MLR-REG-27(1) & MLR-REG-28(2)",
     "gold_answer": "CDD applies to new business relationships, occasional transactions of 15,000 euros or more, suspected ML/TF, or doubted documents; beneficial ownership threshold is more than 25% of shares or voting rights.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SPLIT",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-032",
@@ -643,13 +705,15 @@
     "clause": "MLR-REG-33(1) & MLR-REG-35(5)",
     "gold_answer": "EDD applies to high-risk third countries, PEPs or their associates, and complex/unusually large transactions; establishing or continuing a PEP relationship requires senior management approval.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SPLIT",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-033",
@@ -664,13 +728,15 @@
     "clause": "MLR-REG-27(1) & MLR-REG-35(5)",
     "gold_answer": "Occasional transactions of 15,000 euros or more require CDD under Regulation 27(1), and senior management approval is required for PEP relationships under Regulation 35(5).",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SPLIT",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-034",
@@ -685,13 +751,15 @@
     "clause": "SOP-KYC-1.1 & SOP-KYC-1.2",
     "gold_answer": "Physical onboarding requires one government photo ID and a proof of address within 3 months; digital onboarding requires a minimum 2+2 e-IDV match across independent credit bureaus.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SPLIT",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-035",
@@ -706,13 +774,15 @@
     "clause": "SOP-KYC-2.1 & SOP-KYC-2.4",
     "gold_answer": "Analysts must obtain incorporation, articles, and member register documents and verify >25% owners, and screen against the UK OFSI, UN, and EU sanctions lists.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SPLIT",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-036",
@@ -727,13 +797,15 @@
     "clause": "SOP-KYC-1.1 & SOP-KYC-2.4",
     "gold_answer": "Retail proof of address must be issued within the preceding 3 calendar months, and corporate screening covers the UK HM Treasury OFSI, UN, and EU sanctions lists.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SPLIT",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-037",
@@ -746,15 +818,17 @@
     ],
     "gold_doc": "DOC-INT-POL-MGT-002",
     "clause": "POL-MGT-1.1 & POL-MGT-1.3",
-    "gold_answer": "Material breaches must be reported to the PRA/FCA via FCA Connect within 24 hours; unhedged exposure exceeding £500,000 or affecting >100 retail accounts triggers SMF 16 escalation.",
+    "gold_answer": "Material breaches must be reported to the PRA/FCA via FCA Connect within 24 hours; unhedged exposure exceeding \u00a3500,000 or affecting >100 retail accounts triggers SMF 16 escalation.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SPLIT",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-038",
@@ -769,13 +843,15 @@
     "clause": "POL-MGT-2.2 & POL-MGT-2.5",
     "gold_answer": "High Severity audit issues require a RAP within 14 business days and completion within 60 calendar days; repeated staff omissions require a root-cause investigation within 10 business days.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SPLIT",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-039",
@@ -790,13 +866,15 @@
     "clause": "AUDIT-CONF-1.1 & AUDIT-CONF-1.2",
     "gold_answer": "Project Neptune identified a recurring 14% intra-month deficit in the secondary liquidity buffer, which the Group Internal Auditor escalated directly to the Chair of the Board Risk Committee on 15 March 2025.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SPLIT",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-040",
@@ -811,13 +889,15 @@
     "clause": "AUDIT-CONF-2.3 & AUDIT-CONF-2.4",
     "gold_answer": "Case WB-2024-09 validated algorithmic market timing anomalies in FX trading with two disciplinary referrals; its transcripts are sealed and accessible only to the Group Chief Internal Auditor and external legal counsel.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SPLIT",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-041",
@@ -832,13 +912,15 @@
     "clause": "MLR-REG-28(2) & SOP-KYC-2.1",
     "gold_answer": "Both MLR Regulation 28(2) and internal SOP-KYC-2.1 set a >25% ownership or voting rights threshold for identifying and verifying corporate beneficial owners.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SPLIT",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-042",
@@ -853,13 +935,15 @@
     "clause": "MLR-REG-27(1) & SOP-KYC-1.1",
     "gold_answer": "MLR Regulation 27(1) mandates CDD when establishing a business relationship, and SOP-KYC-1.1 requires one government photo ID (passport, driving licence, or EEA ID) plus a utility bill or bank statement within 3 months.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SPLIT",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-043",
@@ -874,13 +958,15 @@
     "clause": "MLR-REG-27(1) & SOP-KYC-1.2",
     "gold_answer": "MLR Regulation 27(1) requires CDD at relationship onboarding, and SOP-KYC-1.2 requires digital e-IDV to achieve at least a 2+2 matching score across independent credit bureaus.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SPLIT",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-044",
@@ -895,13 +981,15 @@
     "clause": "MLR-REG-33(1) & SOP-KYC-2.4",
     "gold_answer": "MLR Regulation 33(1) requires Enhanced CDD for high-risk third countries, and SOP-KYC-2.4 requires screening against the UK HM Treasury OFSI, UN, and EU sanctions lists before account activation.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SPLIT",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-045",
@@ -916,13 +1004,15 @@
     "clause": "SOP-KYC-2.1 & MLR-REG-35(5)",
     "gold_answer": "SOP-KYC-2.1 requires the certificate of incorporation, articles of association, and register of members, while MLR Regulation 35(5) requires senior management approval for any PEP relationship.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SPLIT",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-046",
@@ -937,13 +1027,15 @@
     "clause": "BASEL-CAP-1.1 & BCOBS-2.1.1R",
     "gold_answer": "Basel III BASEL-CAP-1.1 requires a 4.5% minimum CET1 ratio of RWA, while FCA BCOBS-2.1.1R requires all retail customer communications to be fair, clear, and not misleading.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SPLIT",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-047",
@@ -956,15 +1048,17 @@
     ],
     "gold_doc": "DOC-BASEL-III-2023 & DOC-FCA-BCOBS-2024",
     "clause": "BASEL-LIQ-3.1 & BCOBS-4.1.2R",
-    "gold_answer": "BASEL-LIQ-3.1 requires an LCR of at least 100% over a 30-day stress scenario, and BCOBS-4.1.2R requires 14 calendar days notice (30 days if >0.50%) before reducing deposit rates on balances over £100.",
+    "gold_answer": "BASEL-LIQ-3.1 requires an LCR of at least 100% over a 30-day stress scenario, and BCOBS-4.1.2R requires 14 calendar days notice (30 days if >0.50%) before reducing deposit rates on balances over \u00a3100.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SPLIT",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-048",
@@ -979,13 +1073,15 @@
     "clause": "BCOBS-4.1.1R & SOP-KYC-1.1",
     "gold_answer": "BCOBS-4.1.1R requires pre-contract disclosure of withdrawal penalties, charges, and FSCS protection, while SOP-KYC-1.1 requires one government photo ID and a proof of address dated within 3 months.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SPLIT",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-049",
@@ -1000,13 +1096,15 @@
     "clause": "BCOBS-2.1.2G & SOP-KYC-1.2",
     "gold_answer": "BCOBS-2.1.2G requires displaying AER alongside gross rates and explaining fees before execution, and SOP-KYC-1.2 requires a 2+2 name and address match across independent credit bureaus.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SPLIT",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-050",
@@ -1021,13 +1119,15 @@
     "clause": "BASEL-CAP-2.1 & MLR-REG-27(1)",
     "gold_answer": "The Basel III Capital Conservation Buffer is 2.5% of RWA in CET1 capital, and the UK MLR Regulation 27(1) occasional transaction threshold for CDD is 15,000 euros or more.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SPLIT",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-051",
@@ -1042,13 +1142,15 @@
     "clause": "BASEL-LIQ-3.1 & AUDIT-CONF-1.1",
     "gold_answer": "While BASEL-LIQ-3.1 requires a daily 100% LCR and statutory LCR remained above 100% on paper, Project Neptune (AUDIT-CONF-1.1) uncovered a recurring 14% intra-month deficit in the secondary liquidity buffer.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SPLIT",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-052",
@@ -1064,13 +1166,15 @@
     "clause": "BCOBS-4.1.2R, POL-MGT-1.1 & POL-MGT-1.3",
     "gold_answer": "Affecting >100 retail accounts triggers mandatory SMF 16 escalation under POL-MGT-1.3, and material regulatory breaches must be reported to the PRA and FCA via FCA Connect within 24 hours under POL-MGT-1.1.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SPLIT",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-053",
@@ -1085,13 +1189,15 @@
     "clause": "SOP-KYC-1.2 & POL-MGT-2.5",
     "gold_answer": "SOP-KYC-1.2 mandates a minimum 2+2 e-IDV matching score, and POL-MGT-2.5 requires Compliance Managers to complete a root-cause investigation within 10 business days for repeated procedural omissions.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SPLIT",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-054",
@@ -1106,13 +1212,15 @@
     "clause": "AUDIT-CONF-1.1 & POL-MGT-2.2",
     "gold_answer": "AUDIT-CONF-1.1 identified a 14% secondary liquidity buffer deficit under Project Neptune; under POL-MGT-2.2, a High Severity audit issue requires a RAP within 14 business days and full remediation within 60 calendar days.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SPLIT",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-055",
@@ -1128,13 +1236,15 @@
     "clause": "POL-MGT-1.1, POL-MGT-1.3 & AUDIT-CONF-1.2",
     "gold_answer": "Standard policy routes breaches through Compliance Managers to SMF 16 and FCA Connect within 24 hours, whereas in AUDIT-CONF-1.2 the Group Internal Auditor bypassed division management to escalate directly to the Board Risk Committee Chair on 15 March 2025.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SPLIT",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-056",
@@ -1149,13 +1259,15 @@
     "clause": "BASEL-CAP-1.2 & BCOBS-4.2.4R",
     "gold_answer": "BASEL-CAP-1.2 requires 6.0% Tier 1 and 8.0% Total Capital ratios of RWA, and BCOBS-4.2.4R requires providing free monthly account statements in electronic or physical format.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SPLIT",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-057",
@@ -1170,13 +1282,15 @@
     "clause": "BASEL-LIQ-3.4 & MLR-REG-33(1)",
     "gold_answer": "BASEL-LIQ-3.4 requires a minimum 100% NSFR over an ongoing annual horizon, while MLR-REG-33(1) mandates EDD for high-risk third countries, PEPs, and complex or unusually large transactions.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SPLIT",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-058",
@@ -1191,13 +1305,15 @@
     "clause": "MLR-REG-35(5) & SOP-KYC-2.4",
     "gold_answer": "MLR Regulation 35(5) requires senior management approval for PEP relationships, and SOP-KYC-2.4 requires screening against UK OFSI, UN, and EU sanctions lists with immediate workflow suspension upon any potential hit.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SPLIT",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-059",
@@ -1212,13 +1328,15 @@
     "clause": "POL-MGT-2.2 & AUDIT-CONF-2.4",
     "gold_answer": "POL-MGT-2.2 requires a RAP to the Board Audit Committee within 14 business days and completion in 60 days, while AUDIT-CONF-2.4 seals Case WB-2024-09 records under executive privilege for the Group Chief Internal Auditor and external legal counsel only.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SPLIT",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-060",
@@ -1231,15 +1349,17 @@
     ],
     "gold_doc": "DOC-FCA-BCOBS-2024 & DOC-INT-POL-MGT-002",
     "clause": "BCOBS-4.1.2R & POL-MGT-1.3",
-    "gold_answer": "BCOBS-4.1.2R requires 14 or 30 days advance notice of rate cuts on balances over £100; because systemic detriment affects more than 100 retail accounts, POL-MGT-1.3 requires mandatory escalation to SMF 16.",
+    "gold_answer": "BCOBS-4.1.2R requires 14 or 30 days advance notice of rate cuts on balances over \u00a3100; because systemic detriment affects more than 100 retail accounts, POL-MGT-1.3 requires mandatory escalation to SMF 16.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SPLIT",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-061",
@@ -1253,13 +1373,15 @@
     "clause": "Clause POL-MGT-1.1 (Material Breach Notification Deadlines)",
     "gold_answer": "Compliance Managers must notify the PRA and FCA within 24 hours of confirmation via the formal FCA Connect notification portal.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": "GS-066",
     "expected_route": "SINGLE_SEARCH",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-066",
@@ -1273,7 +1395,7 @@
     "clause": "Clause POL-MGT-1.1 (Material Breach Notification Deadlines)",
     "gold_answer": "I can't find that in the documents available to your role.",
     "expected_behaviour": "refuse",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": "GS-061",
     "expected_route": "SINGLE_SEARCH",
@@ -1282,7 +1404,9 @@
       "FCA Connect"
     ],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-062",
@@ -1294,15 +1418,17 @@
     ],
     "gold_doc": "DOC-INT-POL-MGT-002",
     "clause": "Clause POL-MGT-1.3 (Threshold for Senior Management Regime Escalation)",
-    "gold_answer": "An unhedged financial exposure exceeding £500,000 or systemic customer detriment affecting more than 100 retail accounts triggers mandatory escalation to SMF 16.",
+    "gold_answer": "An unhedged financial exposure exceeding \u00a3500,000 or systemic customer detriment affecting more than 100 retail accounts triggers mandatory escalation to SMF 16.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": "GS-067",
     "expected_route": "SINGLE_SEARCH",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-067",
@@ -1316,7 +1442,7 @@
     "clause": "Clause POL-MGT-1.3 (Threshold for Senior Management Regime Escalation)",
     "gold_answer": "I can't find that in the documents available to your role.",
     "expected_behaviour": "refuse",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": "GS-062",
     "expected_route": "SINGLE_SEARCH",
@@ -1325,7 +1451,9 @@
       "SMF 16"
     ],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-063",
@@ -1339,13 +1467,15 @@
     "clause": "Clause POL-MGT-2.2 (Audit Remediation Timelines)",
     "gold_answer": "A formal Remediation Action Plan (RAP) must be submitted to the Board Audit Committee within 14 business days, with corrective implementation completed within 60 calendar days.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": "GS-068",
     "expected_route": "SINGLE_SEARCH",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-068",
@@ -1359,7 +1489,7 @@
     "clause": "Clause POL-MGT-2.2 (Audit Remediation Timelines)",
     "gold_answer": "I can't find that in the documents available to your role.",
     "expected_behaviour": "refuse",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": "GS-063",
     "expected_route": "SINGLE_SEARCH",
@@ -1369,7 +1499,9 @@
       "Remediation Action Plan"
     ],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-064",
@@ -1383,13 +1515,15 @@
     "clause": "Clause POL-MGT-2.5 (Disciplinary Reporting)",
     "gold_answer": "Compliance Managers must conduct a root-cause investigation within 10 business days for any repeated procedural omission by operational staff.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": "GS-069",
     "expected_route": "SINGLE_SEARCH",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-069",
@@ -1403,7 +1537,7 @@
     "clause": "Clause POL-MGT-2.5 (Disciplinary Reporting)",
     "gold_answer": "I can't find that in the documents available to your role.",
     "expected_behaviour": "refuse",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": "GS-064",
     "expected_route": "SINGLE_SEARCH",
@@ -1412,7 +1546,9 @@
       "root-cause investigation"
     ],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-065",
@@ -1426,13 +1562,15 @@
     "clause": "Clause POL-MGT-2.2 (Audit Remediation Timelines)",
     "gold_answer": "Corrective implementation for a High Severity audit issue must be fully completed within 60 calendar days of issue publication.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": "GS-070",
     "expected_route": "SINGLE_SEARCH",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-070",
@@ -1446,7 +1584,7 @@
     "clause": "Clause POL-MGT-2.2 (Audit Remediation Timelines)",
     "gold_answer": "I can't find that in the documents available to your role.",
     "expected_behaviour": "refuse",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": "GS-065",
     "expected_route": "SINGLE_SEARCH",
@@ -1455,7 +1593,9 @@
       "14 business days"
     ],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-071",
@@ -1469,13 +1609,15 @@
     "clause": "Clause AUDIT-CONF-1.1 (Project Neptune Special Review Findings)",
     "gold_answer": "Project Neptune identified a recurring intra-month deficit of 14% in the secondary liquidity buffer during peak settlement periods.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": "GS-076",
     "expected_route": "SINGLE_SEARCH",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-076",
@@ -1489,7 +1631,7 @@
     "clause": "Clause AUDIT-CONF-1.1 (Project Neptune Special Review Findings)",
     "gold_answer": "I can't find that in the documents available to your role.",
     "expected_behaviour": "refuse",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": "GS-071",
     "expected_route": "SINGLE_SEARCH",
@@ -1499,7 +1641,9 @@
       "secondary liquidity buffer"
     ],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-072",
@@ -1513,13 +1657,15 @@
     "clause": "Clause AUDIT-CONF-1.2 (Chief Risk Officer Escalation Note)",
     "gold_answer": "The Group Internal Auditor escalated the deficit directly to the Chair of the Board Risk Committee on 15 March 2025.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": "GS-077",
     "expected_route": "SINGLE_SEARCH",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-077",
@@ -1533,7 +1679,7 @@
     "clause": "Clause AUDIT-CONF-1.2 (Chief Risk Officer Escalation Note)",
     "gold_answer": "I can't find that in the documents available to your role.",
     "expected_behaviour": "refuse",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": "GS-072",
     "expected_route": "SINGLE_SEARCH",
@@ -1543,7 +1689,9 @@
       "supervisory reporting suppression"
     ],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-073",
@@ -1557,13 +1705,15 @@
     "clause": "Clause AUDIT-CONF-2.3 (Whistleblowing Case WB-2024-09 Findings)",
     "gold_answer": "Internal audit validated algorithmic market timing anomalies in foreign exchange trading desk operations and submitted disciplinary referrals for two desk supervisors to the Board Nominations Committee.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": "GS-078",
     "expected_route": "SINGLE_SEARCH",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-078",
@@ -1577,7 +1727,7 @@
     "clause": "Clause AUDIT-CONF-2.3 (Whistleblowing Case WB-2024-09 Findings)",
     "gold_answer": "I can't find that in the documents available to your role.",
     "expected_behaviour": "refuse",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": "GS-073",
     "expected_route": "SINGLE_SEARCH",
@@ -1587,7 +1737,9 @@
       "Board Nominations Committee"
     ],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-074",
@@ -1601,13 +1753,15 @@
     "clause": "Clause AUDIT-CONF-2.4 (Executive Remediation Oversight)",
     "gold_answer": "All documentation and interview transcripts for Case WB-2024-09 are sealed under executive privilege and accessible exclusively by the Group Chief Internal Auditor and external regulatory legal counsel.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": "GS-079",
     "expected_route": "SINGLE_SEARCH",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-079",
@@ -1621,7 +1775,7 @@
     "clause": "Clause AUDIT-CONF-2.4 (Executive Remediation Oversight)",
     "gold_answer": "I can't find that in the documents available to your role.",
     "expected_behaviour": "refuse",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": "GS-074",
     "expected_route": "SINGLE_SEARCH",
@@ -1631,7 +1785,9 @@
       "external regulatory legal counsel"
     ],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-075",
@@ -1645,13 +1801,15 @@
     "clause": "Clause AUDIT-CONF-1.2 (Chief Risk Officer Escalation Note)",
     "gold_answer": "Regular division management was bypassed due to perceived supervisory reporting suppression risks.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": "GS-080",
     "expected_route": "SINGLE_SEARCH",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-080",
@@ -1665,7 +1823,7 @@
     "clause": "Clause AUDIT-CONF-1.2 (Chief Risk Officer Escalation Note)",
     "gold_answer": "I can't find that in the documents available to your role.",
     "expected_behaviour": "refuse",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": "GS-075",
     "expected_route": "SINGLE_SEARCH",
@@ -1674,7 +1832,9 @@
       "15 March 2025"
     ],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-081",
@@ -1686,13 +1846,15 @@
     "clause": "",
     "gold_answer": "I can't find that in the documents available to your role.",
     "expected_behaviour": "refuse",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SINGLE_SEARCH",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-082",
@@ -1704,13 +1866,15 @@
     "clause": "",
     "gold_answer": "I can't find that in the documents available to your role.",
     "expected_behaviour": "refuse",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SINGLE_SEARCH",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-083",
@@ -1722,13 +1886,15 @@
     "clause": "",
     "gold_answer": "I can't find that in the documents available to your role.",
     "expected_behaviour": "refuse",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SINGLE_SEARCH",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-084",
@@ -1740,13 +1906,15 @@
     "clause": "",
     "gold_answer": "I can't find that in the documents available to your role.",
     "expected_behaviour": "refuse",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SINGLE_SEARCH",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-085",
@@ -1758,13 +1926,15 @@
     "clause": "",
     "gold_answer": "I can't find that in the documents available to your role.",
     "expected_behaviour": "refuse",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SINGLE_SEARCH",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-086",
@@ -1776,13 +1946,15 @@
     "clause": "",
     "gold_answer": "I can't find that in the documents available to your role.",
     "expected_behaviour": "refuse",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SINGLE_SEARCH",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-087",
@@ -1794,13 +1966,15 @@
     "clause": "",
     "gold_answer": "I can't find that in the documents available to your role.",
     "expected_behaviour": "refuse",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SINGLE_SEARCH",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-088",
@@ -1812,13 +1986,15 @@
     "clause": "",
     "gold_answer": "I can't find that in the documents available to your role.",
     "expected_behaviour": "refuse",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SINGLE_SEARCH",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-089",
@@ -1830,13 +2006,15 @@
     "clause": "",
     "gold_answer": "I can't find that in the documents available to your role.",
     "expected_behaviour": "refuse",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SINGLE_SEARCH",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-090",
@@ -1848,13 +2026,15 @@
     "clause": "",
     "gold_answer": "I can't find that in the documents available to your role.",
     "expected_behaviour": "refuse",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SINGLE_SEARCH",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-091",
@@ -1866,13 +2046,15 @@
     "clause": "",
     "gold_answer": "I can't find that in the documents available to your role.",
     "expected_behaviour": "refuse",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SINGLE_SEARCH",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-092",
@@ -1884,13 +2066,15 @@
     "clause": "",
     "gold_answer": "I can't find that in the documents available to your role.",
     "expected_behaviour": "refuse",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SINGLE_SEARCH",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-093",
@@ -1902,13 +2086,15 @@
     "clause": "",
     "gold_answer": "I can't find that in the documents available to your role.",
     "expected_behaviour": "refuse",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SINGLE_SEARCH",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-094",
@@ -1920,13 +2106,15 @@
     "clause": "",
     "gold_answer": "I can't find that in the documents available to your role.",
     "expected_behaviour": "refuse",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SINGLE_SEARCH",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-095",
@@ -1938,13 +2126,15 @@
     "clause": "",
     "gold_answer": "I can't find that in the documents available to your role.",
     "expected_behaviour": "refuse",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "SINGLE_SEARCH",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-096",
@@ -1956,7 +2146,7 @@
     "clause": "",
     "gold_answer": "I can't find that in the documents available to your role.",
     "expected_behaviour": "refuse",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "REFUSE",
@@ -1966,7 +2156,9 @@
       "WB-2024-09"
     ],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-097",
@@ -1978,7 +2170,7 @@
     "clause": "",
     "gold_answer": "I can't find that in the documents available to your role.",
     "expected_behaviour": "refuse",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "REFUSE",
@@ -1987,7 +2179,9 @@
       "SMF 16"
     ],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-098",
@@ -1999,13 +2193,15 @@
     "clause": "",
     "gold_answer": "I can't find that in the documents available to your role.",
     "expected_behaviour": "refuse",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "REFUSE",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-099",
@@ -2017,7 +2213,7 @@
     "clause": "",
     "gold_answer": "I can't find that in the documents available to your role.",
     "expected_behaviour": "refuse",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "REFUSE",
@@ -2028,7 +2224,9 @@
       "15 March 2025"
     ],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-100",
@@ -2040,13 +2238,15 @@
     "clause": "",
     "gold_answer": "I can't find that in the documents available to your role.",
     "expected_behaviour": "refuse",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": null,
     "paired_id": null,
     "expected_route": "REFUSE",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-101",
@@ -2061,13 +2261,15 @@
     "clause": "BASEL-CAP-1.1 + BASEL-CAP-2.1",
     "gold_answer": "The combined CET1 minimum (4.5%) and Capital Conservation Buffer (2.5%) is 7.0% of risk-weighted assets.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": "DOC-BASEL-III-2023_BASEL-CAP-1.1",
     "paired_id": null,
     "expected_route": "SPLIT",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-102",
@@ -2082,13 +2284,15 @@
     "clause": "BASEL-CAP-1.2 + BASEL-CAP-2.1",
     "gold_answer": "Adding the Tier 1 minimum (6.0%) and the Capital Conservation Buffer (2.5%) gives 8.5% of risk-weighted assets.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": "DOC-BASEL-III-2023_BASEL-CAP-1.2",
     "paired_id": null,
     "expected_route": "SPLIT",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-103",
@@ -2103,13 +2307,15 @@
     "clause": "BASEL-CAP-1.2 + BASEL-CAP-2.1",
     "gold_answer": "The Total Capital minimum (8.0%) plus the Capital Conservation Buffer (2.5%) totals 10.5% of risk-weighted assets.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": "DOC-BASEL-III-2023_BASEL-CAP-1.2",
     "paired_id": null,
     "expected_route": "SPLIT",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-104",
@@ -2124,17 +2330,19 @@
     "clause": "BASEL-CAP-1.2 - BASEL-CAP-1.1",
     "gold_answer": "The difference between Total Capital (8.0%) and CET1 minimum (4.5%) is 3.5% of risk-weighted assets.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": "DOC-BASEL-III-2023_BASEL-CAP-1.2",
     "paired_id": null,
     "expected_route": "SPLIT",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-105",
-    "question": "Calculate how much minimum CET1 capital is required on £1,000,000 of risk-weighted assets.",
+    "question": "Calculate how much minimum CET1 capital is required on \u00a31,000,000 of risk-weighted assets.",
     "type": "single_fact",
     "role_asking": "analyst",
     "gold_chunk_ids": [
@@ -2142,19 +2350,21 @@
     ],
     "gold_doc": "DOC-BASEL-III-2023",
     "clause": "BASEL-CAP-1.1",
-    "gold_answer": "At the 4.5% CET1 minimum ratio, £1,000,000 in risk-weighted assets requires £45,000 in CET1 capital.",
+    "gold_answer": "At the 4.5% CET1 minimum ratio, \u00a31,000,000 in risk-weighted assets requires \u00a345,000 in CET1 capital.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": "DOC-BASEL-III-2023_BASEL-CAP-1.1",
     "paired_id": null,
     "expected_route": "SINGLE_SEARCH",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-106",
-    "question": "Calculate the combined CET1 plus CCB capital required on £2,000,000 of risk-weighted assets.",
+    "question": "Calculate the combined CET1 plus CCB capital required on \u00a32,000,000 of risk-weighted assets.",
     "type": "cross_reference",
     "role_asking": "analyst",
     "gold_chunk_ids": [
@@ -2163,19 +2373,21 @@
     ],
     "gold_doc": "DOC-BASEL-III-2023",
     "clause": "BASEL-CAP-1.1 + BASEL-CAP-2.1",
-    "gold_answer": "At 4.5% CET1 plus 2.5% CCB (7.0% total), £2,000,000 in risk-weighted assets requires £140,000 in CET1 capital.",
+    "gold_answer": "At 4.5% CET1 plus 2.5% CCB (7.0% total), \u00a32,000,000 in risk-weighted assets requires \u00a3140,000 in CET1 capital.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": "DOC-BASEL-III-2023_BASEL-CAP-2.1",
     "paired_id": null,
     "expected_route": "SPLIT",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-107",
-    "question": "Calculate the excess over the internal unhedged escalation threshold for a £750,000 compliance failure.",
+    "question": "Calculate the excess over the internal unhedged escalation threshold for a \u00a3750,000 compliance failure.",
     "type": "single_fact",
     "role_asking": "manager",
     "gold_chunk_ids": [
@@ -2183,19 +2395,21 @@
     ],
     "gold_doc": "DOC-INT-POL-MGT-002",
     "clause": "POL-MGT-1.3",
-    "gold_answer": "The £750,000 failure exceeds the £500,000 SMF 16 unhedged escalation threshold by £250,000.",
+    "gold_answer": "The \u00a3750,000 failure exceeds the \u00a3500,000 SMF 16 unhedged escalation threshold by \u00a3250,000.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": "DOC-INT-POL-MGT-002_POL-MGT-1.3",
     "paired_id": "GS-108",
     "expected_route": "SINGLE_SEARCH",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-108",
-    "question": "Calculate the excess over the internal unhedged escalation threshold for a £750,000 compliance failure.",
+    "question": "Calculate the excess over the internal unhedged escalation threshold for a \u00a3750,000 compliance failure.",
     "type": "role_restricted",
     "role_asking": "analyst",
     "gold_chunk_ids": [
@@ -2205,7 +2419,7 @@
     "clause": "POL-MGT-1.3",
     "gold_answer": "I can't find that in the documents available to your role.",
     "expected_behaviour": "refuse",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": "DOC-INT-POL-MGT-002_POL-MGT-1.3",
     "paired_id": "GS-107",
     "expected_route": "SINGLE_SEARCH",
@@ -2215,7 +2429,9 @@
       "Project Neptune"
     ],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-109",
@@ -2229,13 +2445,15 @@
     "clause": "AUDIT-CONF-1.1",
     "gold_answer": "After the 14% intra-month deficit reported under Project Neptune, 86.0% of the secondary liquidity buffer remains.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": "DOC-INT-AUDIT-CONF-2025_AUDIT-CONF-1.1",
     "paired_id": null,
     "expected_route": "SINGLE_SEARCH",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-110",
@@ -2250,13 +2468,15 @@
     "clause": "POL-MAR-2.1 + POL-MAR-2.3",
     "gold_answer": "Combining the 7-day pre-clearance window and 30 calendar days minimum holding period equals 37.0 days.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": "DOC-INT-POL-MAR-004_POL-MAR-2.1",
     "paired_id": null,
     "expected_route": "SPLIT",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-111",
@@ -2272,13 +2492,15 @@
     "clause": "BASEL-CAP-1.1 / 1.2 / 2.1",
     "gold_answer": "Basel III requires minimum CET1 of 4.5%, Tier 1 capital of 6.0%, Total Capital of 8.0%, plus a 2.5% Capital Conservation Buffer.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": "DOC-BASEL-III-2023_BASEL-CAP-1.1",
     "paired_id": null,
     "expected_route": "SPLIT",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-112",
@@ -2293,13 +2515,15 @@
     "clause": "BASEL-LIQ-3.1 / 3.4",
     "gold_answer": "Both the Liquidity Coverage Ratio (LCR) over 30 days and the Net Stable Funding Ratio (NSFR) require a minimum of 100%.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": "DOC-BASEL-III-2023_BASEL-LIQ-3.1",
     "paired_id": null,
     "expected_route": "SPLIT",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-113",
@@ -2311,15 +2535,17 @@
     ],
     "gold_doc": "DOC-FCA-BCOBS-2024",
     "clause": "BCOBS-4.1.2R",
-    "gold_answer": "Under BCOBS 4.1.2R, firms must notify depositors with a balance over £100 when an interest rate reduction is material (such as 0.50%).",
+    "gold_answer": "Under BCOBS 4.1.2R, firms must notify depositors with a balance over \u00a3100 when an interest rate reduction is material (such as 0.50%).",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": "DOC-FCA-BCOBS-2024_BCOBS-4.1.2R",
     "paired_id": null,
     "expected_route": "SINGLE_SEARCH",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-114",
@@ -2334,13 +2560,15 @@
     "clause": "MLR-REG-28(2) + SOP-KYC-2.1",
     "gold_answer": "MLR Regulation 28(2) sets a 25% ownership or control threshold, and SOP-KYC-2.1 requires analysts to collect the certificate of incorporation, memorandum and articles of association, and shareholder register.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": "DOC-UK-MLR-2017_MLR-REG-282",
     "paired_id": null,
     "expected_route": "SPLIT",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   },
   {
     "id": "GS-115",
@@ -2353,14 +2581,16 @@
     ],
     "gold_doc": "DOC-INT-POL-MGT-002",
     "clause": "POL-MGT-2.5 + POL-MGT-1.3",
-    "gold_answer": "Compliance Managers must complete a root-cause investigation within 10 business days under POL-MGT-2.5, and unhedged exposure above £500,000 triggers SMF 16 escalation under POL-MGT-1.3.",
+    "gold_answer": "Compliance Managers must complete a root-cause investigation within 10 business days under POL-MGT-2.5, and unhedged exposure above \u00a3500,000 triggers SMF 16 escalation under POL-MGT-1.3.",
     "expected_behaviour": "answer",
-    "status": "draft",
+    "status": "unreviewed_draft",
     "source_chunk_id": "DOC-INT-POL-MGT-002_POL-MGT-2.5",
     "paired_id": null,
     "expected_route": "SINGLE_SEARCH",
     "unauthorized_keywords": [],
     "reviewed_by": null,
-    "reviewed_on": null
+    "reviewed_on": null,
+    "review_status": "unreviewed_draft",
+    "reviewed_at": null
   }
 ]
