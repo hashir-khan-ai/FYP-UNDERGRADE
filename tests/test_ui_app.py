@@ -476,7 +476,8 @@ def test_citation_verifiable_links_and_internal_badge() -> None:
     assert "Verify on Google ↗" in all_text
     assert "Basel Committee (BIS)" in all_text
     # Check internal citation badge
-    assert "Internal Document — No public verification link" in all_text
+    assert "Internal · visible to" in all_text
+    assert "no verification link" not in all_text.lower()
 
 
 def test_unauthorized_citation_shows_access_warning() -> None:

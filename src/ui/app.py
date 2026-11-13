@@ -445,6 +445,124 @@ APPLE_DESIGN_CSS = """
         box-shadow: 0 0 0 3px rgba(255, 69, 58, 0.16);
         flex: 0 0 auto;
     }
+    .cite-title-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-bottom: 4px;
+    }
+    .cite-index-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1px 7px;
+        border-radius: 5px;
+        font-size: 0.74rem;
+        font-weight: 700;
+        background: rgba(255, 95, 0, 0.18);
+        color: #FF8A47;
+        border: 1px solid rgba(255, 95, 0, 0.42);
+    }
+    .cite-doc-title {
+        color: #F1F3F4;
+        font-size: 0.96rem;
+        font-weight: 700;
+        line-height: 1.35;
+    }
+    .cite-breadcrumb {
+        font-size: 0.81rem;
+        color: #9AA0AE;
+        margin-top: 2px;
+        margin-bottom: 6px;
+        line-height: 1.4;
+    }
+    .public-source-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 6px;
+        margin-top: 4px;
+        margin-bottom: 4px;
+    }
+    .cite-match {
+        background: rgba(255, 95, 0, 0.24);
+        color: #FFFFFF;
+        padding: 1px 4px;
+        border-radius: 4px;
+        border-bottom: 1px solid rgba(255, 95, 0, 0.7);
+    }
+    .tech-details {
+        margin-top: 8px;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+        padding-top: 6px;
+        font-size: 0.78rem;
+        color: #9AA0AE;
+    }
+    .tech-details summary {
+        cursor: pointer;
+        font-weight: 600;
+        color: #AEB5C2;
+        user-select: none;
+    }
+    .tech-details-body {
+        margin-top: 6px;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+        font-family: var(--font-mono);
+        font-size: 0.76rem;
+        color: #C7CDD8;
+    }
+    .copy-cite-btn {
+        background: rgba(255, 255, 255, 0.08);
+        color: #F1F3F4;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        border-radius: 5px;
+        padding: 2px 8px;
+        font-size: 0.72rem;
+        font-weight: 600;
+        cursor: pointer;
+    }
+    .copy-cite-btn:hover {
+        background: rgba(255, 95, 0, 0.22);
+        border-color: rgba(255, 95, 0, 0.55);
+    }
+    a.cite-marker {
+        display: inline-block;
+        padding: 0 5px;
+        margin: 0 2px;
+        border-radius: 4px;
+        font-size: 0.76rem;
+        font-weight: 700;
+        text-decoration: none !important;
+        background: rgba(255, 95, 0, 0.18);
+        color: #FF8A47 !important;
+        border: 1px solid rgba(255, 95, 0, 0.38);
+        vertical-align: baseline;
+        transition: background-color 0.16s ease, transform 0.16s ease;
+    }
+    a.cite-marker:hover {
+        background: rgba(255, 95, 0, 0.34);
+        transform: translateY(-1px);
+    }
+    @keyframes citePulse {
+        0% { box-shadow: 0 0 0 0 rgba(255, 95, 0, 0.55); border-color: #FF5F00; }
+        55% { box-shadow: 0 0 0 8px rgba(255, 95, 0, 0); border-color: #FF5F00; }
+        100% { box-shadow: 0 0 0 0 rgba(255, 95, 0, 0); }
+    }
+    .citation-card.cite-pulse {
+        animation: citePulse 1.2s ease-out 1;
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .citation-card.cite-pulse, div[data-testid="stChatMessage"], .refusal-card {
+            animation: none !important;
+        }
+        a.cite-marker:hover, .citation-link-btn.primary:hover, .citation-link-btn.secondary:hover {
+            transform: none !important;
+        }
+    }
     .source-authority-badge {
         display: inline-flex;
         align-items: center;
@@ -1128,8 +1246,237 @@ def render_sidebar(client: ComplianceAPIClient, token: str, user: dict[str, Any]
                             st.session_state["last_error"] = str(exc)
 
 
+_LOCK_SVG_SMALL = (
+    '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+    'stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+    '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>'
+    '<path d="M7 11V7a5 5 0 0 1 10 0v4"></path>'
+    "</svg>"
+)
+
+_VERIFIED_SVG_SMALL = (
+    '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+    'stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+    '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>'
+    '<path d="m9 12 2 2 4-4"></path>'
+    "</svg>"
+)
+
+
+def build_citation_breadcrumb(heading_path: str, clause: str) -> str:
+    """Build a single deduplicated ' · '-separated breadcrumb line without backticks."""
+    raw_segments = re.split(r"\s*(?:>|·|/|\\| \| )\s*", str(heading_path or ""))
+    cleaned: list[str] = []
+    seen_lower: set[str] = set()
+
+    for seg in raw_segments:
+        item = _MD_HEADING_LINE_RE.sub("", seg).strip().strip("`")
+        if not item or item.lower() in {"section n/a", "n/a", "-", "none"}:
+            continue
+        norm = item.lower()
+        if norm not in seen_lower:
+            seen_lower.add(norm)
+            cleaned.append(item)
+
+    clause_raw = _MD_HEADING_LINE_RE.sub("", str(clause or "")).strip().strip("`")
+    if clause_raw and clause_raw.lower() not in {"-", "n/a", "none", "general"}:
+        clause_label = (
+            clause_raw
+            if re.match(r"^(?:clause|section|para(?:graph)?|article|reg(?:ulation)?)\b", clause_raw, re.IGNORECASE)
+            else f"Clause {clause_raw}"
+        )
+        c_low = clause_raw.lower()
+        cl_low = clause_label.lower()
+        already_covered = any(
+            c_low == s or cl_low == s or c_low in s or s in cl_low
+            for s in seen_lower
+        )
+        if not already_covered:
+            insert_at = 1 if len(cleaned) > 1 else len(cleaned)
+            cleaned.insert(insert_at, clause_label)
+
+    return " · ".join(cleaned) if cleaned else "Regulatory Provision"
+
+
+def highlight_matched_sentence(snippet: str, query: str = "", max_chars: int = 320) -> str:
+    """Return escaped blockquote HTML with the best-matching sentence highlighted."""
+    clean = html.unescape(sanitize_quote_for_display(snippet, max_chars=max_chars))
+    if not clean:
+        return "<em>Clause text unavailable.</em>"
+    sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", clean) if s.strip()]
+    if not sentences:
+        return html.escape(clean)
+
+    query_tokens = {
+        tok
+        for tok in re.findall(r"[a-z0-9]{3,}", str(query or "").lower())
+        if tok not in {"what", "when", "where", "which", "that", "this", "with", "from", "under", "must", "does"}
+    }
+    best_idx = 0
+    if query_tokens:
+        best_score = -1
+        for idx, sent in enumerate(sentences):
+            sent_tokens = set(re.findall(r"[a-z0-9]{3,}", sent.lower()))
+            overlap = len(query_tokens & sent_tokens)
+            if overlap > best_score:
+                best_score = overlap
+                best_idx = idx
+        if best_score <= 0:
+            best_idx = 0
+
+    rendered_parts: list[str] = []
+    for idx, sent in enumerate(sentences):
+        escaped = html.escape(sent)
+        if idx == best_idx:
+            rendered_parts.append(f'<mark class="cite-match">{escaped}</mark>')
+        else:
+            rendered_parts.append(escaped)
+    return " ".join(rendered_parts)
+
+
+def render_citation_card_html(
+    cite: dict[str, Any],
+    index: int = 1,
+    role: str = "",
+    query: str = "",
+    msg_id: int = 0,
+) -> str:
+    """Render a human-friendly citation card in strict display order with collapsed technical details."""
+    chunk_id = html.escape(str(cite.get("chunk_id") or cite.get("doc_id") or "CHUNK"))
+    doc_id = html.escape(str(cite.get("doc_id") or cite.get("document_id") or cite.get("chunk_id") or "DOC"))
+    doc_title = html.escape(str(cite.get("doc_title") or cite.get("doc_name") or "Regulatory Document"))
+    breadcrumb = html.escape(
+        build_citation_breadcrumb(
+            str(cite.get("heading_path") or cite.get("section_title") or ""),
+            str(cite.get("clause") or cite.get("clause_id") or ""),
+        )
+    )
+    page = cite.get("page") if cite.get("page") is not None else cite.get("page_number")
+    page_str = f"Page {page}" if page is not None else "Page n/a"
+    raw_snippet = str(cite.get("quote_snippet") or cite.get("snippet") or "")
+    quote_html = highlight_matched_sentence(raw_snippet, query=query, max_chars=320)
+
+    is_internal = bool(cite.get("is_internal", False))
+    source_url = cite.get("source_url")
+    verification_url = cite.get("verification_url")
+    source_name = html.escape(str(cite.get("source_name") or ""))
+    allowed_roles = [
+        str(item).strip().lower()
+        for item in (cite.get("allowed_roles") or [])
+        if str(item).strip()
+    ]
+    has_access = not allowed_roles or str(role).strip().lower() in allowed_roles
+
+    if not has_access:
+        permitted = ", ".join(role_name.title() for role_name in sorted(set(allowed_roles)))
+        source_pill_html = (
+            '<div class="access-denied-badge" role="status">'
+            '<span class="access-denied-dot" aria-hidden="true"></span>'
+            f"Unauthorized access — restricted to {html.escape(permitted)}"
+            "</div>"
+        )
+    elif is_internal:
+        visible_roles = (
+            ", ".join(role_name.title() for role_name in allowed_roles)
+            if allowed_roles
+            else "Manager, Auditor"
+        )
+        source_pill_html = (
+            f'<div class="internal-badge">{_LOCK_SVG_SMALL}'
+            f"<span>Internal · visible to {html.escape(visible_roles)}</span></div>"
+        )
+    else:
+        links_parts = [f'<span class="source-authority-badge">{_VERIFIED_SVG_SMALL} Public · verifiable</span>']
+        if source_name:
+            links_parts.append(f'<span class="pill-badge">{source_name}</span>')
+        if source_url:
+            safe_src = html.escape(str(source_url), quote=True)
+            links_parts.append(
+                f'<a href="{safe_src}" target="_blank" rel="noopener noreferrer" class="citation-link-btn primary">'
+                "Open Source ↗</a>"
+            )
+        if verification_url:
+            safe_vurl = html.escape(str(verification_url), quote=True)
+            links_parts.append(
+                f'<a href="{safe_vurl}" target="_blank" rel="noopener noreferrer" class="citation-link-btn secondary">'
+                "Verify on Google ↗</a>"
+            )
+        source_pill_html = f'<div class="public-source-row">{"".join(links_parts)}</div>'
+
+    copy_payload = html.escape(f"{doc_title} | {page_str} | {doc_id} | {chunk_id}", quote=True)
+    tech_html = (
+        '<details class="tech-details">'
+        "<summary>Technical details</summary>"
+        '<div class="tech-details-body">'
+        f"<span>Doc ID: {doc_id}</span>"
+        f"<span>{html.escape(page_str)}</span>"
+        f"<span>Chunk ID: {chunk_id}</span>"
+        f'<button type="button" class="copy-cite-btn" data-copy="{copy_payload}" aria-label="Copy citation identifiers">Copy</button>'
+        "</div>"
+        "</details>"
+    )
+
+    card_dom_id = f"cite-card-{int(msg_id)}-{int(index)}"
+    return "".join(
+        [
+            f'<div class="citation-card" id="{card_dom_id}" style="--card-index:{int(index)};">',
+            f'<div class="cite-title-row"><span class="cite-index-badge">[{int(index)}]</span> <strong class="cite-doc-title">{doc_title}</strong></div>',
+            f'<div class="cite-breadcrumb">{breadcrumb}</div>',
+            source_pill_html,
+            f'<blockquote class="quote-snippet">{quote_html}</blockquote>',
+            tech_html,
+            "</div>",
+        ]
+    )
+
+
+def format_answer_with_citation_markers(
+    answer: str,
+    citations: list[dict[str, Any]],
+    msg_id: int = 0,
+) -> str:
+    """Link inline [1]/[2] or [CHUNK_ID] references in answers to their citation cards."""
+    if not citations or not answer:
+        return answer
+
+    marker_links: dict[int, str] = {}
+    chunk_to_idx: dict[str, int] = {}
+    for idx, cite in enumerate(citations, start=1):
+        dom_id = f"cite-card-{int(msg_id)}-{idx}"
+        marker_links[idx] = (
+            f'<a href="#{dom_id}" class="cite-marker" data-cite-target="{dom_id}" '
+            f'title="Scroll to source [{idx}]">[{idx}]</a>'
+        )
+        cid = str(cite.get("chunk_id") or "").strip()
+        if cid:
+            chunk_to_idx[cid] = idx
+
+    out = str(answer)
+    matched_any = False
+
+    for cid, idx in chunk_to_idx.items():
+        pat = re.compile(rf"\[{re.escape(cid)}\]")
+        if pat.search(out):
+            out = pat.sub(marker_links[idx], out)
+            matched_any = True
+
+    def _replace_num(match: re.Match[str]) -> str:
+        nonlocal matched_any
+        idx = int(match.group(1))
+        if idx in marker_links:
+            matched_any = True
+            return marker_links[idx]
+        return match.group(0)
+
+    out = re.sub(r"\[(\d+)\](?!\()", _replace_num, out)
+    if not matched_any:
+        trailing = " ".join(marker_links[i] for i in sorted(marker_links))
+        out = f"{out} {trailing}"
+    return out
+
+
 def _render_citations_and_trace(
-    turn_data: dict[str, Any], msg_id: int = 0, role: str = ""
+    turn_data: dict[str, Any], msg_id: int = 0, role: str = "", query: str = ""
 ) -> None:
     """Render structured citations panel, metadata, and expandable safe reasoning trace."""
     route = str(turn_data.get("route") or turn_data.get("route_taken") or "SINGLE_SEARCH")
@@ -1208,88 +1555,14 @@ def _render_citations_and_trace(
             with st.expander(f"Sources & citations ({len(citations)})", expanded=False):
                 _render_citation_spotlight_bridge()
                 st.markdown(f"**Verified Authoritative Citations ({len(citations)})**")
-                for cite in citations:
-                    chunk_id = html.escape(str(cite.get("chunk_id") or cite.get("doc_id") or "CHUNK"))
-                    doc_title = html.escape(
-                        str(cite.get("doc_title") or cite.get("doc_name") or "Regulatory Document")
-                    )
-                    heading_path = html.escape(
-                        str(cite.get("heading_path") or cite.get("section_title") or "Section n/a")
-                    )
-                    clause = html.escape(str(cite.get("clause") or cite.get("clause_id") or "-"))
-                    page = cite.get("page") if cite.get("page") is not None else cite.get("page_number")
-                    page_str = f"Page {page}" if page is not None else "Page n/a"
-                    snippet = sanitize_quote_for_display(
-                        str(cite.get("quote_snippet") or cite.get("snippet") or ""),
-                        max_chars=250,
-                    )
-                    is_internal = bool(cite.get("is_internal", False))
-                    source_url = cite.get("source_url")
-                    verification_url = cite.get("verification_url")
-                    source_name = html.escape(str(cite.get("source_name") or ""))
-                    allowed_roles = [
-                        str(item).strip().lower()
-                        for item in (cite.get("allowed_roles") or [])
-                        if str(item).strip()
-                    ]
-                    has_access = (
-                        not allowed_roles or str(role).strip().lower() in allowed_roles
-                    )
-
-                    if not has_access:
-                        permitted = ", ".join(
-                            role_name.title() for role_name in sorted(set(allowed_roles))
-                        )
-                        links_html = (
-                            '<div class="access-denied-badge" role="status">'
-                            '<span class="access-denied-dot" aria-hidden="true"></span>'
-                            f"Unauthorized access — restricted to {html.escape(permitted)}"
-                            "</div>"
-                        )
-                    elif is_internal:
-                        links_html = (
-                            '<div class="internal-badge">'
-                            "Internal Document — No public verification link (Restricted Institutional Access)"
-                            "</div>"
-                        )
-                    else:
-                        links_parts = []
-                        if source_name:
-                            links_parts.append(f'<span class="source-authority-badge">{source_name}</span>')
-                        if source_url:
-                            safe_src = html.escape(str(source_url), quote=True)
-                            links_parts.append(
-                                f'<a href="{safe_src}" target="_blank" rel="noopener noreferrer" class="citation-link-btn primary">'
-                                f'Open Source ↗</a>'
-                            )
-                        if verification_url:
-                            safe_vurl = html.escape(str(verification_url), quote=True)
-                            links_parts.append(
-                                f'<a href="{safe_vurl}" target="_blank" rel="noopener noreferrer" class="citation-link-btn secondary">'
-                                f'Verify on Google ↗</a>'
-                            )
-                        links_html = f'<div style="margin-top:8px;display:flex;flex-wrap:wrap;align-items:center;gap:6px;">{"".join(links_parts)}</div>'
-
-                    card_html = "".join(
-                        [
-                            '<div class="citation-card">',
-                            '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;">',
-                            "<div>",
-                            f'<span class="pill-accent">{chunk_id}</span> ',
-                            f'<strong style="color:#F4F6F9;">{doc_title}</strong>',
-                            "</div>",
-                            "<div>",
-                            f'<span class="pill-badge">{html.escape(page_str)}</span> ',
-                            f'<span class="pill-badge">Clause: {clause}</span>',
-                            "</div>",
-                            "</div>",
-                            '<div style="font-size:0.84rem;color:#9AA0AE;margin-top:6px;">',
-                            f"Heading Path: <code>{heading_path}</code>",
-                            "</div>",
-                            f'<blockquote class="quote-snippet">"{snippet}"</blockquote>',
-                            links_html,
-                            "</div>",
-                        ]
+                effective_query = query or str(turn_data.get("query") or "")
+                for idx, cite in enumerate(citations, start=1):
+                    card_html = render_citation_card_html(
+                        cite,
+                        index=idx,
+                        role=role,
+                        query=effective_query,
+                        msg_id=msg_id,
                     )
                     st.markdown(card_html, unsafe_allow_html=True)
 
@@ -1571,6 +1844,43 @@ def _render_citation_spotlight_bridge() -> None:
                 var doc = host.document;
                 if (!doc) return;
                 host.__citationSpotlightBound = true;
+                doc.addEventListener('click', function (event) {
+                  var copyBtn = event.target && event.target.closest ? event.target.closest('.copy-cite-btn') : null;
+                  if (copyBtn) {
+                    var val = copyBtn.getAttribute('data-copy') || '';
+                    if (host.navigator && host.navigator.clipboard && val) {
+                      host.navigator.clipboard.writeText(val).catch(function () {});
+                    }
+                    copyBtn.textContent = 'Copied';
+                    setTimeout(function () { copyBtn.textContent = 'Copy'; }, 1200);
+                    return;
+                  }
+                  var marker = event.target && event.target.closest ? event.target.closest('a.cite-marker') : null;
+                  if (marker) {
+                    var targetId = marker.getAttribute('data-cite-target');
+                    var targetEl = targetId ? doc.getElementById(targetId) : null;
+                    if (targetEl) {
+                      event.preventDefault();
+                      var parentDetails = targetEl.closest('details');
+                      if (parentDetails) parentDetails.open = true;
+                      targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                      targetEl.classList.remove('cite-pulse');
+                      void targetEl.offsetWidth;
+                      targetEl.classList.add('cite-pulse');
+                    }
+                  }
+                });
+                doc.addEventListener('mouseover', function (event) {
+                  var marker = event.target && event.target.closest ? event.target.closest('a.cite-marker') : null;
+                  if (!marker) return;
+                  var targetId = marker.getAttribute('data-cite-target');
+                  var targetEl = targetId ? doc.getElementById(targetId) : null;
+                  if (targetEl) {
+                    targetEl.classList.remove('cite-pulse');
+                    void targetEl.offsetWidth;
+                    targetEl.classList.add('cite-pulse');
+                  }
+                });
                 if (host.matchMedia && host.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
                 doc.addEventListener('mousemove', function (event) {
                   var card = event.target && event.target.closest ? event.target.closest('.citation-card') : null;
@@ -1733,10 +2043,13 @@ def render_chat_view(client: ComplianceAPIClient, token: str, user: dict[str, An
                     _submit_question(client, token, session_id, item["query"], response_mode=selected_mode, intent_mode=selected_intent)
 
     # Conversation stream
+    last_user_query = ""
     for msg in messages:
         sender = str(msg.get("sender", "user"))
         content = str(msg.get("content", ""))
         msg_id = int(msg.get("id", 0))
+        if sender == "user":
+            last_user_query = content
         with st.chat_message("user" if sender == "user" else "assistant"):
             detail = turn_details.get(msg_id)
             if sender == "assistant" and (
@@ -1773,11 +2086,16 @@ def render_chat_view(client: ComplianceAPIClient, token: str, user: dict[str, An
                     unsafe_allow_html=True,
                 )
             else:
-                st.markdown(content)
+                cite_list = (detail.get("citations") or []) if isinstance(detail, dict) else []
+                if sender == "assistant" and cite_list:
+                    linked_content = format_answer_with_citation_markers(content, cite_list, msg_id=msg_id)
+                    st.markdown(linked_content, unsafe_allow_html=True)
+                else:
+                    st.markdown(content)
 
             if sender == "assistant":
                 if detail:
-                    _render_citations_and_trace(detail, msg_id=msg_id, role=role)
+                    _render_citations_and_trace(detail, msg_id=msg_id, role=role, query=last_user_query)
                 elif isinstance(msg.get("metadata"), dict):
                     meta = msg["metadata"]
                     chunk_ids = meta.get("chunk_ids") or []

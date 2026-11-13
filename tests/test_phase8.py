@@ -376,3 +376,95 @@ def test_8a4_quick_fill_persona_buttons_only_when_demo_mode_true(
     assert "quick_analyst" in btn_keys_on
     assert "quick_manager" in btn_keys_on
     assert "quick_auditor" in btn_keys_on
+
+
+# ==============================================================================
+# Phase 8B — Citation Card Redesign Golden Tests
+# ==============================================================================
+def test_8b_golden_public_and_internal_citation_cards_order_and_content() -> None:
+    """Golden-render test verifying exact order and fields for public and internal citation cards."""
+    from src.ui.app import format_answer_with_citation_markers, render_citation_card_html
+
+    public_cite = {
+        "doc_id": "DOC-BASEL-01",
+        "chunk_id": "CH-BASEL-49",
+        "doc_title": "Basel III: A Global Regulatory Framework",
+        "heading_path": "Part 2 > Para 49 > Minimum Capital Requirements",
+        "clause": "Para 49",
+        "page": 14,
+        "quote_snippet": "Banks must hold a minimum CET1 ratio at all times. Common Equity Tier 1 must be at least 4.5% of risk-weighted assets.",
+        "is_internal": False,
+        "source_name": "Basel Committee (BIS)",
+        "source_url": "https://www.bis.org/publ/bcbs189.pdf",
+        "verification_url": "https://www.google.com/search?q=Basel+III+Para+49",
+        "allowed_roles": ["analyst", "manager", "auditor"],
+    }
+    internal_cite = {
+        "doc_id": "DOC-POL-MGT",
+        "chunk_id": "CH-POL-MGT-13",
+        "doc_title": "Bank Internal Management Policy: Regulatory Incident Escalation",
+        "heading_path": "Section 1 > Threshold for Senior Management Regime Escalation",
+        "clause": "POL-MGT-1.3",
+        "page": 3,
+        "quote_snippet": "### Clause Heading\nThresholds breached above tier two require immediate notification. Any material breach requires Senior Management Regime escalation within 24 hours.",
+        "is_internal": True,
+        "allowed_roles": ["manager", "auditor"],
+    }
+
+    pub_html = render_citation_card_html(
+        public_cite, index=1, role="analyst", query="minimum CET1 ratio", msg_id=42
+    )
+    int_html = render_citation_card_html(
+        internal_cite, index=2, role="manager", query="Senior Management Regime escalation 24 hours", msg_id=42
+    )
+
+    # Golden assertions for PUBLIC card & strict element order:
+    assert "Basel III: A Global Regulatory Framework" in pub_html
+    assert "Part 2 · Para 49 · Minimum Capital Requirements" in pub_html
+    assert "Public · verifiable" in pub_html
+    assert "Open Source ↗" in pub_html
+    assert "Verify on Google ↗" in pub_html
+    assert "Clause:" not in pub_html
+    assert "Heading Path:" not in pub_html
+    assert "<code>" not in pub_html
+    assert '<mark class="cite-match">' in pub_html
+    assert "<details class=\"tech-details\"><summary>Technical details</summary>" in pub_html
+    assert "DOC-BASEL-01" in pub_html
+    assert "Page 14" in pub_html
+    assert "CH-BASEL-49" in pub_html
+    assert (
+        pub_html.index("Basel III: A Global Regulatory Framework")
+        < pub_html.index("Part 2 · Para 49")
+        < pub_html.index("Public · verifiable")
+        < pub_html.index("<blockquote")
+        < pub_html.index("<details class=\"tech-details\">")
+    )
+
+    # Golden assertions for INTERNAL card & strict element order:
+    assert "Bank Internal Management Policy: Regulatory Incident Escalation" in int_html
+    assert "Section 1 · Clause POL-MGT-1.3 · Threshold for Senior Management Regime Escalation" in int_html
+    assert "<svg" in int_html  # lock icon
+    assert "Internal · visible to Manager, Auditor" in int_html
+    assert "no public verification link" not in int_html.lower()
+    assert "no verification link" not in int_html.lower()
+    assert "###" not in int_html
+    assert "Clause:" not in int_html
+    assert "Heading Path:" not in int_html
+    assert '<mark class="cite-match">Any material breach requires Senior Management Regime escalation within 24 hours.</mark>' in int_html
+    assert (
+        int_html.index("Bank Internal Management Policy: Regulatory Incident Escalation")
+        < int_html.index("Section 1 · Clause POL-MGT-1.3")
+        < int_html.index("Internal · visible to Manager, Auditor")
+        < int_html.index("<blockquote")
+        < int_html.index("<details class=\"tech-details\">")
+    )
+
+    # Inline citation markers link cleanly to card IDs [1], [2]
+    linked = format_answer_with_citation_markers(
+        "CET1 must be 4.5% [1] and material breaches escalate in 24h [2].",
+        [public_cite, internal_cite],
+        msg_id=42,
+    )
+    assert 'href="#cite-card-42-1"' in linked
+    assert 'href="#cite-card-42-2"' in linked
+    assert 'class="cite-marker"' in linked
