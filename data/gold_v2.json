@@ -19,7 +19,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-002",
@@ -41,7 +42,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-003",
@@ -63,7 +65,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-004",
@@ -85,7 +88,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-005",
@@ -107,7 +111,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-006",
@@ -129,7 +134,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-007",
@@ -151,7 +157,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-008",
@@ -173,7 +180,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-009",
@@ -195,11 +203,12 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-010",
-    "question": "How many days of advance written notice are required under BCOBS-4.1.2R for standard and significant interest rate reductions on deposit accounts over \u00a3100?",
+    "question": "How many days of advance written notice are required under BCOBS-4.1.2R for standard and significant interest rate reductions on deposit accounts over £100?",
     "type": "single_fact",
     "role_asking": "analyst",
     "gold_chunk_ids": [
@@ -207,7 +216,7 @@
     ],
     "gold_doc": "DOC-FCA-BCOBS-2024",
     "clause": "Clause BCOBS-4.1.2R (Notification of Interest Rate Changes)",
-    "gold_answer": "At least 14 calendar days advance written notice is required for a rate reduction on accounts over \u00a3100, or at least 30 calendar days if the reduction exceeds 0.50% within 12 months.",
+    "gold_answer": "At least 14 calendar days advance written notice is required for a rate reduction on accounts over £100, or at least 30 calendar days if the reduction exceeds 0.50% within 12 months.",
     "expected_behaviour": "answer",
     "status": "unreviewed_draft",
     "source_chunk_id": null,
@@ -217,7 +226,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-011",
@@ -239,7 +249,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-012",
@@ -261,7 +272,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-013",
@@ -283,7 +295,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-014",
@@ -305,7 +318,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-015",
@@ -327,7 +341,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-016",
@@ -349,7 +364,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-017",
@@ -371,7 +387,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-018",
@@ -393,7 +410,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-019",
@@ -415,7 +433,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-020",
@@ -437,7 +456,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-021",
@@ -460,7 +480,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-022",
@@ -483,7 +504,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-023",
@@ -506,7 +528,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-024",
@@ -529,7 +552,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-025",
@@ -552,7 +576,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-026",
@@ -575,7 +600,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-027",
@@ -588,7 +614,7 @@
     ],
     "gold_doc": "DOC-FCA-BCOBS-2024",
     "clause": "BCOBS-4.1.1R & BCOBS-4.1.2R",
-    "gold_answer": "Pre-contract disclosure covers withdrawal penalties, service charges, and FSCS protection; rate reductions on balances over \u00a3100 require 14 days notice, or 30 days if exceeding 0.50% in 12 months.",
+    "gold_answer": "Pre-contract disclosure covers withdrawal penalties, service charges, and FSCS protection; rate reductions on balances over £100 require 14 days notice, or 30 days if exceeding 0.50% in 12 months.",
     "expected_behaviour": "answer",
     "status": "unreviewed_draft",
     "source_chunk_id": null,
@@ -598,7 +624,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-028",
@@ -611,7 +638,7 @@
     ],
     "gold_doc": "DOC-FCA-BCOBS-2024",
     "clause": "BCOBS-4.1.2R & BCOBS-4.2.4R",
-    "gold_answer": "Interest rate cuts on balances over \u00a3100 require 14 days (or 30 days if >0.50%) advance written notice, and post-contract statements must be provided monthly free of charge.",
+    "gold_answer": "Interest rate cuts on balances over £100 require 14 days (or 30 days if >0.50%) advance written notice, and post-contract statements must be provided monthly free of charge.",
     "expected_behaviour": "answer",
     "status": "unreviewed_draft",
     "source_chunk_id": null,
@@ -621,7 +648,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-029",
@@ -644,7 +672,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-030",
@@ -667,7 +696,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-031",
@@ -690,7 +720,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-032",
@@ -713,7 +744,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-033",
@@ -736,7 +768,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-034",
@@ -759,7 +792,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-035",
@@ -782,7 +816,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-036",
@@ -805,7 +840,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-037",
@@ -818,7 +854,7 @@
     ],
     "gold_doc": "DOC-INT-POL-MGT-002",
     "clause": "POL-MGT-1.1 & POL-MGT-1.3",
-    "gold_answer": "Material breaches must be reported to the PRA/FCA via FCA Connect within 24 hours; unhedged exposure exceeding \u00a3500,000 or affecting >100 retail accounts triggers SMF 16 escalation.",
+    "gold_answer": "Material breaches must be reported to the PRA/FCA via FCA Connect within 24 hours; unhedged exposure exceeding £500,000 or affecting >100 retail accounts triggers SMF 16 escalation.",
     "expected_behaviour": "answer",
     "status": "unreviewed_draft",
     "source_chunk_id": null,
@@ -828,7 +864,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-038",
@@ -851,7 +888,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-039",
@@ -874,7 +912,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-040",
@@ -897,7 +936,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-041",
@@ -920,7 +960,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-042",
@@ -943,7 +984,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-043",
@@ -966,7 +1008,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-044",
@@ -989,7 +1032,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-045",
@@ -1012,7 +1056,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-046",
@@ -1035,7 +1080,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-047",
@@ -1048,7 +1094,7 @@
     ],
     "gold_doc": "DOC-BASEL-III-2023 & DOC-FCA-BCOBS-2024",
     "clause": "BASEL-LIQ-3.1 & BCOBS-4.1.2R",
-    "gold_answer": "BASEL-LIQ-3.1 requires an LCR of at least 100% over a 30-day stress scenario, and BCOBS-4.1.2R requires 14 calendar days notice (30 days if >0.50%) before reducing deposit rates on balances over \u00a3100.",
+    "gold_answer": "BASEL-LIQ-3.1 requires an LCR of at least 100% over a 30-day stress scenario, and BCOBS-4.1.2R requires 14 calendar days notice (30 days if >0.50%) before reducing deposit rates on balances over £100.",
     "expected_behaviour": "answer",
     "status": "unreviewed_draft",
     "source_chunk_id": null,
@@ -1058,7 +1104,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-048",
@@ -1081,7 +1128,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-049",
@@ -1104,7 +1152,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-050",
@@ -1127,7 +1176,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-051",
@@ -1150,7 +1200,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-052",
@@ -1174,7 +1225,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-053",
@@ -1197,7 +1249,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-054",
@@ -1220,7 +1273,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-055",
@@ -1244,7 +1298,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-056",
@@ -1267,7 +1322,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-057",
@@ -1290,7 +1346,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-058",
@@ -1313,7 +1370,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-059",
@@ -1336,7 +1394,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-060",
@@ -1349,7 +1408,7 @@
     ],
     "gold_doc": "DOC-FCA-BCOBS-2024 & DOC-INT-POL-MGT-002",
     "clause": "BCOBS-4.1.2R & POL-MGT-1.3",
-    "gold_answer": "BCOBS-4.1.2R requires 14 or 30 days advance notice of rate cuts on balances over \u00a3100; because systemic detriment affects more than 100 retail accounts, POL-MGT-1.3 requires mandatory escalation to SMF 16.",
+    "gold_answer": "BCOBS-4.1.2R requires 14 or 30 days advance notice of rate cuts on balances over £100; because systemic detriment affects more than 100 retail accounts, POL-MGT-1.3 requires mandatory escalation to SMF 16.",
     "expected_behaviour": "answer",
     "status": "unreviewed_draft",
     "source_chunk_id": null,
@@ -1359,7 +1418,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-061",
@@ -1381,7 +1441,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-066",
@@ -1406,7 +1467,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-062",
@@ -1418,7 +1480,7 @@
     ],
     "gold_doc": "DOC-INT-POL-MGT-002",
     "clause": "Clause POL-MGT-1.3 (Threshold for Senior Management Regime Escalation)",
-    "gold_answer": "An unhedged financial exposure exceeding \u00a3500,000 or systemic customer detriment affecting more than 100 retail accounts triggers mandatory escalation to SMF 16.",
+    "gold_answer": "An unhedged financial exposure exceeding £500,000 or systemic customer detriment affecting more than 100 retail accounts triggers mandatory escalation to SMF 16.",
     "expected_behaviour": "answer",
     "status": "unreviewed_draft",
     "source_chunk_id": null,
@@ -1428,7 +1490,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-067",
@@ -1453,7 +1516,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-063",
@@ -1475,7 +1539,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-068",
@@ -1501,7 +1566,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-064",
@@ -1523,7 +1589,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-069",
@@ -1548,7 +1615,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-065",
@@ -1570,7 +1638,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-070",
@@ -1595,7 +1664,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-071",
@@ -1617,7 +1687,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-076",
@@ -1643,7 +1714,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-072",
@@ -1665,7 +1737,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-077",
@@ -1691,7 +1764,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-073",
@@ -1713,7 +1787,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-078",
@@ -1739,7 +1814,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-074",
@@ -1761,7 +1837,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-079",
@@ -1787,7 +1864,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-075",
@@ -1809,7 +1887,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-080",
@@ -1834,7 +1913,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-081",
@@ -1854,7 +1934,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-082",
@@ -1874,7 +1955,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-083",
@@ -1894,7 +1976,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-084",
@@ -1914,7 +1997,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-085",
@@ -1934,7 +2018,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-086",
@@ -1954,7 +2039,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-087",
@@ -1974,7 +2060,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-088",
@@ -1994,7 +2081,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-089",
@@ -2014,7 +2102,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-090",
@@ -2034,7 +2123,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-091",
@@ -2054,7 +2144,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-092",
@@ -2074,7 +2165,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-093",
@@ -2094,7 +2186,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-094",
@@ -2114,7 +2207,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-095",
@@ -2134,7 +2228,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-096",
@@ -2158,7 +2253,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-097",
@@ -2181,7 +2277,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-098",
@@ -2201,7 +2298,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-099",
@@ -2226,7 +2324,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-100",
@@ -2246,7 +2345,8 @@
     "reviewed_by": null,
     "reviewed_on": null,
     "review_status": "unreviewed_draft",
-    "reviewed_at": null
+    "reviewed_at": null,
+    "subset": "original_100"
   },
   {
     "id": "GS-101",
@@ -2342,7 +2442,7 @@
   },
   {
     "id": "GS-105",
-    "question": "Calculate how much minimum CET1 capital is required on \u00a31,000,000 of risk-weighted assets.",
+    "question": "Calculate how much minimum CET1 capital is required on £1,000,000 of risk-weighted assets.",
     "type": "single_fact",
     "role_asking": "analyst",
     "gold_chunk_ids": [
@@ -2350,7 +2450,7 @@
     ],
     "gold_doc": "DOC-BASEL-III-2023",
     "clause": "BASEL-CAP-1.1",
-    "gold_answer": "At the 4.5% CET1 minimum ratio, \u00a31,000,000 in risk-weighted assets requires \u00a345,000 in CET1 capital.",
+    "gold_answer": "At the 4.5% CET1 minimum ratio, £1,000,000 in risk-weighted assets requires £45,000 in CET1 capital.",
     "expected_behaviour": "answer",
     "status": "unreviewed_draft",
     "source_chunk_id": "DOC-BASEL-III-2023_BASEL-CAP-1.1",
@@ -2364,7 +2464,7 @@
   },
   {
     "id": "GS-106",
-    "question": "Calculate the combined CET1 plus CCB capital required on \u00a32,000,000 of risk-weighted assets.",
+    "question": "Calculate the combined CET1 plus CCB capital required on £2,000,000 of risk-weighted assets.",
     "type": "cross_reference",
     "role_asking": "analyst",
     "gold_chunk_ids": [
@@ -2373,7 +2473,7 @@
     ],
     "gold_doc": "DOC-BASEL-III-2023",
     "clause": "BASEL-CAP-1.1 + BASEL-CAP-2.1",
-    "gold_answer": "At 4.5% CET1 plus 2.5% CCB (7.0% total), \u00a32,000,000 in risk-weighted assets requires \u00a3140,000 in CET1 capital.",
+    "gold_answer": "At 4.5% CET1 plus 2.5% CCB (7.0% total), £2,000,000 in risk-weighted assets requires £140,000 in CET1 capital.",
     "expected_behaviour": "answer",
     "status": "unreviewed_draft",
     "source_chunk_id": "DOC-BASEL-III-2023_BASEL-CAP-2.1",
@@ -2387,7 +2487,7 @@
   },
   {
     "id": "GS-107",
-    "question": "Calculate the excess over the internal unhedged escalation threshold for a \u00a3750,000 compliance failure.",
+    "question": "Calculate the excess over the internal unhedged escalation threshold for a £750,000 compliance failure.",
     "type": "single_fact",
     "role_asking": "manager",
     "gold_chunk_ids": [
@@ -2395,7 +2495,7 @@
     ],
     "gold_doc": "DOC-INT-POL-MGT-002",
     "clause": "POL-MGT-1.3",
-    "gold_answer": "The \u00a3750,000 failure exceeds the \u00a3500,000 SMF 16 unhedged escalation threshold by \u00a3250,000.",
+    "gold_answer": "The £750,000 failure exceeds the £500,000 SMF 16 unhedged escalation threshold by £250,000.",
     "expected_behaviour": "answer",
     "status": "unreviewed_draft",
     "source_chunk_id": "DOC-INT-POL-MGT-002_POL-MGT-1.3",
@@ -2409,7 +2509,7 @@
   },
   {
     "id": "GS-108",
-    "question": "Calculate the excess over the internal unhedged escalation threshold for a \u00a3750,000 compliance failure.",
+    "question": "Calculate the excess over the internal unhedged escalation threshold for a £750,000 compliance failure.",
     "type": "role_restricted",
     "role_asking": "analyst",
     "gold_chunk_ids": [
@@ -2535,7 +2635,7 @@
     ],
     "gold_doc": "DOC-FCA-BCOBS-2024",
     "clause": "BCOBS-4.1.2R",
-    "gold_answer": "Under BCOBS 4.1.2R, firms must notify depositors with a balance over \u00a3100 when an interest rate reduction is material (such as 0.50%).",
+    "gold_answer": "Under BCOBS 4.1.2R, firms must notify depositors with a balance over £100 when an interest rate reduction is material (such as 0.50%).",
     "expected_behaviour": "answer",
     "status": "unreviewed_draft",
     "source_chunk_id": "DOC-FCA-BCOBS-2024_BCOBS-4.1.2R",
@@ -2581,7 +2681,7 @@
     ],
     "gold_doc": "DOC-INT-POL-MGT-002",
     "clause": "POL-MGT-2.5 + POL-MGT-1.3",
-    "gold_answer": "Compliance Managers must complete a root-cause investigation within 10 business days under POL-MGT-2.5, and unhedged exposure above \u00a3500,000 triggers SMF 16 escalation under POL-MGT-1.3.",
+    "gold_answer": "Compliance Managers must complete a root-cause investigation within 10 business days under POL-MGT-2.5, and unhedged exposure above £500,000 triggers SMF 16 escalation under POL-MGT-1.3.",
     "expected_behaviour": "answer",
     "status": "unreviewed_draft",
     "source_chunk_id": "DOC-INT-POL-MGT-002_POL-MGT-2.5",

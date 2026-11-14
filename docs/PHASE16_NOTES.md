@@ -157,3 +157,51 @@ All token foregrounds tested mathematically across all 5 theme surfaces (`canvas
 ### 6. Final Post-Edit Verification Results
 - **Frontend (`npm --prefix web run typecheck`, `npm --prefix web test`, `npm --prefix web run build`):** `tsc --noEmit` `0` errors; Vitest `10` files, **`68` passed, `0` failed**; Next.js `16.4.6` compiled cleanly in `5.7s`.
 - **Python Suite (`.venv\Scripts\python.exe -m pytest -q`):** **`291` passed, `2` failed** in `69.68s` (all 3 new `tests/test_gold_review_tool.py` cases pass; the 2 failures remain the pre-existing `140 == 100` count checks on `data/eval/gold_set.jsonl`).
+
+---
+
+## Addendum 2: Close-Out Checks (`2026-11-15`)
+
+### 1. Router & `src/` Git Diff (`78193c0..dad18ac` + Close-Out `gold_set.py`)
+- **`src/core/router.py`** (`78193c0..dad18ac`, `4 +++-`):
+  ```diff
+  -from src.core.llm_client import LLMClientError, ResilientLLMClient
+  +from src.core.llm_client import LLMAuthError, LLMClientError, ResilientLLMClient
+  ...
+  +    except LLMAuthError:
+  +        raise
+       except LLMClientError:
+  ```
+  - Line reason (import): import explicit `LLMAuthError` for fail-fast handling.
+  - Line reason (`except LLMAuthError: raise`): prevent invalid API key errors from falling through to the generic `SINGLE_SEARCH` fallback.
+  - **Routing logic, thresholds, or labels changed?** **NO.**
+  - **Stale results:** Because routing logic, thresholds, and labels did not change, earlier security/routing conclusions were **not** invalidated; `tests/test_router.py` + `tests/test_intent_routing.py` + `tests/test_gold_review_tool.py` re-ran (`30 passed in 5.25s`), and `scripts/run_mutant_matrix.py` re-ran (`7/7` valid `AssertionError` kills, `0` survived). Note `scripts/leakage_check.py --real-index` currently raises `Portalocker AlreadyLocked` on `data/qdrant` while the live FastAPI server (`uvicorn` PID active on port `8000`) holds the embedded storage lock. Superseded/stale numbers from prior notes: prior `288 passed, 2 failed` / `291 passed, 2 failed` test counts, prior `100`-row `gold_set.jsonl` assumptions, and prior un-tagged `HARD-Q-*` `"reviewed"`/`"student"` counts.
+- **`src/evaluation/gold_set.py`**:
+  - Session `84ab72f` (`25 ++++++++++++++++++++++---`): added `human_notes`, `original_gold_answer`, `original_clause`, `original_gold_chunk_ids` on `GoldQuestionItem`, added `exclude_rejected_questions()` and `include_rejected` on `load_gold_set()`, and excluded rejected rows from `select_reviewed_questions()` — **Reason:** preserve pre-fix answers alongside human edits and omit rejected rows from metrics.
+  - Close-Out update: added `subset`, `authored_by`, `counts_by_subset`, and a validation rule rejecting `authored_by="agent"` items marked `review_status="reviewed"` without a human/student reviewer — **Reason:** track `original_100` vs `agent_extra_40` provenance explicitly and enforce review honesty.
+
+### 2. Runtime Fixes Summary (One Line per Edited File)
+- `web/app/globals.css`: Switched `html` to `overflow-x: clip;` and removed `overscroll-behavior-y: none; overflow-x: hidden;` from `body` so mouse-wheel scrolling works on `/documents` and other document-scroll routes.
+- `web/components/ui/error-state.tsx`: Handled `LLM_AUTH_ERROR`, `LLM_UNAVAILABLE`, and `MODEL_WEIGHTS_MISSING` ahead of HTTP `503` catch-all so auth/provider errors do not masquerade as "Compliance Service Offline".
+- `web/components/chat/chat-view.tsx`: Propagated `error.status` to `ErrorState`, stopped `setOffline(true)` on `LLM_*`/`MODEL_WEIGHTS_MISSING` 503 responses (keeping composer enabled), and scrolled empty sessions cleanly to top.
+- `src/core/router.py`: Re-raised `LLMAuthError` ahead of `except LLMClientError:` so upstream auth errors surface cleanly instead of falling back inside intent classification.
+
+### 3. Gold Dataset Provenance Update & Test Alignment
+- **Recorded Original-100 Integrity Hashes (`GS-001`..`GS-100`):**
+  - Pre-tag raw JSONL SHA-256: `a005480c627f922bb7fce735adf9ae40991c52eed01c4e5e35fd42513a3f10a7`
+  - Canonical JSON SHA-256 (sorted keys, excluding `"subset"`): `ea226229ff95684915465ec994346fd29aea555bec866d1d3bbd86f3469f6ffb` (asserted in both `test_phase7_eval.py` and `test_phase8.py` to guarantee zero silent edits to the original 100 items).
+- **Updated Data Tags:**
+  - `GS-001`..`GS-100` tagged `subset="original_100"` across `data/eval/gold_set.jsonl`, `data/gold_v2.jsonl`, `data/eval/gold_v2.jsonl`, and `data/gold_v2.json`.
+  - `HARD-Q-01`..`HARD-Q-40` tagged `subset="agent_extra_40"`, `authored_by="agent"`, `review_status="unreviewed_draft"`, `status="unreviewed_draft"`, `reviewed_by=null`, `reviewed_on=null`, `reviewed_at=null`.
+- **Deliberate Test Updates (`0` weakened assertions):**
+  - `tests/test_phase7_eval.py::test_gold_set_validator_passes_real_file`: updated expected total `100 -> 140`, added strict checks on `counts_by_subset == {"original_100": 100, "agent_extra_40": 40}`, `student_reviewed_count == 0`, canonical SHA-256 hash of `original_100`, and `unreviewed_draft`/`agent` provenance of `agent_extra_40`.
+  - `tests/test_phase8.py::test_phase8c_gold_v2_and_ablation_metrics`: updated `len(orig_lines) == 140` and `v2_lines[:100] == orig_lines[:100]`, plus canonical SHA-256 check on `original_100` and provenance check on `agent_extra_40`.
+  - `tests/test_gold_review_tool.py::test_apply_review_updates_only_decided_items_and_preserves_originals`: updated undecided `HARD-Q-02` assertion from stale `"student"` to `reviewed_by is None`, `review_status == "unreviewed_draft"`, and exact equality with pre-run fixture.
+
+### 4. Review Tool Audit & Final Verification Results
+- Audited `scripts/review_gold.py` and regenerated `reports/gold_review.html`: removed `expected_route`, `source_chunk_id`, `paired_id`, prior review metadata, and the UI `Route:` label so only the question, role/difficulty/type/expect metadata, expected `gold_answer`, and full cited source clause (`heading_path`, `text_content`, `doc_id`, `doc_title`, `allowed_roles`, `page`) are present — zero system output or model answers.
+- Added `#export-reminder` banner and `EXPORT_REMINDER_EVERY = 15` toast + reminder bar every 15 actionable decisions (`15, 30, 45, 60...`), verified automatically in `tests/test_gold_review_tool.py::test_review_gold_no_system_output_and_export_reminder` and via Node `jsdom` simulation at `15` and `30` decisions.
+- **Gold Validator (`scripts/validate_gold_set.py`):** `PASSED` (`140` total: `100 original_100`, `40 agent_extra_40`, `0` reviewed).
+- **Python Suite (`.venv\Scripts\python.exe -m pytest -q`):** **`294` passed, `0` failed** in `96.05s`.
+- **Frontend (`npm --prefix web run typecheck`, `npm --prefix web test`):** `0` TS errors; Vitest **`10` files, `68` passed, `0` failed**.
+- **Mutant Matrix (`scripts/run_mutant_matrix.py`):** **`7/7` (`100.0%`)** valid `AssertionError` kills (`14/14` independent tests, `0` baseline failures).

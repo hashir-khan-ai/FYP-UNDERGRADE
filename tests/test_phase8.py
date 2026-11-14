@@ -284,6 +284,7 @@ def test_phase8c_calculator_ast_whitelist_injection_and_rbac():
 
 
 def test_phase8c_gold_v2_and_ablation_metrics():
+    import hashlib
     from pathlib import Path
     import json
     from src.evaluation.ablation import ABLATION_MATRIX, aggregate_ablation_rows
@@ -295,11 +296,28 @@ def test_phase8c_gold_v2_and_ablation_metrics():
     v2_eval_lines = Path("data/eval/gold_v2.jsonl").read_text(encoding="utf-8").splitlines()
     v2_json = json.loads(Path("data/gold_v2.json").read_text(encoding="utf-8"))
 
-    assert len(orig_lines) == 100
+    assert len(orig_lines) == 140
     assert len(v2_lines) == 115
-    assert v2_lines[:100] == orig_lines
+    assert v2_lines[:100] == orig_lines[:100]
     assert v2_eval_lines == v2_lines
     assert len(v2_json) == 115
+
+    orig_rows = [json.loads(line) for line in orig_lines]
+    assert all(r.get("subset") == "original_100" for r in orig_rows[:100])
+    assert all(
+        r.get("subset") == "agent_extra_40"
+        and r.get("authored_by") == "agent"
+        and r.get("review_status") == "unreviewed_draft"
+        and r.get("reviewed_by") is None
+        for r in orig_rows[100:]
+    )
+    canonical_orig_100 = "\n".join(
+        json.dumps({k: v for k, v in r.items() if k != "subset"}, sort_keys=True, ensure_ascii=False)
+        for r in orig_rows[:100]
+    )
+    assert hashlib.sha256(canonical_orig_100.encode("utf-8")).hexdigest() == (
+        "ea226229ff95684915465ec994346fd29aea555bec866d1d3bbd86f3469f6ffb"
+    )
 
     report = validate_gold_set_file("data/eval/gold_v2.jsonl", min_per_type=0)
     assert report.valid is True

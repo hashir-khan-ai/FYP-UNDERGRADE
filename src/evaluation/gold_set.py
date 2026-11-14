@@ -57,6 +57,8 @@ class GoldQuestionItem(BaseModel):
     original_gold_answer: str | None = Field(default=None)
     original_clause: str | None = Field(default=None)
     original_gold_chunk_ids: list[str] | None = Field(default=None)
+    subset: str | None = Field(default=None)
+    authored_by: str | None = Field(default=None)
 
     @field_validator("gold_chunk_ids")
     @classmethod
@@ -75,6 +77,7 @@ class GoldSetValidationReport(BaseModel):
     counts_by_status: dict[str, int]
     counts_by_role: dict[str, int]
     counts_by_behaviour: dict[str, int]
+    counts_by_subset: dict[str, int] = Field(default_factory=dict)
     missing_chunk_errors: list[str] = Field(default_factory=list)
     schema_errors: list[str] = Field(default_factory=list)
     type_quota_errors: list[str] = Field(default_factory=list)
@@ -201,6 +204,7 @@ def validate_gold_set_file(
     status_counts = Counter(item.status for item in items)
     role_counts = Counter(item.role_asking for item in items)
     behaviour_counts = Counter(item.expected_behaviour for item in items)
+    subset_counts = Counter(item.subset or "unspecified" for item in items)
     student_reviewed_n = sum(
         1 for item in items if item.status == "reviewed" and item.reviewed_by in ("student", "human")
     )
@@ -212,6 +216,10 @@ def validate_gold_set_file(
         if item.status == "reviewed" and item.reviewed_by not in ("student", "human"):
             schema_errors.append(
                 f"Question '{item.id}': status='reviewed' requires reviewed_by='student' or 'human' (found {item.reviewed_by!r})."
+            )
+        if item.authored_by == "agent" and item.review_status == "reviewed" and item.reviewed_by not in ("student", "human"):
+            schema_errors.append(
+                f"Question '{item.id}': authored_by='agent' cannot have review_status='reviewed' without human/student reviewer."
             )
 
     for qtype in REQUIRED_QUESTION_TYPES:
@@ -231,6 +239,7 @@ def validate_gold_set_file(
         counts_by_status=dict(status_counts),
         counts_by_role=dict(role_counts),
         counts_by_behaviour=dict(behaviour_counts),
+        counts_by_subset=dict(subset_counts),
         missing_chunk_errors=missing_chunk_errors,
         schema_errors=schema_errors,
         type_quota_errors=type_quota_errors,

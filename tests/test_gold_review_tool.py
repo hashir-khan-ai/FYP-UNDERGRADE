@@ -102,6 +102,7 @@ def test_apply_review_updates_only_decided_items_and_preserves_originals(tmp_pat
                 writer.writerow(row)
 
     orig_gs002 = next(r for r in subset_rows if r["id"] == "GS-002")
+    orig_hard_q_02 = next(r for r in subset_rows if r["id"] == "HARD-Q-02")
 
     decisions_file = tmp_path / "gold_review_decisions.json"
     decisions_payload = {
@@ -187,7 +188,9 @@ def test_apply_review_updates_only_decided_items_and_preserves_originals(tmp_pat
     assert by_id["GS-004"]["review_status"] == "unreviewed_draft"
     assert by_id["GS-005"]["reviewed_by"] is None
     assert by_id["GS-005"]["review_status"] == "unreviewed_draft"
-    assert by_id["HARD-Q-02"]["reviewed_by"] == "student"
+    assert by_id["HARD-Q-02"]["reviewed_by"] is None
+    assert by_id["HARD-Q-02"]["review_status"] == "unreviewed_draft"
+    assert by_id["HARD-Q-02"] == orig_hard_q_02
 
     # HARD-Q-01 was decided -> updated in JSONL and added to CSV
     assert by_id["HARD-Q-01"]["reviewed_by"] == "human"
@@ -234,4 +237,81 @@ def test_real_repo_gold_files_not_marked_human_by_agent() -> None:
     if not decisions_path.exists():
         items = load_gold_set(PROJECT_ROOT / "data" / "eval" / "gold_set.jsonl")
         assert all(item.reviewed_by != "human" for item in items)
+
+
+def test_review_gold_no_system_output_and_export_reminder(tmp_path: Path) -> None:
+    """gold_review.html must omit all system/router outputs and show an 'Export decisions' reminder every 15 decisions."""
+    out_file = tmp_path / "gold_review_check.html"
+    write_review_html(output_path=out_file)
+    html = out_file.read_text(encoding="utf-8")
+
+    match = re.search(
+        r'<script id="gold-review-data" type="application/json">(.*?)</script>',
+        html,
+        flags=re.DOTALL,
+    )
+    assert match is not None
+    payload = json.loads(match.group(1).replace("<\\/", "</"))
+
+    allowed_item_keys = {
+        "id",
+        "question",
+        "type",
+        "role_asking",
+        "difficulty",
+        "source_subset",
+        "is_boundary",
+        "expected_behaviour",
+        "gold_doc",
+        "clause",
+        "gold_chunk_ids",
+        "gold_answer",
+        "unauthorized_keywords",
+        "existing_human_notes",
+        "clauses",
+        "sample_stratum",
+        "in_default_sample",
+        "default_order",
+    }
+    forbidden_output_keys = {
+        "system_answer",
+        "model_answer",
+        "retrieved_chunks",
+        "rag_output",
+        "rerank_scores",
+        "grader_verdict",
+        "latency_ms",
+        "audit_id",
+        "llm_profile",
+        "expected_route",
+        "pipeline_stages",
+    }
+
+    for item in payload["items"]:
+        keys = set(item.keys())
+        assert keys == allowed_item_keys, f"Unexpected item keys in {item['id']}: {keys - allowed_item_keys}"
+        assert not (forbidden_output_keys & keys)
+        for clause in item["clauses"]:
+            assert set(clause.keys()) == {
+                "chunk_id",
+                "doc_id",
+                "doc_title",
+                "heading_path",
+                "section_label",
+                "clause_label",
+                "page",
+                "allowed_roles",
+                "text_content",
+                "missing",
+            }
+
+    # UI must not display router/system output labels and must include the 15-decision Export reminder
+    assert "<span>Route:" not in html
+    assert 'id="export-reminder"' in html
+    assert 'id="btn-reminder-export"' in html
+    assert "Export decisions" in html
+    assert "EXPORT_REMINDER_EVERY = 15" in html
+    assert "newActionable % EXPORT_REMINDER_EVERY === 0" in html
+    assert "Math.floor(actionableCount / EXPORT_REMINDER_EVERY) * EXPORT_REMINDER_EVERY" in html
+
 

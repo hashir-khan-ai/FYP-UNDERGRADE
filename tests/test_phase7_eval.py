@@ -104,11 +104,41 @@ def test_answer_correctness_and_bootstrap_ci() -> None:
 # 2. Gold-set validation & LLM suggestion status guard
 # ==============================================================================
 def test_gold_set_validator_passes_real_file() -> None:
+    import hashlib
+
     report = validate_gold_set_file("data/eval/gold_set.jsonl", min_per_type=15)
     assert report.valid is True
-    assert report.total_count == 100
+    assert report.total_count == 140
+    assert report.counts_by_subset == {"original_100": 100, "agent_extra_40": 40}
+    assert report.student_reviewed_count == 0
+    assert report.human_reviewed_count == 0
     for qtype in ("single_fact", "multi_part", "cross_reference", "role_restricted", "unanswerable"):
         assert report.counts_by_type[qtype] >= 15
+
+    raw_rows = [
+        json.loads(line)
+        for line in Path("data/eval/gold_set.jsonl").read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    orig_100 = [r for r in raw_rows if r.get("subset") == "original_100"]
+    extra_40 = [r for r in raw_rows if r.get("subset") == "agent_extra_40"]
+    assert len(orig_100) == 100
+    assert len(extra_40) == 40
+
+    # Verify original_100 rows retain exact pre-tag content (canonical SHA-256 without 'subset')
+    canonical_payload = "\n".join(
+        json.dumps({k: v for k, v in r.items() if k != "subset"}, sort_keys=True, ensure_ascii=False)
+        for r in orig_100
+    )
+    assert hashlib.sha256(canonical_payload.encode("utf-8")).hexdigest() == (
+        "ea226229ff95684915465ec994346fd29aea555bec866d1d3bbd86f3469f6ffb"
+    )
+
+    for row in extra_40:
+        assert row.get("authored_by") == "agent"
+        assert row.get("review_status") == "unreviewed_draft"
+        assert row.get("status") == "unreviewed_draft"
+        assert row.get("reviewed_by") is None
 
 
 def test_gold_set_validator_catches_missing_chunks_and_quotas(tmp_path: Path) -> None:

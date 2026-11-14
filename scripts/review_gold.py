@@ -175,17 +175,11 @@ def build_review_records(
                 "source_subset": source_subset,
                 "is_boundary": is_boundary,
                 "expected_behaviour": item.expected_behaviour,
-                "expected_route": item.expected_route or "",
                 "gold_doc": item.gold_doc,
                 "clause": item.clause,
                 "gold_chunk_ids": list(item.gold_chunk_ids),
-                "source_chunk_id": item.source_chunk_id or "",
-                "paired_id": item.paired_id or "",
                 "gold_answer": item.gold_answer,
                 "unauthorized_keywords": list(item.unauthorized_keywords),
-                "existing_review_status": item.review_status,
-                "existing_reviewed_by": item.reviewed_by or "",
-                "existing_reviewed_at": item.reviewed_at or "",
                 "existing_human_notes": existing_notes,
                 "clauses": clauses,
                 "sample_stratum": None,
@@ -557,6 +551,23 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       width: 0%;
       transition: width 180ms ease;
     }
+
+    .export-reminder {
+      background: var(--warn-bg);
+      border: 1.5px solid rgba(154, 74, 0, 0.45);
+      border-radius: var(--radius-md);
+      padding: 10px 14px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      font-size: 0.84rem;
+      font-weight: 600;
+      color: var(--warn);
+    }
+
+    .export-reminder[hidden] { display: none; }
 
     .workspace {
       display: grid;
@@ -962,12 +973,20 @@ HTML_TEMPLATE = """<!DOCTYPE html>
           <input id="chk-auto-advance" type="checkbox" checked />
           Auto-advance
         </label>
-        <button id="btn-export" type="button" class="btn btn-accent">Export decisions JSON</button>
+        <button id="btn-export" type="button" class="btn btn-accent">Export decisions</button>
         <label class="btn" for="input-import" style="cursor:pointer;">Import JSON</label>
         <input id="input-import" type="file" accept=".json,application/json" class="visually-hidden" />
         <button id="btn-reset" type="button" class="btn">Reset Drafts</button>
       </div>
     </section>
+
+    <div id="export-reminder" class="export-reminder" role="status" aria-live="polite" hidden>
+      <span id="export-reminder-text">Reminder: Export decisions now to save your progress.</span>
+      <div class="action-group">
+        <button id="btn-reminder-export" type="button" class="btn btn-accent">Export decisions</button>
+        <button id="btn-reminder-dismiss" type="button" class="btn">Dismiss until next 15</button>
+      </div>
+    </div>
 
     <main id="workspace-root">
       <div class="workspace" id="main-grid">
@@ -1125,8 +1144,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       var elNotes = document.getElementById("input-notes");
       var elClauseList = document.getElementById("clause-list");
       var elClauseCount = document.getElementById("clause-count-pill");
+      var elExportReminder = document.getElementById("export-reminder");
+      var elExportReminderText = document.getElementById("export-reminder-text");
       var elToast = document.getElementById("toast");
       var toastTimer = null;
+      var EXPORT_REMINDER_EVERY = 15;
 
       function loadState() {
         try {
@@ -1140,7 +1162,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                   ? parsed.filters
                   : { subset: "stratified_60", difficulty: "all", status: "all" },
                 autoAdvance: typeof parsed.autoAdvance === "boolean" ? parsed.autoAdvance : true,
-                lastItemId: typeof parsed.lastItemId === "string" ? parsed.lastItemId : null
+                lastItemId: typeof parsed.lastItemId === "string" ? parsed.lastItemId : null,
+                lastExportMilestone: typeof parsed.lastExportMilestone === "number" ? parsed.lastExportMilestone : 0
               };
             }
           }
@@ -1151,7 +1174,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
           decisions: {},
           filters: { subset: "stratified_60", difficulty: "all", status: "all" },
           autoAdvance: true,
-          lastItemId: null
+          lastItemId: null,
+          lastExportMilestone: 0
         };
       }
 
@@ -1197,6 +1221,29 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         });
       }
 
+      function countActionableDecisions() {
+        var total = 0;
+        ITEMS.forEach(function (item) {
+          var dec = getDecision(item.id);
+          if (dec && ACTIONABLE[dec.decision]) total += 1;
+        });
+        return total;
+      }
+
+      function updateExportReminder(actionableCount) {
+        if (!elExportReminder || !elExportReminderText) return;
+        var milestone = Math.floor(actionableCount / EXPORT_REMINDER_EVERY) * EXPORT_REMINDER_EVERY;
+        if (milestone >= EXPORT_REMINDER_EVERY && milestone > (state.lastExportMilestone || 0)) {
+          elExportReminderText.textContent =
+            "Export decisions reminder: " +
+            actionableCount +
+            " decisions recorded locally — export data/gold_review_decisions.json now.";
+          elExportReminder.hidden = false;
+        } else {
+          elExportReminder.hidden = true;
+        }
+      }
+
       function updateProgressUI() {
         var doneOrig = 0, totalOrig = 0;
         var doneExtra = 0, totalExtra = 0;
@@ -1238,6 +1285,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         var targetPill = document.getElementById("pill-total-target");
         targetPill.classList.toggle("complete", remTotal === 0 && totalTarget > 0);
         targetPill.classList.toggle("primary", remTotal > 0);
+
+        updateExportReminder(totalAllDecided);
       }
 
       function makeBadge(text, cls) {
@@ -1392,8 +1441,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
         elMetaLine.innerHTML =
           "<span>Doc: <code>" + escapeHtml(item.gold_doc || "none") + "</code></span>" +
-          "<span>Clause: <code>" + escapeHtml(item.clause || "none") + "</code></span>" +
-          "<span>Route: <code>" + escapeHtml(item.expected_route || "none") + "</code></span>";
+          "<span>Clause: <code>" + escapeHtml(item.clause || "none") + "</code></span>";
 
         var buttons = document.querySelectorAll(".verdict-btn");
         buttons.forEach(function (btn) {
@@ -1411,6 +1459,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
       function upsertDecision(item, verdict, opts) {
         opts = opts || {};
+        var prevActionable = countActionableDecisions();
         var prev = state.decisions[item.id] || {};
         var next = {
           id: item.id,
@@ -1435,6 +1484,16 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         };
         state.decisions[item.id] = next;
         saveState();
+        var newActionable = countActionableDecisions();
+        if (
+          newActionable >= EXPORT_REMINDER_EVERY &&
+          newActionable > prevActionable &&
+          newActionable % EXPORT_REMINDER_EVERY === 0
+        ) {
+          showToast(
+            "Reminder: " + newActionable + " decisions saved locally — click Export decisions!"
+          );
+        }
       }
 
       function moveRelative(delta) {
@@ -1567,7 +1626,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         renderCurrentItem();
       });
 
-      document.getElementById("btn-export").addEventListener("click", function () {
+      function exportDecisionsJson() {
         var payload = {
           schema_version: 1,
           exported_at: new Date().toISOString(),
@@ -1584,7 +1643,20 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         a.click();
         a.remove();
         setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+        var actionable = countActionableDecisions();
+        state.lastExportMilestone = Math.floor(actionable / EXPORT_REMINDER_EVERY) * EXPORT_REMINDER_EVERY;
+        saveState();
+        updateExportReminder(actionable);
         showToast("Exported gold_review_decisions.json — save in data/ and run apply_review.py");
+      }
+
+      document.getElementById("btn-export").addEventListener("click", exportDecisionsJson);
+      document.getElementById("btn-reminder-export").addEventListener("click", exportDecisionsJson);
+      document.getElementById("btn-reminder-dismiss").addEventListener("click", function () {
+        var actionable = countActionableDecisions();
+        state.lastExportMilestone = Math.floor(actionable / EXPORT_REMINDER_EVERY) * EXPORT_REMINDER_EVERY;
+        saveState();
+        updateExportReminder(actionable);
       });
 
       document.getElementById("input-import").addEventListener("change", function (ev) {
@@ -1617,6 +1689,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
           return;
         }
         state.decisions = {};
+        state.lastExportMilestone = 0;
         saveState();
         renderCurrentItem();
         showToast("Local review drafts cleared.");

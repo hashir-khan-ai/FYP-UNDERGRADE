@@ -44,7 +44,10 @@ def main() -> int:
     )
     reviewed_n = report.student_reviewed_count
     total_marked_reviewed = report.counts_by_status.get("reviewed", 0)
-    draft_n = report.counts_by_status.get("draft", 0)
+    draft_n = (
+        report.counts_by_status.get("draft", 0)
+        + report.counts_by_status.get("unreviewed_draft", 0)
+    )
     rejected_n = report.counts_by_status.get("rejected", 0)
     gate_n = args.min_reviewed if args.min_reviewed > 0 else DEFAULT_MIN_REVIEWED
 
@@ -52,6 +55,7 @@ def main() -> int:
     print(f"GOLD SET VALIDATION REPORT ({args.path})")
     print("==============================================================================")
     print(f"Total questions   : {report.total_count}")
+    print(f"Counts by subset  : {report.counts_by_subset}")
     print(f"Student reviewed  : {reviewed_n} (required for final ablation)")
     if total_marked_reviewed != reviewed_n:
         print(f"Unverified reviewed: {total_marked_reviewed - reviewed_n} (status=reviewed but reviewed_by != 'student')")
