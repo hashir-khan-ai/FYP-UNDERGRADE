@@ -68,3 +68,13 @@ This document catalogues all third-party software packages, pre-trained neural m
 | **remark-gfm** | 4.0.1 | MIT | https://github.com/remarkjs/remark-gfm/blob/main/license | GitHub Flavored Markdown plugin |
 | **axe-core** | 4.14.0 | MPL-2.0 | https://github.com/dequelabs/axe-core/blob/develop/LICENSE | Official automated WCAG accessibility test engine |
 
+---
+
+## 5. Self-Hosted Typefaces (`web/app/fonts/`)
+
+| Typeface | Weights / Format | Licence | Verified Licence URL | Usage |
+| :--- | :--- | :--- | :--- | :--- |
+| **Newsreader** (Production Type) | Variable weight normal + italic (`woff2`, Latin subset) | SIL OFL 1.1 | https://github.com/productiontype/Newsreader/blob/master/OFL.txt | Editorial display headings and verbatim regulatory clause quotations |
+| **IBM Plex Sans** (IBM Corp) | 400, 500, 600 (`woff2`, Latin subset) | SIL OFL 1.1 | https://github.com/IBM/plex/blob/master/LICENSE.txt | Primary interface prose, navigation, tables, and controls |
+| **IBM Plex Mono** (IBM Corp) | 400, 500 (`woff2`, Latin subset) | SIL OFL 1.1 | https://github.com/IBM/plex/blob/master/LICENSE.txt | Regulatory clause IDs, audit trace telemetry, latencies, and tabular indicators |
+

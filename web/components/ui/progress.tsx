@@ -27,11 +27,11 @@ export function Progress({
             ? `${Math.round(clamped)} percent`
             : undefined
       }
-      className={cn("h-1.5 w-full overflow-hidden rounded-full bg-white/[0.06]", className)}
+      className={cn("h-2 w-full overflow-hidden rounded-full bg-surface-3 shadow-[var(--inner-inset)]", className)}
     >
       <div
         className={cn(
-          "h-full rounded-full bg-[linear-gradient(90deg,var(--accent-strong),var(--teal))] transition-[width] duration-[var(--duration-slow)] ease-[var(--ease-out)]",
+          "h-full rounded-full bg-accent transition-[width] duration-[var(--duration-slow)] ease-[var(--ease-out)]",
           indeterminate && "animate-soft-pulse w-1/2",
         )}
         style={indeterminate || clamped === null ? undefined : { width: `${clamped}%` }}

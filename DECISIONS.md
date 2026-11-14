@@ -819,3 +819,16 @@ in LaTeX thesis documents without manual transcription errors.
 
 
 
+
+
+---
+
+## Part R — Compliance Ledger & Reference-Driven Polish (Phase 16 & Addendum)
+
+### 83. Compliance Ledger Design System & First-Class Warm Light / Dark Themes (Phase 16)
+**Decision (2026-11-15):** Redesigned the Next.js Compliance Desk visually without modifying backend APIs, RBAC, caching, or audit schemas. Self-hosted `Newsreader`, `IBM Plex Sans`, and `IBM Plex Mono` (`woff2`, SIL OFL 1.1) in `web/app/fonts/` and replaced flat generic dark cards with layered warm cream (`#FAF7F2` -> `#FFFFFF`) and obsidian dark (`#16171A` -> `#23262C`) tonal steps, `clamp()` typography (`>= 13px` labels), and centralized calm motion (`120 / 200 / 320 ms`, full `prefers-reduced-motion` parity).
+**Why:** Elevates readability for dense regulatory text while preserving WCAG AA contrast (>= 5.08:1 dark / >= 5.37:1 light across all tokens and soft pills) and maintaining strict zero-leakage guarantees.
+
+### 84. Addendum Missing Reference Disclosure & Surface-Tinted Language Extraction (Phase 16 Addendum)
+**Decision (2026-11-15):** Because `docs/reference/ui-reference.png` was absent from the workspace, extracted enterprise UI principles from `hashbyt.com/blog/enterprise-ui-design` plus the 9 Addendum rules: `(8, 12, 16, 24)` px radius scale, 3-level warm/cool surface-tinted shadow tokens + 1px inner highlights, `<StatCard>` real-data SVG progress/sparklines (honest `"No data yet"` fallback), `<PipelineStepper>`, interactive `<CitePin>` + hover/focus SVG dotted connector overlay, and bespoke `<PipelineHeroSvg>` / editorial spot SVGs.
+**Why:** Documents the exact visual basis transparently while eliminating hard border clutter and fake telemetry across audit and catalog screens.

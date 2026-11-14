@@ -57,8 +57,8 @@ function MobileBottomBar({
         href="/chat"
         aria-label="Compliance chat"
         className={cn(
-          "flex min-h-[44px] min-w-[44px] flex-col items-center justify-center rounded-[var(--r-sm)] text-[10px] font-medium transition-colors",
-          pathname?.startsWith("/chat") ? "text-accent" : "text-muted hover:text-ink",
+          "flex min-h-[44px] min-w-[44px] flex-col items-center justify-center rounded-[var(--r-sm)] px-1.5 text-xs font-medium transition-colors",
+          pathname?.startsWith("/chat") ? "text-accent-link" : "text-muted hover:text-ink",
         )}
       >
         <MessageSquare className="size-4" aria-hidden="true" />
@@ -69,8 +69,8 @@ function MobileBottomBar({
         href="/documents"
         aria-label="Docs - Document catalog"
         className={cn(
-          "flex min-h-[44px] min-w-[44px] flex-col items-center justify-center rounded-[var(--r-sm)] text-[10px] font-medium transition-colors",
-          pathname === "/documents" ? "text-accent" : "text-muted hover:text-ink",
+          "flex min-h-[44px] min-w-[44px] flex-col items-center justify-center rounded-[var(--r-sm)] px-1.5 text-xs font-medium transition-colors",
+          pathname === "/documents" ? "text-accent-link" : "text-muted hover:text-ink",
         )}
       >
         <FileText className="size-4" aria-hidden="true" />
@@ -82,8 +82,8 @@ function MobileBottomBar({
           href="/audit"
           aria-label="Audit log"
           className={cn(
-            "flex min-h-[44px] min-w-[44px] flex-col items-center justify-center rounded-[var(--r-sm)] text-[10px] font-medium transition-colors",
-            pathname === "/audit" ? "text-accent" : "text-muted hover:text-ink",
+            "flex min-h-[44px] min-w-[44px] flex-col items-center justify-center rounded-[var(--r-sm)] px-1.5 text-xs font-medium transition-colors",
+            pathname === "/audit" ? "text-accent-link" : "text-muted hover:text-ink",
           )}
         >
           <ShieldCheck className="size-4" aria-hidden="true" />
@@ -96,7 +96,7 @@ function MobileBottomBar({
         onClick={() => void createSession()}
         disabled={creating}
         aria-label="New session"
-        className="flex min-h-[44px] min-w-[44px] flex-col items-center justify-center rounded-[var(--r-sm)] text-[10px] font-medium text-accent"
+        className="flex min-h-[44px] min-w-[44px] flex-col items-center justify-center rounded-[var(--r-sm)] px-1.5 text-xs font-medium text-accent-link"
       >
         <Plus className="size-4" aria-hidden="true" />
         <span>New</span>
@@ -106,7 +106,7 @@ function MobileBottomBar({
         type="button"
         onClick={onOpenMenu}
         aria-label="Workspace menu"
-        className="flex min-h-[44px] min-w-[44px] flex-col items-center justify-center rounded-[var(--r-sm)] text-[10px] font-medium text-muted hover:text-ink"
+        className="flex min-h-[44px] min-w-[44px] flex-col items-center justify-center rounded-[var(--r-sm)] px-1.5 text-xs font-medium text-muted hover:text-ink"
       >
         <Menu className="size-4" aria-hidden="true" />
         <span>Menu</span>
@@ -246,7 +246,7 @@ function WorkspaceInner({
 
       <div
         className={cn(
-          "transition-[padding-left] duration-200",
+          "transition-[padding-left] duration-[var(--duration-slow)] ease-[var(--ease-emphasized)]",
           collapsed ? "lg:pl-16" : "lg:pl-[var(--sidebar-width)]",
         )}
       >

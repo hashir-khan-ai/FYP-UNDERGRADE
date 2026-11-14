@@ -21,11 +21,11 @@ import type { AdminConfig, HealthResponse } from "@/lib/types";
 
 function Stat({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="rounded-[var(--r-sm)] border border-line bg-[rgba(3,6,10,0.35)] px-3 py-2">
-      <div className="text-xs font-semibold uppercase tracking-[0.08em] text-faint">
+    <div className="rounded-[var(--r-md)] bg-inset px-3.5 py-2.5 shadow-[var(--inner-inset)]">
+      <div className="text-xs font-semibold uppercase tracking-[0.06em] text-faint">
         {label}
       </div>
-      <div className="mt-1 truncate text-xs font-medium text-ink">{value}</div>
+      <div className="mt-1 truncate text-xs font-medium tabular text-ink">{value}</div>
     </div>
   );
 }

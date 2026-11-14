@@ -4,6 +4,7 @@ import * as React from "react";
 import {
   AlertTriangle,
   Check,
+  ChevronDown,
   Download,
   ExternalLink,
   FileText,
@@ -23,7 +24,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DestructiveDialog } from "@/components/ui/destructive-dialog";
 import { ColumnDef, DataTable } from "@/components/ui/data-table";
+import { EmptyState } from "@/components/ui/empty-state";
+import { VaultDocIcon } from "@/components/ui/icons";
 import { Input } from "@/components/ui/input";
+import { StatCard } from "@/components/ui/stat-card";
 import { ApiError, api } from "@/lib/api-client";
 import { canUploadDocuments, roleLabel } from "@/lib/auth";
 import { safeHttpUrl } from "@/lib/citations";
@@ -32,26 +36,25 @@ import { useDebouncedCallback, useDebouncedValue } from "@/lib/hooks/use-debounc
 import type { DocumentItem, UserProfile } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
-  return (
-    <div className="rounded-[var(--r-md)] border border-line bg-surface/55 p-3.5">
-      <div className="text-xs font-semibold uppercase tracking-[0.09em] text-faint">
-        {label}
-      </div>
-      <div className="tabular mt-1 text-lg font-semibold tracking-[-0.02em] text-ink">{value}</div>
-      {hint ? <div className="mt-0.5 text-xs text-faint">{hint}</div> : null}
-    </div>
-  );
+function formatShortDate(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "2-digit",
+  }).format(d);
 }
 
 function TrustCell({ document }: { document: DocumentItem }) {
   const url = document.is_internal ? null : safeHttpUrl(document.source_url);
   if (document.is_internal) {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full border border-warning/30 bg-warning-soft px-2 py-0.5 text-[11px] font-medium text-warning">
-        <LockKeyhole className="size-3" aria-hidden="true" />
-        Restricted to Manager, Auditor
-      </span>
+      <Badge tone="warning" title="Restricted to Manager, Auditor">
+        <LockKeyhole className="size-3.5 shrink-0" aria-hidden="true" />
+        Restricted (M/A)
+      </Badge>
     );
   }
   if (url) {
@@ -60,23 +63,32 @@ function TrustCell({ document }: { document: DocumentItem }) {
         href={url}
         target="_blank"
         rel="noopener noreferrer nofollow"
-        className="inline-flex items-center gap-1 text-xs font-medium text-accent underline-offset-2 hover:underline"
+        title={document.source_name ?? "Official source"}
+        className="inline-flex min-h-[32px] max-w-[148px] items-center gap-1 text-xs font-medium text-accent-link underline-offset-2 hover:underline"
       >
-        <ExternalLink className="size-3" aria-hidden="true" />
-        {document.source_name ?? "Official source"}
+        <ExternalLink className="size-3.5 shrink-0" aria-hidden="true" />
+        <span className="truncate">{document.source_name ?? "Official source"}</span>
       </a>
     );
   }
-  return <span className="text-xs text-faint">No public link</span>;
+  return <span className="whitespace-nowrap text-xs text-faint">No public link</span>;
 }
+
+const DOC_TYPE_LABELS: Record<string, string> = {
+  PUBLIC_REGULATION: "Public Reg",
+  INTERNAL_SOP: "Internal SOP",
+  INTERNAL_MANAGEMENT_POLICY: "Mgmt Policy",
+  CONFIDENTIAL_AUDIT_FINDINGS: "Audit Findings",
+};
 
 function RoleBadges({ roles }: { roles: string[] }) {
   return (
-    <span className="flex flex-wrap gap-1">
+    <span className="flex flex-wrap items-center gap-1">
       {roles.map((role) => (
         <Badge
           key={role}
           tone={role === "auditor" ? "info" : role === "manager" ? "warning" : "neutral"}
+          className="px-2.5"
         >
           {roleLabel(role)}
         </Badge>
@@ -213,6 +225,11 @@ export function DocumentsView({
   // Stats scoped strictly to user's permitted documents
   const totalChunks = documents.reduce((sum, document) => sum + (document.total_chunks || 0), 0);
   const internal = documents.filter((document) => document.is_internal).length;
+  const chunkSeries = React.useMemo(
+    () => documents.map((document) => document.total_chunks || 0),
+    [documents],
+  );
+  const hasRealChunkCounts = chunkSeries.filter((n) => n > 0).length >= 2;
 
   // DataTable column definitions
   const columns: ColumnDef<DocumentItem>[] = React.useMemo(() => {
@@ -222,7 +239,7 @@ export function DocumentsView({
         header: "Document",
         sortable: true,
         accessorKey: "filename",
-        className: "max-w-72",
+        className: "max-w-[185px]",
         cell: (doc) => {
           const editState = editStates[doc.id];
           const title = editState?.title ?? doc.filename;
@@ -230,35 +247,40 @@ export function DocumentsView({
 
           if (canManage) {
             return (
-              <div className="space-y-1">
-                <div className="flex items-center gap-1.5">
+              <div className="min-w-0 max-w-[160px] overflow-hidden space-y-1">
+                <div className="flex min-w-0 items-center gap-1">
                   <Input
+                    size={1}
                     value={title}
                     onChange={(e) => handleTitleChange(doc, e.target.value)}
-                    className="h-7 text-xs font-medium py-1 px-2 text-ink bg-surface-2/40 border-line hover:border-line-strong focus:border-line-accent"
+                    className="h-9 min-h-[36px] w-full min-w-0 rounded-[var(--r-sm)] border-0 bg-transparent px-1.5 py-0.5 text-xs font-medium text-ink shadow-none transition-colors hover:bg-inset focus:bg-inset focus:shadow-[var(--inner-inset)]"
                     aria-label={`Edit title for ${doc.id}`}
                   />
                   {status === "saving" && (
-                    <span className="text-[10px] text-faint animate-pulse">Saving…</span>
+                    <span className="text-xs text-faint animate-pulse">Saving…</span>
                   )}
                   {status === "saved" && (
-                    <span className="inline-flex items-center gap-0.5 text-[10px] text-success">
-                      <Check className="size-3" /> Saved
+                    <span className="inline-flex items-center gap-0.5 text-xs text-success">
+                      <Check className="size-3.5" /> Saved
                     </span>
                   )}
                   {status === "error" && (
-                    <span className="text-[10px] text-danger">Error</span>
+                    <span className="text-xs text-danger">Error</span>
                   )}
                 </div>
-                <div className="truncate font-mono text-[11px] text-faint px-0.5">{doc.id}</div>
+                <div className="truncate font-mono text-xs text-faint px-0.5">
+                  {doc.id} · v{doc.version}
+                </div>
               </div>
             );
           }
 
           return (
-            <div>
+            <div className="space-y-0.5">
               <div className="truncate text-xs font-medium text-ink">{doc.filename}</div>
-              <div className="truncate font-mono text-[11px] text-faint">{doc.id}</div>
+              <div className="truncate font-mono text-xs text-faint">
+                {doc.id} · v{doc.version}
+              </div>
             </div>
           );
         },
@@ -268,25 +290,36 @@ export function DocumentsView({
         header: "Jurisdiction",
         sortable: true,
         accessorKey: "source_jurisdiction",
-        cell: (doc) => <span className="text-muted">{doc.source_jurisdiction}</span>,
+        className: "min-w-[108px] max-w-[116px]",
+        cell: (doc) => (
+          <span className="block max-w-[100px] truncate text-muted" title={doc.source_jurisdiction}>
+            {doc.source_jurisdiction}
+          </span>
+        ),
       },
       {
         id: "doc_type",
         header: "Type",
         sortable: true,
         accessorKey: "doc_type",
-        cell: (doc) => <Badge tone="outline">{doc.doc_type}</Badge>,
+        cell: (doc) => (
+          <Badge tone="outline" title={doc.doc_type}>
+            {DOC_TYPE_LABELS[doc.doc_type] ?? doc.doc_type}
+          </Badge>
+        ),
       },
       {
         id: "version",
         header: "Version",
         sortable: true,
+        defaultHidden: true,
         accessorKey: "version",
         cell: (doc) => <span className="font-mono text-muted">{doc.version}</span>,
       },
       {
         id: "allowed_roles",
         header: "Read Access",
+        className: "max-w-[168px]",
         cell: (doc) => <RoleBadges roles={doc.allowed_roles} />,
       },
       {
@@ -307,8 +340,11 @@ export function DocumentsView({
         sortable: true,
         accessorKey: "created_at",
         cell: (doc) => (
-          <span className="whitespace-nowrap text-faint">
-            {formatDateTime(doc.created_at)}
+          <span
+            className="whitespace-nowrap text-faint"
+            title={formatDateTime(doc.created_at)}
+          >
+            {formatShortDate(doc.created_at)}
           </span>
         ),
       },
@@ -365,11 +401,11 @@ export function DocumentsView({
         }
       />
 
-      <div className="px-4 py-5 sm:px-6 lg:px-10">
+      <div className="px-4 py-5 sm:px-6 lg:px-7">
         {error ? (
           <div
             role="alert"
-            className="mb-4 flex items-start gap-2 rounded-[var(--r-md)] border border-[rgba(255,133,133,0.28)] bg-danger-soft px-3.5 py-3 text-xs text-danger"
+            className="mb-4 flex items-start gap-2 rounded-[var(--r-lg)] bg-danger-soft px-4 py-3 text-xs text-danger shadow-[var(--elev-1)] ring-1 ring-inset ring-danger/30"
           >
             <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
             <div className="flex-1">
@@ -383,34 +419,81 @@ export function DocumentsView({
         ) : null}
 
         {/* Stats Grid: zero leak of documents outside caller's role */}
-        <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
-          <Stat
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <StatCard
             label="Permitted Documents"
-            value={formatNumber(documents.length)}
-            hint="Authorized for your role"
+            value={documents.length}
+            delta={
+              documents.length > 0
+                ? `${Math.round((internal / documents.length) * 100)}% internal`
+                : "Empty scope"
+            }
+            deltaTone="accent"
+            accentValue
+            icon={<FileText className="size-4" aria-hidden="true" />}
+            ring={
+              documents.length > 0
+                ? {
+                    value: documents.length - internal,
+                    max: documents.length,
+                    label: "Public corpus share",
+                    tone: "info",
+                  }
+                : { value: 0, max: 0, tone: "info" }
+            }
+            emptyVisualText="No data yet"
+            caption="Authorized for your role"
           />
-          <Stat
+          <StatCard
             label="Indexed Chunks"
-            value={formatNumber(totalChunks)}
-            hint="In your retrieval scope"
+            value={totalChunks}
+            delta={
+              documents.length > 0 && totalChunks > 0
+                ? `${Math.round(totalChunks / documents.length)} / doc`
+                : null
+            }
+            deltaTone="neutral"
+            icon={<Search className="size-4" aria-hidden="true" />}
+            sparkline={hasRealChunkCounts ? chunkSeries : null}
+            sparkVariant="bars"
+            sparkLabel="Chunks across permitted documents"
+            emptyVisualText="No data yet"
+            caption="In your retrieval scope"
           />
-          <Stat
+          <StatCard
             label="Internal Sources"
-            value={formatNumber(internal)}
-            hint="Internal regulatory SOPs"
+            value={internal}
+            delta={documents.length > 0 ? "Role gated" : null}
+            deltaTone={internal > 0 ? "warning" : "neutral"}
+            icon={<LockKeyhole className="size-4" aria-hidden="true" />}
+            ring={
+              documents.length > 0
+                ? {
+                    value: internal,
+                    max: documents.length,
+                    label: "Internal SOP share",
+                    tone: "accent",
+                  }
+                : { value: 0, max: 0, tone: "accent" }
+            }
+            emptyVisualText="No data yet"
+            caption="Internal regulatory SOPs"
           />
-          <Stat
+          <StatCard
             label="Current Scope"
             value={roleLabel(role)}
-            hint="Enforced server-side"
+            delta="Server RBAC"
+            deltaTone="success"
+            icon={<ShieldCheck className="size-4 text-success" aria-hidden="true" />}
+            caption="Enforced at index layer"
           />
         </div>
 
         {/* Filters bar */}
-        <div className="mt-5 flex flex-wrap items-center gap-2">
-          <div className="relative min-w-52 flex-1 sm:max-w-xs">
+        <div className="mt-5 flex flex-wrap items-center gap-3 rounded-[var(--r-lg)] bg-canvas-raised p-3.5 shadow-[var(--elev-1)]">
+          <div className="relative min-w-56 flex-1 sm:max-w-xs">
             <Search
-              className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-faint"
+              className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-faint"
               aria-hidden="true"
             />
             <Input
@@ -418,25 +501,31 @@ export function DocumentsView({
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search by title, ID or jurisdiction"
               aria-label="Search documents"
-              className="h-9 pl-8 text-xs"
+              className="h-11 min-h-[44px] pl-9 text-sm"
             />
           </div>
           <label className="sr-only" htmlFor="doc-type-filter">
             Filter by document type
           </label>
-          <select
-            id="doc-type-filter"
-            value={typeFilter}
-            onChange={(event) => setTypeFilter(event.target.value)}
-            className="h-9 rounded-[var(--r-sm)] border border-line bg-[rgba(3,6,10,0.44)] px-2.5 text-xs text-ink outline-none focus:border-line-accent"
-          >
-            <option value="all">All types</option>
-            {types.map((type) => (
-              <option key={type} value={type}>
-                {type}
-              </option>
-            ))}
-          </select>
+          <div className="relative inline-flex items-center">
+            <select
+              id="doc-type-filter"
+              value={typeFilter}
+              onChange={(event) => setTypeFilter(event.target.value)}
+              className="h-11 min-h-[44px] appearance-none rounded-[var(--r-md)] bg-inset pl-3.5 pr-9 text-sm text-ink shadow-[var(--inner-inset)] outline-none transition-shadow focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            >
+              <option value="all">All types</option>
+              {types.map((type) => (
+                <option key={type} value={type}>
+                  {type}
+                </option>
+              ))}
+            </select>
+            <ChevronDown
+              className="pointer-events-none absolute right-3 size-4 text-faint"
+              aria-hidden="true"
+            />
+          </div>
         </div>
 
         {/* Reusable DataTable with sorting, column toggle, bulk export, pagination */}
@@ -447,11 +536,11 @@ export function DocumentsView({
             getRowId={(doc) => doc.id}
             pageSize={10}
             emptyState={
-              <div className="py-8 text-center">
-                <FileText className="mx-auto mb-2 size-6 text-faint" aria-hidden="true" />
-                <p className="text-xs font-medium text-ink">No matching documents found</p>
-                <p className="mt-1 text-xs text-muted">Try adjusting your search query or filters.</p>
-              </div>
+              <EmptyState
+                title="No matching documents found"
+                description="Try adjusting your search query or filters."
+                icon={<VaultDocIcon className="size-6" />}
+              />
             }
             bulkActions={(selectedIds, clearSelection) => (
               <Button
@@ -478,7 +567,7 @@ export function DocumentsView({
           />
         </div>
 
-        <div className="mt-5 flex items-start gap-2 rounded-[var(--r-md)] border border-line bg-surface/40 px-3.5 py-3">
+        <div className="mt-5 flex items-start gap-2.5 rounded-[var(--r-lg)] bg-canvas-raised px-4 py-3.5 shadow-[var(--elev-1)]">
           <ShieldCheck className="mt-0.5 size-4 shrink-0 text-accent" aria-hidden="true" />
           <p className="text-xs leading-relaxed text-muted">
             Corpus RBAC is enforced strictly at the database and index level. Any document outside

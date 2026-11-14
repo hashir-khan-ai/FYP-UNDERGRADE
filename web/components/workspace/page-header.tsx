@@ -35,9 +35,9 @@ export function PageHeader({
       )}
     >
       <div className="min-w-0 max-w-2xl">
-        <div className="mb-1 flex flex-wrap items-center gap-2">
+        <div className="mb-1.5 flex flex-wrap items-center gap-2.5">
           {eyebrow ? (
-            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-faint">
+            <p className="font-mono text-xs font-semibold uppercase tracking-[0.12em] text-faint">
               {eyebrow}
             </p>
           ) : null}
@@ -47,9 +47,11 @@ export function PageHeader({
             </Badge>
           ) : null}
         </div>
-        <h1 className="text-lg font-semibold tracking-[-0.02em] text-ink sm:text-xl">{title}</h1>
+        <h1 className="font-display text-[clamp(1.375rem,2.4vw,1.875rem)] font-semibold tracking-[-0.02em] text-ink">
+          {title}
+        </h1>
         {description ? (
-          <p className="mt-1.5 text-xs leading-relaxed text-muted sm:text-[0.8125rem]">
+          <p className="mt-1.5 text-sm leading-relaxed text-muted">
             {description}
           </p>
         ) : null}

@@ -1,4 +1,5 @@
 import * as React from "react";
+import { EmptyDeskIllustration } from "@/components/visual/illustrations";
 import { cn } from "@/lib/utils";
 
 export interface EmptyStateProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -21,38 +22,25 @@ export function EmptyState({
       role="region"
       aria-label={title}
       className={cn(
-        "flex flex-col items-center justify-center p-8 text-center rounded-xl",
-        "border border-dashed border-[var(--border-subtle)] bg-[var(--surface-muted)]/30",
-        className
+        "flex flex-col items-center justify-center rounded-[var(--r-xl)] bg-surface p-8 text-center shadow-[var(--elev-1)]",
+        className,
       )}
       {...props}
     >
-      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[var(--surface-muted)] text-[var(--accent-primary)] mb-4 shadow-xs">
-        {icon || (
-          <svg
-            className="h-7 w-7"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.75"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-            <polyline points="14 2 14 8 20 8" />
-            <line x1="12" y1="18" x2="12" y2="12" />
-            <line x1="9" y1="15" x2="15" y2="15" />
-          </svg>
-        )}
-      </div>
+      {icon ? (
+        <div className="mb-4 flex size-14 items-center justify-center rounded-[var(--r-lg)] bg-surface-2 text-accent-link shadow-[var(--elev-1)]">
+          {icon}
+        </div>
+      ) : (
+        <EmptyDeskIllustration className="mb-4" />
+      )}
 
-      <h3 className="text-base font-semibold text-[var(--text-primary)]">
+      <h3 className="font-display text-lg font-semibold text-ink">
         {title}
       </h3>
 
       {description && (
-        <p className="mt-1.5 max-w-sm text-sm text-[var(--text-muted)] leading-relaxed">
+        <p className="mt-1.5 max-w-md text-sm leading-relaxed text-muted">
           {description}
         </p>
       )}

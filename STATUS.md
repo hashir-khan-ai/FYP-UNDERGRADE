@@ -2,8 +2,8 @@
 
 > **PROJECT FREEZE NOTICE:** Feature development is frozen; only evidence and documentation work remains.
 
-**Current Phase:** Phase 15b (Verify and Close) Complete â€” PROJECT FROZEN  
-**Verification:** Full pytest suite passing (290 passed, 0 failed, 1 deselected slow) | Next.js tests: 59 passed (Vitest) | Next.js build: clean Turbopack production build | Official axe-core v4.14.0 a11y audit: 0 violations across 8 route/viewport combinations (/login, /chat, /documents, /audit at 390px and 1440px) | Keyboard flows: 4/4 passing (palette open/close/select, sidebar collapse, delete dialog focus trap/return, table row selection) | Saved views multi-tenant isolation: verified | Audit CSV export with formula injection neutralization: verified | Document autosave audit logging & cache invalidation: verified | Dual-index staging & atomic swap: verified | 14/14 mutant kills verified
+**Current Phase:** Phase 16 + Addendum (Compliance Ledger & Reference-Driven Polish) Complete — PROJECT FROZEN  
+**Verification:** Frontend Vitest: 67 passed (10 files) | `tsc --noEmit`: 0 errors | Next.js 16.4.6 Turbopack build: clean (`2.6s`) | Official axe-core v4.14.0 a11y audit: 0 violations across 16 route/viewport/theme combinations (`/login`, `/chat`, `/documents`, `/audit` in Light & Dark at 390px and 1440px) | Keyboard flows: 4/4 passing | Real-index RBAC leakage: 0.00% (141/141 cells) | Mutation matrix: 7/7 valid kills (14/14 independent tests) | Pytest: 288 passed, 2 pre-existing data-count failures (`test_gold_set_validator_passes_real_file`, `test_phase8c_gold_v2_and_ablation_metrics` on uncommitted `140` vs `100` rows in `data/eval/gold_set.jsonl`)
 
 ---
 
@@ -56,6 +56,10 @@
   - **12 UX Patterns:** `<Skeleton>`, `<EmptyState>`, `<ErrorState>` with friendly messages for 429/503/403 and route error boundaries; deduplicated/sanitized toasts; collapsible persistent sidebar with tooltips, active indicator, date-grouped sessions, and mobile bottom bar; Command Palette (Cmd/Ctrl+K) with focus trap and ARIA combobox; central shortcuts registry with `?` cheat sheet and `/` composer focus; debounce and throttle hooks; Mode 1 and Mode 2 ("type-the-name") destructive dialogs; reusable `DataTable` with sorting, column toggle, bulk action bar, and backend saved views; smart validation on blur/change; header role badges and internal source tags; custom 404 page with session search; autosave on document title editing.
   - **Skipped Patterns Justification:** Referral pages, onboarding telemetry capture, and upsell banners excluded with formal governance and regulatory privacy justification in `docs/PHASE15_NOTES.md`.
   - **Verification:** 56/56 Vitest tests passing; 278/278 pytest tests passing; 0 TypeScript errors; 0 WCAG AA accessibility violations; 16 responsive screenshots captured at 1440px and 390px in `docs/screenshots/phase15/`.
+- **Phase 16 & Addendum (Compliance Ledger & Reference-Driven Polish):**
+  - **Design System & Dual Themes:** First-class Warm Light (`#FAF7F2`–`#FFFFFF`) & Matte Dark (`#16171A`–`#23262C`) tonal depth surfaces with 3-level tinted shadows, `1px` inner highlights, `(8, 12, 16, 24)` px radii, self-hosted `Newsreader`, `IBM Plex Sans`, and `IBM Plex Mono` (`woff2`), calm motion (`120/200/320ms` + `prefers-reduced-motion`), and hashbyt.com + 9-spec reference language (with `docs/reference/ui-reference.png` disclosed absent).
+  - **Visual & Interactive Polish:** Real-data `<StatCard>` SVG rings/sparklines (`"No data yet"` fallback), `<PipelineStepper>`, interactive `<CitePin>` + hover/focus SVG dotted connector overlay, `<PipelineHeroSvg>` topology diagram, and unified `h-7` pills & `44px` control heights. Zero backend/RBAC/audit/cache edits.
+  - **Verification:** Vitest `67/67`, `tsc --noEmit` `0` errors, clean Turbopack build, `axe-core v4.14.0` `0` violations across `16` route/viewport/theme states + `4/4` keyboard flows, `7/7` valid mutant kills, `141/141` (`0.00%`) real-index leakage checks, `58` Light/Dark screenshots (`0` horizontal overflows), `pytest` `288 passed / 2 pre-existing data-count failures`.
 
 ---
 

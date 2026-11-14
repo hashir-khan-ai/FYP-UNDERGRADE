@@ -390,3 +390,11 @@ Harden the architecture for public release and peer review: cryptographic audit 
 7. [x] **A.7 Adversarial Red Team Evaluation:** Created `data/redteam.jsonl` with 45 cases across 5 categories and `scripts/eval_redteam.py`. 45/45 passed (100.0% defense pass rate).
 8. [x] **Section B Rigor:** Added paired bootstrap CIs in `src/evaluation/metrics.py` and adjacent comparison in `scripts/run_ablation.py`. Penned `docs/LIMITATIONS.md`.
 9. [x] **Section C Repository Quality:** Created `LICENSE`, `THIRD_PARTY.md`, `DATA.md`, `docs/RELATED_WORK.md`, `Dockerfile`, `docker-compose.yml`, `Makefile`, `.github/workflows/ci.yml`, `SECURITY.md`, `CONTRIBUTING.md`, `CITATION.cff`, and `README.md`. Clean secret scan across repo and git history.
+
+
+---
+
+## Phases 12–16: Verification Hardening, Streamlit Retirement, UX Patterns, & Compliance Ledger Polish [Completed]
+- [x] **Phases 12–14b:** Blind claim validation, Qdrant/BM25 atomic swap & ACL-versioned cache TTL, guard hardening, and 7-mutant matrix (`14/14` independent valid kills).
+- [x] **Phase 13 / Part B & Phase 15–15b:** Retired Streamlit (`src/ui/`), unified on Next.js 16 Compliance Desk, documented memory architecture (`docs/MEMORY_ARCHITECTURE.md`), shipped 12 enterprise UX patterns, CSV formula neutralization, saved views isolation, and CI hygiene tests.
+- [x] **Phase 16 & Addendum:** Delivered "The Compliance Ledger" visual/motion overhaul (first-class Warm Light + Dark themes, self-hosted `Newsreader` + `IBM Plex Sans/Mono`, `(8, 12, 16, 24)` radii + 3-level tinted shadows, `<StatCard>` SVG rings/sparklines, `<PipelineStepper>`, hover/focus citation SVG connector overlay, `<PipelineHeroSvg>`, `67/67` Vitest, `0` axe-core violations across 16 theme/viewport/route states). See [`docs/PHASE16_NOTES.md`](docs/PHASE16_NOTES.md).

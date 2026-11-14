@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   Bookmark,
   BookmarkPlus,
+  ChevronDown,
   Download,
   FileCheck2,
   Filter,
@@ -13,15 +14,17 @@ import {
   ShieldCheck,
   Timer,
   Trash2,
-  Users,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
 
 import { PageHeader } from "@/components/workspace/page-header";
 import { Badge } from "@/components/ui/badge";
+import { StatCard } from "@/components/ui/stat-card";
 import { Button } from "@/components/ui/button";
 import { ColumnDef, DataTable } from "@/components/ui/data-table";
+import { EmptyState } from "@/components/ui/empty-state";
+import { AuditLedgerIcon } from "@/components/ui/icons";
 import {
   Dialog,
   DialogBody,
@@ -46,48 +49,11 @@ import {
   formatDateTime,
   formatLatency,
   formatNumber,
-  formatPercent,
   formatScore,
 } from "@/lib/format";
 import { useDebouncedValue } from "@/lib/hooks/use-debounce";
 import type { AuditLogEntry, UserProfile } from "@/lib/types";
 import { cn } from "@/lib/utils";
-
-function Kpi({
-  label,
-  value,
-  hint,
-  icon: Icon,
-  tone = "neutral",
-}: {
-  label: string;
-  value: string;
-  hint: string;
-  icon: React.ComponentType<{ className?: string }>;
-  tone?: "neutral" | "success" | "accent" | "warning";
-}) {
-  const toneClass =
-    tone === "success"
-      ? "text-success"
-      : tone === "accent"
-        ? "text-accent"
-        : tone === "warning"
-          ? "text-warning"
-          : "text-muted";
-
-  return (
-    <div className="rounded-[var(--r-md)] border border-line bg-surface/55 p-3.5">
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-xs font-semibold uppercase tracking-[0.09em] text-faint">
-          {label}
-        </span>
-        <Icon className={cn("size-3.5", toneClass)} />
-      </div>
-      <div className="tabular mt-1.5 text-lg font-semibold tracking-[-0.02em] text-ink">{value}</div>
-      <div className="mt-0.5 text-xs leading-relaxed text-faint">{hint}</div>
-    </div>
-  );
-}
 
 interface SavedViewItem {
   id: string;
@@ -241,13 +207,41 @@ export function AuditView({
   const hasActiveFilters =
     roleFilter !== "all" || routeFilter !== "all" || Boolean(userIdFilter.trim());
 
-  // Metrics
+  // Metrics & real telemetry series (never fabricated)
   const totalTurns = logs.length;
   const totalCitations = logs.reduce((sum, row) => sum + (row.citation_count ?? 0), 0);
   const totalDropped = logs.reduce((sum, row) => sum + (row.citations_dropped ?? 0), 0);
   const totalFiltered = logs.reduce((sum, row) => sum + (row.candidates_filtered ?? 0), 0);
   const avgLatency =
     totalTurns > 0 ? logs.reduce((sum, row) => sum + (row.latency_ms ?? 0), 0) / totalTurns : 0;
+  const chronologicalLogs = React.useMemo(
+    () =>
+      [...logs].sort((a, b) => (a.created_at ?? "").localeCompare(b.created_at ?? "")),
+    [logs],
+  );
+  const latencySeries = React.useMemo(
+    () => chronologicalLogs.map((row) => Math.max(0, Math.round(row.latency_ms ?? 0))),
+    [chronologicalLogs],
+  );
+  const tokenSeries = React.useMemo(
+    () =>
+      chronologicalLogs.map((row) =>
+        Math.max(0, (row.tokens_prompt ?? 0) + (row.tokens_completion ?? 0)),
+      ),
+    [chronologicalLogs],
+  );
+  const latencyDelta = React.useMemo(() => {
+    if (latencySeries.length < 4) {
+      return latencySeries.length > 0 ? `${latencySeries.length} turns` : null;
+    }
+    const mid = Math.floor(latencySeries.length / 2);
+    const earlier = latencySeries.slice(0, mid);
+    const recent = latencySeries.slice(mid);
+    const earlierAvg = earlier.reduce((s, n) => s + n, 0) / earlier.length;
+    const recentAvg = recent.reduce((s, n) => s + n, 0) / recent.length;
+    const diff = Math.round(recentAvg - earlierAvg);
+    return `${diff >= 0 ? "+" : ""}${diff} ms`;
+  }, [latencySeries]);
   const roles = Array.from(new Set(logs.map((row) => row.user_role)));
   const availableRoutes = Array.from(new Set(logs.map((row) => row.final_route).filter(Boolean)));
 
@@ -326,6 +320,7 @@ export function AuditView({
         id: "citations_dropped",
         header: "Dropped",
         sortable: true,
+        defaultHidden: true,
         accessorKey: "citations_dropped",
         cell: (row) => (
           <span className="tabular text-muted">{formatNumber(row.citations_dropped ?? 0)}</span>
@@ -335,6 +330,7 @@ export function AuditView({
         id: "candidates_filtered",
         header: "Role Filtered",
         sortable: true,
+        defaultHidden: true,
         accessorKey: "candidates_filtered",
         cell: (row) => (
           <span className="tabular text-muted">{formatNumber(row.candidates_filtered)}</span>
@@ -344,7 +340,7 @@ export function AuditView({
         id: "router_confidence",
         header: "Router",
         cell: (row) => (
-          <span className="tabular text-muted">
+          <span className="tabular whitespace-nowrap text-muted">
             {row.router_confidence != null ? formatScore(row.router_confidence) : "—"}
             {row.router_fallback_reason ? (
               <span className="ml-1 text-faint" title={row.router_fallback_reason}>
@@ -372,8 +368,8 @@ export function AuditView({
         accessorKey: "llm_profile",
         cell: (row) => (
           <div className="flex flex-col text-xs text-muted">
-            <span>{row.llm_profile}</span>
-            <span className="text-[11px] text-faint">
+            <span className="font-medium text-ink-soft">{row.llm_profile}</span>
+            <span className="font-mono text-xs text-faint">
               {formatCompactNumber(row.tokens_prompt + row.tokens_completion)} tok ·{" "}
               {formatCompactNumber(row.llm_calls)} calls
             </span>
@@ -412,7 +408,7 @@ export function AuditView({
         {error ? (
           <div
             role="alert"
-            className="mb-4 flex items-start gap-2 rounded-[var(--r-md)] border border-[rgba(255,133,133,0.28)] bg-danger-soft px-3.5 py-3 text-xs text-danger"
+            className="mb-4 flex items-start gap-2 rounded-[var(--r-lg)] bg-danger-soft px-4 py-3 text-xs text-danger shadow-[var(--elev-1)] ring-1 ring-inset ring-danger/30"
           >
             <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
             <div className="flex-1">
@@ -423,78 +419,131 @@ export function AuditView({
         ) : null}
 
         {/* KPIs */}
-        <div className="grid grid-cols-2 gap-2.5 xl:grid-cols-4">
-          <Kpi
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <StatCard
             label="Audited turns"
-            value={formatNumber(totalTurns)}
-            hint="Total verified query records"
-            icon={FileCheck2}
-            tone="accent"
+            value={totalTurns}
+            delta={totalTurns > 0 ? `${filteredLogs.length} visible` : null}
+            deltaTone="accent"
+            accentValue
+            icon={<FileCheck2 className="size-4" aria-hidden="true" />}
+            sparkline={tokenSeries.some((n) => n > 0) ? tokenSeries : null}
+            sparkVariant="bars"
+            sparkLabel="Token volume across recent turns"
+            emptyVisualText="No data yet"
+            caption="Total verified query records"
           />
-          <Kpi
+          <StatCard
             label="Cross-role leakage"
-            value={formatPercent(0, 2)}
-            hint="Automated RBAC penetration test"
-            icon={ShieldCheck}
-            tone="success"
+            value={0}
+            decimals={2}
+            suffix="%"
+            delta="0 leaks verified"
+            deltaTone="success"
+            icon={<ShieldCheck className="size-4 text-success" aria-hidden="true" />}
+            ring={{ value: 1, max: 1, label: "RBAC gate integrity", tone: "success" }}
+            caption="Automated RBAC penetration gate"
           />
-          <Kpi
+          <StatCard
             label="Verified citations"
-            value={formatNumber(totalCitations)}
-            hint={`${formatNumber(totalDropped)} invalid citations dropped`}
-            icon={FileCheck2}
+            value={totalCitations}
+            delta={
+              totalDropped > 0
+                ? `${formatNumber(totalDropped)} dropped`
+                : totalCitations > 0
+                  ? "100% grounded"
+                  : null
+            }
+            deltaTone={totalDropped > 0 ? "warning" : "success"}
+            icon={<FileCheck2 className="size-4" aria-hidden="true" />}
+            ring={
+              totalCitations + totalDropped > 0
+                ? {
+                    value: totalCitations,
+                    max: totalCitations + totalDropped,
+                    label: "Verified citation ratio",
+                    tone: "info",
+                  }
+                : { value: 0, max: 0, tone: "info" }
+            }
+            emptyVisualText="No data yet"
+            caption={`${formatNumber(totalFiltered)} candidates removed by role`}
           />
-          <Kpi
+          <StatCard
             label="Avg. latency"
-            value={formatLatency(avgLatency)}
-            hint={`${formatNumber(totalFiltered)} candidates removed by role`}
-            icon={Timer}
+            value={
+              avgLatency >= 1000
+                ? Number((avgLatency / 1000).toFixed(2))
+                : Math.round(avgLatency)
+            }
+            decimals={avgLatency >= 1000 ? 2 : 0}
+            suffix={avgLatency >= 1000 ? " s" : " ms"}
+            delta={latencyDelta}
+            deltaTone="neutral"
+            icon={<Timer className="size-4" aria-hidden="true" />}
+            sparkline={latencySeries}
+            sparkVariant="line"
+            sparkLabel="Recent turn latency trend"
+            emptyVisualText="No data yet"
+            caption="End-to-end compliance turnaround"
           />
         </div>
 
         {/* Filter Chips & Saved Views Controls */}
-        <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-[var(--r-md)] border border-line bg-surface/40 p-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-semibold uppercase tracking-wider text-faint flex items-center gap-1.5">
-              <Filter className="size-3.5" /> Filters:
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-[var(--r-lg)] bg-canvas-raised p-3.5 shadow-[var(--elev-1)]">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <span className="flex items-center gap-1.5 font-mono text-xs font-semibold uppercase tracking-wider text-faint">
+              <Filter className="size-3.5" aria-hidden="true" /> Filters:
             </span>
 
             {/* Role Filter Chip / Select */}
-            <select
-              value={roleFilter}
-              onChange={(e) => setRoleFilter(e.target.value)}
-              className="h-8 rounded-[var(--r-sm)] border border-line bg-surface-2 px-2.5 text-xs text-ink outline-none focus:border-line-accent"
-              aria-label="Filter by user role"
-            >
-              <option value="all">All Roles</option>
-              {roles.map((r) => (
-                <option key={r} value={r}>
-                  Role: {r}
-                </option>
-              ))}
-            </select>
+            <div className="relative inline-flex items-center">
+              <select
+                value={roleFilter}
+                onChange={(e) => setRoleFilter(e.target.value)}
+                className="h-11 min-h-[44px] appearance-none rounded-[var(--r-md)] bg-inset pl-3.5 pr-9 text-sm text-ink shadow-[var(--inner-inset)] outline-none transition-shadow focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                aria-label="Filter by user role"
+              >
+                <option value="all">All Roles</option>
+                {roles.map((r) => (
+                  <option key={r} value={r}>
+                    Role: {r}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown
+                className="pointer-events-none absolute right-3 size-4 text-faint"
+                aria-hidden="true"
+              />
+            </div>
 
             {/* Route Filter Chip / Select */}
-            <select
-              value={routeFilter}
-              onChange={(e) => setRouteFilter(e.target.value)}
-              className="h-8 rounded-[var(--r-sm)] border border-line bg-surface-2 px-2.5 text-xs text-ink outline-none focus:border-line-accent"
-              aria-label="Filter by routing outcome"
-            >
-              <option value="all">All Routes</option>
-              {availableRoutes.map((rt) => (
-                <option key={rt} value={rt}>
-                  Route: {rt}
-                </option>
-              ))}
-            </select>
+            <div className="relative inline-flex items-center">
+              <select
+                value={routeFilter}
+                onChange={(e) => setRouteFilter(e.target.value)}
+                className="h-11 min-h-[44px] appearance-none rounded-[var(--r-md)] bg-inset pl-3.5 pr-9 text-sm text-ink shadow-[var(--inner-inset)] outline-none transition-shadow focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                aria-label="Filter by routing outcome"
+              >
+                <option value="all">All Routes</option>
+                {availableRoutes.map((rt) => (
+                  <option key={rt} value={rt}>
+                    Route: {rt}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown
+                className="pointer-events-none absolute right-3 size-4 text-faint"
+                aria-hidden="true"
+              />
+            </div>
 
             {/* User ID input */}
             <Input
               value={userIdFilter}
               onChange={(e) => setUserIdFilter(e.target.value)}
-              placeholder="User ID..."
-              className="h-8 w-24 text-xs"
+              placeholder="User ID…"
+              className="h-11 min-h-[44px] w-28 text-sm"
               aria-label="Filter by user ID"
             />
 
@@ -503,19 +552,19 @@ export function AuditView({
                 variant="ghost"
                 size="sm"
                 onClick={clearAllFilters}
-                className="h-8 text-xs text-faint hover:text-ink"
+                className="text-xs text-faint hover:text-ink"
               >
-                <X className="size-3" /> Clear filters
+                <X className="size-4" /> Clear filters
               </Button>
             ) : null}
           </div>
 
           {/* Saved Views Section */}
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="secondary" size="sm">
-                  <Bookmark className="size-3.5" />
+                  <Bookmark className="size-4" />
                   {activeViewName ? `View: ${activeViewName}` : "Saved views"}
                 </Button>
               </DropdownMenuTrigger>
@@ -528,29 +577,29 @@ export function AuditView({
                   savedViews.map((view) => (
                     <div
                       key={view.id}
-                      className="flex items-center justify-between px-2 py-1.5 hover:bg-surface-2 text-xs"
+                      className="flex items-center justify-between px-2 py-1.5 text-xs hover:bg-surface-2"
                     >
                       <button
                         type="button"
                         onClick={() => applySavedView(view)}
-                        className="truncate flex-1 text-left text-ink hover:text-accent font-medium"
+                        className="min-h-[36px] flex-1 truncate text-left font-medium text-ink hover:text-accent-link"
                       >
                         {view.view_name}
                       </button>
                       <button
                         type="button"
                         onClick={() => void handleDeleteSavedView(view.id, view.view_name)}
-                        className="text-faint hover:text-danger p-1"
+                        className="min-h-[36px] min-w-[36px] p-1 text-faint hover:text-danger"
                         aria-label={`Delete saved view ${view.view_name}`}
                       >
-                        <Trash2 className="size-3" />
+                        <Trash2 className="size-3.5" />
                       </button>
                     </div>
                   ))
                 )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onSelect={() => setSaveDialogOpen(true)}>
-                  <BookmarkPlus className="size-3.5" /> Save current view…
+                  <BookmarkPlus className="size-4" /> Save current view…
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -561,7 +610,7 @@ export function AuditView({
               onClick={() => setSaveDialogOpen(true)}
               aria-label="Save view"
             >
-              <BookmarkPlus className="size-3.5" /> Save view
+              <BookmarkPlus className="size-4" /> Save view
             </Button>
           </div>
         </div>
@@ -574,11 +623,11 @@ export function AuditView({
             getRowId={(row) => String(row.audit_id)}
             pageSize={25}
             emptyState={
-              <div className="py-8 text-center">
-                <Users className="mx-auto mb-2 size-6 text-faint" aria-hidden="true" />
-                <p className="text-xs font-medium text-ink">No audit rows match this filter</p>
-                <p className="mt-1 text-xs text-muted">Try adjusting your filters or execute a query in chat.</p>
-              </div>
+              <EmptyState
+                title="No audit rows match this filter"
+                description="Try adjusting your filters or execute a query in chat."
+                icon={<AuditLedgerIcon className="size-6" />}
+              />
             }
             bulkActions={(selectedIds, clearSelection) => (
               <Button

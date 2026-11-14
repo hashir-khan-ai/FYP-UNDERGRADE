@@ -406,7 +406,7 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    questions = load_gold_set(args.gold_set)
+    questions = load_gold_set(args.gold_set, include_rejected=False)
     human_reviewed_count = sum(
         1 for q in questions if getattr(q, "status", None) == "reviewed" and getattr(q, "reviewed_by", None) == "human"
     )

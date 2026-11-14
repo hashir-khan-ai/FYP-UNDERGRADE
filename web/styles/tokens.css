@@ -1,115 +1,206 @@
 /* ============================================================================
-   Design tokens — Enterprise Regulatory Compliance Workspace
-   Apple HIG-inspired banking palette. All values are semantic and AA-checked.
+   Design tokens — "The Compliance Ledger" (Phase 16 Addendum: Reference Polish)
+   Strict 60 / 30 / 10 institutional distribution across Light & Dark themes:
+     - First-class Warm Cream Light mode (#FAF7F2 -> #F3EFE7 -> #FFFFFF -> #F6F3EC)
+     - Matte Obsidian Dark mode (#16171A -> #1D1F24 -> #23262C -> #191B1F)
+     - Single accent: Safety Orange (#FF5F00) + WCAG-AA text accent tokens
+   Every foreground/background & soft-pill pair verified >= WCAG AA 4.5:1.
    ========================================================================== */
 
-:root {
+:root,
+:root[data-theme="dark"] {
   color-scheme: dark;
 
-  /* Surfaces: deep navy-charcoal, not pure black */
-  --canvas: #070b11;
-  --canvas-raised: #090e15;
-  --surface: #0d131c;
-  --surface-2: #111925;
-  --surface-3: #162130;
-  --surface-glass: rgba(13, 19, 28, 0.78);
-  --surface-hover: rgba(158, 182, 214, 0.06);
-  --surface-active: rgba(120, 169, 255, 0.1);
+  /* 60% Primary Canvas -> Layered Tonal Surfaces (no hard borders) */
+  --canvas: #16171A;
+  --canvas-raised: #1D1F24;
+  --surface: #23262C;
+  --surface-2: #2B2F36;
+  --surface-3: #343942;
+  --surface-inset: #191B1F;
+  --surface-glass: rgba(22, 23, 26, 0.88);
+  --surface-hover: rgba(241, 243, 244, 0.055);
+  --surface-active: rgba(255, 95, 0, 0.14);
 
-  /* Hairlines */
-  --line: rgba(164, 184, 212, 0.12);
-  --line-strong: rgba(164, 184, 212, 0.22);
-  --line-accent: rgba(120, 169, 255, 0.36);
+  /* Quiet Tonal Edges & Optional Hairlines */
+  --storm: #5A6068;
+  --line: rgba(241, 243, 244, 0.08);
+  --line-strong: rgba(241, 243, 244, 0.16);
+  --line-accent: rgba(255, 138, 71, 0.45);
+  --inner-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.075), inset 0 0 0 1px rgba(255, 255, 255, 0.035);
+  --inner-inset: inset 0 1px 3px rgba(0, 0, 0, 0.36), inset 0 0 0 1px rgba(241, 243, 244, 0.08);
 
-  /* Text */
-  --ink: #f3f6fa;
-  --ink-soft: #d9e1eb;
-  --muted: #a4afbf;
-  --faint: #7f8b9d;
+  /* Typography Ink (verified >= 4.5:1 against canvas, panel, card, inset) */
+  --ink: #F1F3F4;
+  --ink-soft: #DCE0E5;
+  --muted: #B6BCC4;
+  --faint: #98A0AA;
 
-  /* Accents */
-  --accent: #78a9ff;
-  --accent-strong: #4f8df7;
-  --accent-ink: #06101d;
-  --accent-soft: rgba(120, 169, 255, 0.12);
-  --teal: #54d6c4;
-  --teal-soft: rgba(84, 214, 196, 0.12);
+  /* 10% Accent: Safety Orange */
+  --accent: #FF5F00;
+  --accent-strong: #EA5600;
+  --accent-ink: #16171A;
+  --accent-link: #FF8A47;
+  --accent-soft: rgba(255, 95, 0, 0.14);
+  --accent-soft-hover: rgba(255, 95, 0, 0.22);
 
-  /* Semantic */
-  --success: #56d99b;
-  --success-soft: rgba(86, 217, 155, 0.12);
-  --warning: #f0c36a;
-  --warning-soft: rgba(240, 195, 106, 0.12);
-  --danger: #ff8585;
-  --danger-soft: rgba(255, 133, 133, 0.1);
-  --info: #83c9ff;
-  --info-soft: rgba(131, 201, 255, 0.12);
-  --non-grounded: #c1a8ff;
-  --non-grounded-soft: rgba(193, 168, 255, 0.12);
+  /* Semantic Status (calibrated for >= 5.0:1 across cards & soft pills) */
+  --teal: #58D6B8;
+  --teal-soft: rgba(88, 214, 184, 0.14);
+  --success: #5EE09E;
+  --success-soft: rgba(94, 224, 158, 0.14);
+  --warning: #F5B841;
+  --warning-soft: rgba(245, 184, 65, 0.14);
+  --danger: #FF8585;
+  --danger-soft: rgba(255, 133, 133, 0.14);
+  --danger-border: rgba(255, 133, 133, 0.34);
+  --info: #8DCBFF;
+  --info-soft: rgba(141, 203, 255, 0.14);
+  --non-grounded: #D1B8FF;
+  --non-grounded-soft: rgba(209, 184, 255, 0.14);
 
-  /* Typography: rem scale anchored at 16px base, labels >= 13px, body 16-17px */
-  --type-ui: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
-    "Helvetica Neue", Arial, sans-serif;
-  --type-mono: "SF Mono", ui-monospace, Menlo, Monaco, Consolas, monospace;
-  --text-2xs: 0.8125rem; /* 13px: strictly enforces minimum accessible label size */
-  --text-xs: 0.8125rem;  /* 13px: labels and captions */
-  --text-sm: 0.875rem;   /* 14px: secondary text */
-  --text-base: clamp(1rem, 0.96rem + 0.2vw, 1.0625rem); /* 16-17px: body */
+  /* Normalized Aliases */
+  --surface-primary: var(--surface);
+  --surface-muted: var(--surface-2);
+  --text-primary: var(--ink);
+  --text-secondary: var(--ink-soft);
+  --text-muted: var(--faint);
+  --border-subtle: var(--line);
+  --accent-primary: var(--accent);
+  --status-danger: var(--danger);
+  --status-danger-subtle: var(--danger-soft);
+  --status-danger-border: var(--danger-border);
+
+  /* Editorial & UI Type Stacks (self-hosted local .woff2 via next/font/local) */
+  --type-serif: var(--font-newsreader), Georgia, "Times New Roman", serif;
+  --type-ui: var(--font-ibm-sans), "Helvetica Neue", Arial, sans-serif;
+  --type-mono: var(--font-ibm-mono), ui-monospace, Menlo, Consolas, monospace;
+
+  /* Fluid Type Scale: 16px root, strict >= 13px minimum label floor */
+  --text-2xs: 0.8125rem; /* 13px */
+  --text-xs: 0.8125rem;  /* 13px */
+  --text-sm: 0.875rem;   /* 14px */
+  --text-base: clamp(1rem, 0.96rem + 0.2vw, 1.0625rem); /* 16-17px */
   --text-md: 1.0625rem;  /* 17px */
-  --text-lg: clamp(1.125rem, 1.05rem + 0.35vw, 1.25rem);
-  --text-xl: clamp(1.375rem, 1.25rem + 0.5vw, 1.5rem);
-  --text-2xl: clamp(1.75rem, 1.5rem + 0.8vw, 2rem);
-  --text-3xl: clamp(2.25rem, 1.9rem + 1.2vw, 2.6rem);
-  --text-4xl: clamp(2.75rem, 2.2rem + 1.8vw, 3.25rem);
+  --text-lg: clamp(1.125rem, 1.06rem + 0.32vw, 1.25rem);
+  --text-xl: clamp(1.375rem, 1.25rem + 0.5vw, 1.5625rem);
+  --text-2xl: clamp(1.75rem, 1.5rem + 0.9vw, 2.25rem);
+  --text-3xl: clamp(2.125rem, 1.8rem + 1.3vw, 2.75rem);
+  --text-4xl: clamp(2.5rem, 2.1rem + 1.8vw, 3.375rem);
 
   /* Line heights */
-  --lh-tight: 1.25;
-  --lh-snug: 1.375;
+  --lh-tight: 1.2;
+  --lh-snug: 1.35;
   --lh-body: 1.6;
   --lh-relaxed: 1.65;
 
-  /* Spacing rhythm: 4pt */
-  --space-1: 0.25rem;
-  --space-2: 0.5rem;
-  --space-3: 0.75rem;
-  --space-4: 1rem;
-  --space-5: 1.25rem;
-  --space-6: 1.5rem;
-  --space-8: 2rem;
-  --space-10: 2.5rem;
-  --space-12: 3rem;
-  --space-16: 4rem;
-  --space-20: 5rem;
+  /* Strict 8px spacing scale */
+  --space-0-5: 0.25rem; /* 4px */
+  --space-1: 0.5rem;    /* 8px */
+  --space-2: 1rem;      /* 16px */
+  --space-3: 1.5rem;    /* 24px */
+  --space-4: 2rem;      /* 32px */
+  --space-5: 2.5rem;    /* 40px */
+  --space-6: 3rem;      /* 48px */
+  --space-8: 4rem;      /* 64px */
+  --space-10: 5rem;     /* 80px */
+  --space-12: 6rem;     /* 96px */
 
-  /* Radii */
-  --r-xs: 0.375rem;
-  --r-sm: 0.5rem;
-  --r-md: 0.75rem;
-  --r-lg: 1rem;
-  --r-xl: 1.25rem;
-  --r-2xl: 1.5rem;
-  --r-pill: 999px;
+  /* Shape Radius Scale: strictly (8, 12, 16, 24) */
+  --r-xs: 0.5rem;   /* 8px (minimum square component radius) */
+  --r-sm: 0.5rem;   /* 8px — compact controls, chips, kbd */
+  --r-md: 0.75rem;  /* 12px — standard buttons, inputs, insets */
+  --r-lg: 1rem;     /* 16px — panels, stat cards, citation cards */
+  --r-xl: 1.5rem;   /* 24px — hero surfaces, floating dialogs, showcase cards */
+  --r-pill: 9999px;
 
-  /* Elevation */
-  --elev-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
-  --elev-md: 0 8px 24px rgba(0, 0, 0, 0.28);
-  --elev-lg: 0 24px 64px rgba(0, 0, 0, 0.42);
-  --elev-accent: 0 8px 28px rgba(79, 141, 247, 0.18);
-  --inset-top: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  /* 3-Level Surface-Tinted Depth Scale + 1px Inner Highlight */
+  --elev-1: 0 2px 10px -2px rgba(4, 5, 8, 0.36), 0 1px 2px rgba(4, 5, 8, 0.24), var(--inner-highlight);
+  --elev-2: 0 14px 36px -8px rgba(3, 4, 6, 0.5), 0 4px 12px -2px rgba(3, 4, 6, 0.3), var(--inner-highlight);
+  --elev-3: 0 26px 60px -12px rgba(2, 3, 5, 0.64), 0 10px 24px -4px rgba(2, 3, 5, 0.4), var(--inner-highlight);
+  --elev-sm: var(--elev-1);
+  --elev-md: var(--elev-2);
+  --elev-lg: var(--elev-3);
+  --elev-floating: var(--elev-3);
+  --elev-accent: 0 6px 20px -4px rgba(255, 95, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  --inset-top: inset 0 1px 0 rgba(255, 255, 255, 0.07);
 
-  /* Motion */
-  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
-  --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
+  /* Centralized Calm Motion Tokens (120 / 200 / 320 ms) */
+  --ease-standard: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-emphasized: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out: var(--ease-standard);
+  --ease-spring: var(--ease-emphasized);
   --duration-fast: 120ms;
-  --duration-base: 180ms;
-  --duration-slow: 240ms;
+  --duration-base: 200ms;
+  --duration-slow: 320ms;
 
-  /* Layout: 880-960px chat column with clamp scaling (minimum never exceeds 100% of viewport) */
-  --sidebar-width: 300px;
-  --sidebar-collapsed: 76px;
-  --reading-width: clamp(min(100%, 880px), 62vw, 960px);
-  --content-width: clamp(min(100%, 1080px), 80vw, 1280px);
-  --tap-min: 44px; /* WCAG AA tap target size minimum */
+  /* Layout grid & typographic reading measures */
+  --sidebar-width: 288px;
+  --sidebar-collapsed: 72px;
+  --reading-measure: 68ch;
+  --reading-width: clamp(min(100%, 880px), 66vw, 1080px);
+  --content-width: clamp(min(100%, 1120px), 84vw, 1344px);
+  --tap-min: 44px;
+}
+
+/* First-Class Warm Light Theme (Cream canvas -> Tinted panels -> Pure white insets/cards) */
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --canvas: #FAF7F2;
+  --canvas-raised: #F3EFE7;
+  --surface: #FFFFFF;
+  --surface-2: #EFEAE1;
+  --surface-3: #E6DFD4;
+  --surface-inset: #F6F3EC;
+  --surface-glass: rgba(250, 247, 242, 0.88);
+  --surface-hover: rgba(25, 26, 29, 0.045);
+  --surface-active: rgba(255, 95, 0, 0.11);
+
+  --storm: #575C64;
+  --line: rgba(38, 34, 28, 0.08);
+  --line-strong: rgba(38, 34, 28, 0.16);
+  --line-accent: rgba(155, 52, 0, 0.35);
+  --inner-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.94), inset 0 0 0 1px rgba(46, 38, 28, 0.055);
+  --inner-inset: inset 0 1px 2px rgba(46, 38, 28, 0.06), inset 0 0 0 1px rgba(46, 38, 28, 0.09);
+
+  --ink: #191A1D;
+  --ink-soft: #26292E;
+  --muted: #494D54;
+  --faint: #575C64;
+
+  /* Vivid Safety Orange CTA (#FF5F00 + #16171A ink = 5.88:1 AA) + #9B3400 text links (6.81:1 AA) */
+  --accent: #FF5F00;
+  --accent-strong: #EA5600;
+  --accent-ink: #16171A;
+  --accent-link: #9B3400;
+  --accent-soft: rgba(255, 95, 0, 0.12);
+  --accent-soft-hover: rgba(255, 95, 0, 0.2);
+
+  /* All semantic foregrounds verified >= 5.4:1 against soft pills AND white/cream cards */
+  --teal: #0B5E50;
+  --teal-soft: rgba(11, 94, 80, 0.11);
+  --success: #0C5C36;
+  --success-soft: rgba(12, 92, 54, 0.11);
+  --warning: #7A4600;
+  --warning-soft: rgba(122, 70, 0, 0.11);
+  --danger: #A31D14;
+  --danger-soft: rgba(163, 29, 20, 0.1);
+  --danger-border: rgba(163, 29, 20, 0.28);
+  --info: #124E9E;
+  --info-soft: rgba(18, 78, 158, 0.11);
+  --non-grounded: #5B2CA0;
+  --non-grounded-soft: rgba(91, 44, 160, 0.11);
+
+  --elev-1: 0 2px 10px -2px rgba(56, 42, 24, 0.06), 0 1px 3px rgba(56, 42, 24, 0.035), var(--inner-highlight);
+  --elev-2: 0 12px 32px -6px rgba(56, 42, 24, 0.095), 0 4px 12px -2px rgba(56, 42, 24, 0.045), var(--inner-highlight);
+  --elev-3: 0 24px 56px -12px rgba(45, 34, 20, 0.15), 0 8px 20px -4px rgba(45, 34, 20, 0.06), var(--inner-highlight);
+  --elev-sm: var(--elev-1);
+  --elev-md: var(--elev-2);
+  --elev-lg: var(--elev-3);
+  --elev-floating: var(--elev-3);
+  --elev-accent: 0 6px 20px -4px rgba(255, 95, 0, 0.26), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  --inset-top: inset 0 1px 0 rgba(255, 255, 255, 0.85);
 }
 
 @media (prefers-reduced-motion: reduce) {

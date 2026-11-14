@@ -24,7 +24,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from src.config import settings
-from src.core.llm_client import LLMClientError, ResilientLLMClient
+from src.core.llm_client import LLMAuthError, LLMClientError, ResilientLLMClient
 from src.core.prompts import load_prompt
 from src.core.spend_guard import spend_guard
 
@@ -420,6 +420,8 @@ def classify_question(
             step="router",
             session_id=session_id,
         )
+    except LLMAuthError:
+        raise
     except LLMClientError:
         elapsed = (time.perf_counter() - start) * 1000.0
         logger.warning("Router JSON invalid after one repair retry; using SINGLE_SEARCH.")

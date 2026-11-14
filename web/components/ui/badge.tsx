@@ -4,19 +4,19 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const badgeVariants = cva(
-  "inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-0.5 text-xs font-medium leading-5 tracking-[0.01em] [&_svg]:size-3.5",
+  "inline-flex h-7 items-center gap-1.5 whitespace-nowrap rounded-full px-3 text-xs font-medium leading-none tracking-[0.01em] ring-1 ring-inset [&_svg]:size-3.5",
   {
     variants: {
       tone: {
-        neutral: "border-line bg-surface-2 text-muted",
-        accent: "border-[rgba(120,169,255,0.3)] bg-accent-soft text-accent",
-        success: "border-[rgba(86,217,155,0.28)] bg-success-soft text-success",
-        warning: "border-[rgba(240,195,106,0.28)] bg-warning-soft text-warning",
-        danger: "border-[rgba(255,133,133,0.3)] bg-danger-soft text-danger",
-        info: "border-[rgba(131,201,255,0.28)] bg-info-soft text-info",
+        neutral: "bg-surface-2 text-muted ring-line",
+        accent: "bg-accent-soft text-accent-link ring-line-accent",
+        success: "bg-success-soft text-success ring-success/25",
+        warning: "bg-warning-soft text-warning ring-warning/25",
+        danger: "bg-danger-soft text-danger ring-danger/28",
+        info: "bg-info-soft text-info ring-info/25",
         nonGrounded:
-          "border-[rgba(193,168,255,0.3)] bg-nongrounded-soft text-nongrounded",
-        outline: "border-line-strong bg-transparent text-ink-soft",
+          "bg-nongrounded-soft text-nongrounded ring-nongrounded/25",
+        outline: "bg-surface text-ink-soft ring-line-strong",
       },
     },
     defaultVariants: { tone: "neutral" },

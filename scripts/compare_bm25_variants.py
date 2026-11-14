@@ -38,7 +38,7 @@ def run_bm25_comparison(
     if not indexer.load():
         raise RuntimeError(f"Failed to load BM25 index from {settings.BM25_INDEX_PATH}. Index corpus first.")
 
-    questions = load_gold_set(gold_path)
+    questions = load_gold_set(gold_path, include_rejected=False)
     human_reviewed = [
         q for q in questions
         if getattr(q, "status", None) == "reviewed" and getattr(q, "reviewed_by", None) == "human"

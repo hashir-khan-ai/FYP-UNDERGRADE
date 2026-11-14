@@ -44,18 +44,18 @@ export function ShortcutsSheet({ open, onOpenChange }: ShortcutsSheetProps) {
                 <h4 className="text-xs font-semibold uppercase tracking-[0.08em] text-faint">
                   {cat}
                 </h4>
-                <div className="rounded-[var(--r-sm)] border border-line bg-surface/50 p-2 space-y-1.5">
+                <div className="space-y-1.5 rounded-[var(--r-md)] bg-canvas-raised p-2.5 shadow-[var(--inner-inset)]">
                   {items.map((shortcut) => (
                     <div
                       key={shortcut.id}
-                      className="flex items-center justify-between text-xs py-1 px-1.5"
+                      className="flex items-center justify-between px-2 py-1.5 text-xs"
                     >
                       <span className="text-muted">{shortcut.label}</span>
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1.5">
                         {shortcut.displayKeys.map((k, i) => (
                           <kbd
                             key={i}
-                            className="rounded border border-line-strong bg-surface-2 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-ink"
+                            className="kbd"
                           >
                             {k}
                           </kbd>

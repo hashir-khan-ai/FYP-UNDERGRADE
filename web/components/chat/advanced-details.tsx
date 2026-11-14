@@ -9,6 +9,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { Badge } from "@/components/ui/badge";
+import { PipelineStepper, buildPipelineStages } from "@/components/chat/pipeline-stepper";
 import { formatCompactNumber, formatLatency, formatScore } from "@/lib/format";
 import type { Message } from "@/lib/types";
 
@@ -30,6 +31,10 @@ export function AdvancedDetails({ message }: { message: Message }) {
   const timings = metadata.timings ?? {};
   const trace = metadata.reasoning_trace ?? [];
   const router = metadata.router;
+  const stageTimings: Record<string, number> = {
+    ...(router?.latency_ms != null ? { route_ms: router.latency_ms } : {}),
+    ...timings,
+  };
 
   return (
     <Collapsible>
@@ -42,8 +47,16 @@ export function AdvancedDetails({ message }: { message: Message }) {
         Pipeline details
       </CollapsibleTrigger>
       <CollapsibleContent className="mt-2 data-[state=open]:animate-enter">
-        <div className="rounded-[var(--r-md)] border border-line bg-[rgba(3,6,10,0.3)] p-3">
-          <div className="mb-2 flex flex-wrap gap-1.5">
+        <div className="space-y-4 rounded-[var(--r-lg)] bg-surface p-4 shadow-[var(--elev-1)]">
+          <PipelineStepper
+            compact
+            stages={buildPipelineStages({
+              mode: "completed",
+              routeUsed: message.route_used ?? router?.route,
+              timings: stageTimings,
+            })}
+          />
+          <div className="flex flex-wrap gap-1.5">
             <Badge tone="outline">{message.route_used ?? "unknown route"}</Badge>
             {metadata.intent_mode ? <Badge tone="neutral">intent: {metadata.intent_mode}</Badge> : null}
             {metadata.response_type ? (

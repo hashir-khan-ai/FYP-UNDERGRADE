@@ -12,10 +12,18 @@ export function ProgressiveAnswer({
   text,
   animate,
   onDone,
+  citationCount,
+  activeCiteIndex,
+  onHoverCite,
+  onJumpCite,
 }: {
   text: string;
   animate: boolean;
   onDone?: () => void;
+  citationCount?: number;
+  activeCiteIndex?: number | null;
+  onHoverCite?: (index: number | null) => void;
+  onJumpCite?: (index: number) => void;
 }) {
   const [visible, setVisible] = React.useState(() => (animate ? 0 : text.length));
   const doneRef = React.useRef(onDone);
@@ -56,7 +64,14 @@ export function ProgressiveAnswer({
 
   return (
     <div className={streaming ? "streaming-caret" : undefined} aria-busy={streaming}>
-      <Markdown>{text.slice(0, visible)}</Markdown>
+      <Markdown
+        citationCount={citationCount}
+        activeCiteIndex={activeCiteIndex}
+        onHoverCite={onHoverCite}
+        onJumpCite={onJumpCite}
+      >
+        {text.slice(0, visible)}
+      </Markdown>
     </div>
   );
 }

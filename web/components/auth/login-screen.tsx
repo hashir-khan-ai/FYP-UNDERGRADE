@@ -10,14 +10,17 @@ import {
   FileCheck2,
   LoaderCircle,
   LockKeyhole,
+  Moon,
   ShieldCheck,
   Sparkles,
+  Sun,
   TriangleAlert,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { toast } from "sonner";
 
 import { Logo } from "@/components/brand/logo";
+import { useTheme } from "@/components/providers/theme-provider";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -49,7 +52,7 @@ function Feature({
 }) {
   return (
     <div className="flex gap-3">
-      <span className="mt-0.5 inline-flex size-8 shrink-0 items-center justify-center rounded-[var(--r-sm)] border border-line bg-surface-2 text-accent">
+      <span className="mt-0.5 inline-flex size-9 shrink-0 items-center justify-center rounded-[var(--r-md)] bg-surface text-accent-link shadow-[var(--elev-1)]">
         <Icon className="size-4" aria-hidden="true" />
       </span>
       <div>
@@ -62,6 +65,7 @@ function Feature({
 
 export function LoginScreen({ health }: { health: HealthResponse | null }) {
   const router = useRouter();
+  const { theme, toggleTheme } = useTheme();
   const [username, setUsername] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [usernameTouched, setUsernameTouched] = React.useState(false);
@@ -128,30 +132,42 @@ export function LoginScreen({ health }: { health: HealthResponse | null }) {
   }
 
   return (
-    <div className="relative min-h-dvh overflow-hidden">
+    <main className="relative min-h-dvh overflow-x-clip">
       <div className="app-atmosphere" aria-hidden="true" />
       <div className="mx-auto grid min-h-dvh w-full max-w-6xl items-center gap-8 px-4 py-8 sm:px-6 lg:grid-cols-[1.05fr_0.95fr] lg:gap-12 lg:py-10">
-        <section className="order-2 lg:order-1">
-          <Logo showWordmark />
-          <Badge tone="accent" className="mt-6">
-            <Sparkles /> Local-first regulatory intelligence
-          </Badge>
-          <h1 className="mt-3 max-w-xl text-[2rem] font-semibold leading-[1.08] tracking-[-0.035em] text-ink sm:text-[2.5rem]">
-            Regulatory answers you can defend.
-          </h1>
-          <p className="mt-3 max-w-lg text-sm leading-relaxed text-muted">
-            A compliance workspace that retrieves only what your role may read, verifies every
-            citation, and refuses when the corpus does not support an answer.
-          </p>
-
-          <div className="mt-6 rounded-[var(--r-lg)] border border-line bg-[rgba(3,6,10,0.3)] p-3.5">
-            <TrustMap />
-            <p className="mt-1.5 text-center text-xs text-faint">
-              Corpus → role gate → relevance grader → verified answer or safe refusal
+        <section className="order-2 space-y-6 lg:order-1">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <Logo showWordmark className="hidden lg:inline-flex" />
+            <div className="flex items-center gap-2">
+              <Badge tone="accent">
+                <Sparkles /> Local-first intelligence
+              </Badge>
+              <Button
+                variant="secondary"
+                size="icon-sm"
+                onClick={toggleTheme}
+                aria-label={theme === "light" ? "Switch to dark theme" : "Switch to light theme"}
+                aria-pressed={theme === "light"}
+                title={theme === "light" ? "Switch to dark theme" : "Switch to light theme"}
+                className="hidden lg:inline-flex"
+              >
+                {theme === "light" ? <Moon className="size-4" /> : <Sun className="size-4" />}
+              </Button>
+            </div>
+          </div>
+          <div>
+            <h1 className="max-w-xl font-display text-[clamp(2rem,3.6vw,2.75rem)] font-semibold leading-[1.08] tracking-[-0.025em] text-ink">
+              Regulatory answers you can defend.
+            </h1>
+            <p className="mt-3 max-w-lg text-sm leading-relaxed text-muted sm:text-base">
+              A compliance workspace that retrieves only what your role may read, verifies every
+              citation, and refuses when the corpus does not support an answer.
             </p>
           </div>
 
-          <div className="mt-6 grid gap-3 sm:grid-cols-3">
+          <TrustMap />
+
+          <div className="grid gap-4 sm:grid-cols-3">
             <Feature
               icon={ShieldCheck}
               title="Role gate first"
@@ -171,10 +187,22 @@ export function LoginScreen({ health }: { health: HealthResponse | null }) {
         </section>
 
         <section className="order-1 lg:order-2" aria-labelledby="sign-in-heading">
-          <div className="rounded-[var(--r-xl)] border border-line-strong bg-canvas-raised/92 p-5 shadow-[var(--elev-lg)] sm:p-6">
-            <div className="flex items-center justify-between gap-2">
+          <div className="mb-5 flex items-center justify-between gap-3 lg:hidden">
+            <Logo showWordmark />
+            <Button
+              variant="secondary"
+              size="icon-sm"
+              onClick={toggleTheme}
+              aria-label={theme === "light" ? "Switch to dark theme" : "Switch to light theme"}
+              aria-pressed={theme === "light"}
+            >
+              {theme === "light" ? <Moon className="size-4" /> : <Sun className="size-4" />}
+            </Button>
+          </div>
+          <div className="rounded-[var(--r-xl)] bg-surface p-6 shadow-[var(--elev-3)] sm:p-7">
+            <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <h2 id="sign-in-heading" className="text-base font-semibold tracking-[-0.02em] text-ink">
+                <h2 id="sign-in-heading" className="font-display text-xl font-semibold tracking-[-0.02em] text-ink">
                   Sign in to the workspace
                 </h2>
                 <p className="mt-1 text-xs leading-relaxed text-muted">
@@ -183,7 +211,7 @@ export function LoginScreen({ health }: { health: HealthResponse | null }) {
               </div>
               <Badge tone={healthy ? "success" : "warning"}>
                 <span
-                  className={cn("size-1.5 rounded-full", healthy ? "bg-success" : "bg-warning")}
+                  className={cn("size-2 rounded-full", healthy ? "bg-success" : "bg-warning")}
                   aria-hidden="true"
                 />
                 {healthy ? "API online" : "API offline"}
@@ -191,10 +219,10 @@ export function LoginScreen({ health }: { health: HealthResponse | null }) {
             </div>
 
             <div className="mt-5">
-              <p className="mb-2 text-xs font-semibold uppercase tracking-[0.08em] text-faint">
+              <p className="mb-2.5 font-mono text-xs font-semibold uppercase tracking-[0.08em] text-faint">
                 Quick-fill a persona
               </p>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-3 gap-2.5">
                 {PERSONAS.map((persona) => {
                   const selected = selectedPersona === persona.username;
                   return (
@@ -204,10 +232,10 @@ export function LoginScreen({ health }: { health: HealthResponse | null }) {
                       aria-pressed={selected}
                       onClick={() => fillPersona(persona)}
                       className={cn(
-                        "flex min-h-[52px] flex-col items-center gap-1.5 rounded-[var(--r-md)] border px-2.5 py-2.5 text-center transition-[border-color,background-color,transform] duration-[var(--duration-fast)] hover:-translate-y-0.5",
+                        "flex min-h-[68px] flex-col items-center gap-1.5 rounded-[var(--r-md)] px-2.5 py-3 text-center transition-[background-color,box-shadow,transform] duration-[var(--duration-fast)] hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
                         selected
-                          ? "border-line-accent bg-accent-soft"
-                          : "border-line bg-surface-2/50 hover:border-line-strong",
+                          ? "bg-accent-soft ring-1 ring-inset ring-line-accent shadow-[var(--elev-1)]"
+                          : "bg-inset shadow-[var(--inner-inset)] hover:bg-surface-2",
                       )}
                       title={persona.scope}
                     >
@@ -218,13 +246,13 @@ export function LoginScreen({ health }: { health: HealthResponse | null }) {
                   );
                 })}
               </div>
-              <p className="mt-2 text-xs leading-relaxed text-faint">
+              <p className="mt-2.5 text-xs leading-relaxed text-faint">
                 Quick-fill sets the username only. Enter the synthetic demo password from the project
                 runbook — it is deliberately not embedded in client code.
               </p>
             </div>
 
-            <form onSubmit={submit} className="mt-5 space-y-3.5" noValidate>
+            <form onSubmit={submit} className="mt-5 space-y-4" noValidate>
               <div>
                 <Label htmlFor="username">Username</Label>
                 <Input
@@ -240,7 +268,7 @@ export function LoginScreen({ health }: { health: HealthResponse | null }) {
                   }}
                   onBlur={() => setUsernameTouched(true)}
                   placeholder="analyst_user"
-                  className={cn("mt-1.5", usernameError && "border-danger focus:border-danger")}
+                  className={cn("mt-1.5 min-h-[44px]", usernameError && "border-danger focus:border-danger")}
                   aria-invalid={Boolean(usernameError)}
                   aria-describedby={
                     usernameError ? "username-error" : roleHint ? "role-hint" : undefined
@@ -249,7 +277,7 @@ export function LoginScreen({ health }: { health: HealthResponse | null }) {
                   required
                 />
                 {usernameError ? (
-                  <p id="username-error" className="mt-1 text-xs text-danger font-medium">
+                  <p id="username-error" className="mt-1 text-xs font-medium text-danger">
                     {usernameError}
                   </p>
                 ) : roleHint ? (
@@ -265,11 +293,11 @@ export function LoginScreen({ health }: { health: HealthResponse | null }) {
                   <button
                     type="button"
                     onClick={() => setShowPassword((current) => !current)}
-                    className="inline-flex min-h-[36px] items-center gap-1.5 px-1 text-xs text-faint transition-colors hover:text-ink"
+                    className="inline-flex min-h-[44px] items-center gap-1.5 px-2 text-xs text-faint transition-colors hover:text-ink"
                     aria-label={showPassword ? "Hide password" : "Show password"}
                     aria-pressed={showPassword}
                   >
-                    {showPassword ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+                    {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                     {showPassword ? "Hide" : "Show"}
                   </button>
                 </div>
@@ -286,14 +314,14 @@ export function LoginScreen({ health }: { health: HealthResponse | null }) {
                   }}
                   onBlur={() => setPasswordTouched(true)}
                   placeholder="Synthetic demo password"
-                  className={cn("mt-1.5", passwordError && "border-danger focus:border-danger")}
+                  className={cn("mt-1.5 min-h-[44px]", passwordError && "border-danger focus:border-danger")}
                   aria-invalid={Boolean(passwordError)}
                   aria-describedby={passwordError ? "password-error" : undefined}
                   disabled={submitting}
                   required
                 />
                 {passwordError ? (
-                  <p id="password-error" className="mt-1 text-xs text-danger font-medium">
+                  <p id="password-error" className="mt-1 text-xs font-medium text-danger">
                     {passwordError}
                   </p>
                 ) : null}
@@ -302,9 +330,9 @@ export function LoginScreen({ health }: { health: HealthResponse | null }) {
               {error ? (
                 <div
                   role="alert"
-                  className="flex items-start gap-2 rounded-[var(--r-sm)] border border-[rgba(255,133,133,0.28)] bg-danger-soft px-3 py-2.5 text-xs leading-relaxed text-danger"
+                  className="flex items-start gap-2 rounded-[var(--r-sm)] border border-danger/35 bg-danger-soft px-3 py-2.5 text-xs leading-relaxed text-danger"
                 >
-                  <TriangleAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+                  <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
                   <span>{error}</span>
                 </div>
               ) : null}
@@ -322,13 +350,13 @@ export function LoginScreen({ health }: { health: HealthResponse | null }) {
               </Button>
             </form>
 
-            <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3 text-xs text-faint">
-              <span className="inline-flex items-center gap-1">
-                <ShieldCheck className="size-3.5" aria-hidden="true" />
+            <div className="mt-5 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3.5 text-xs text-faint">
+              <span className="inline-flex items-center gap-1.5">
+                <ShieldCheck className="size-4" aria-hidden="true" />
                 Server-side RBAC
               </span>
-              <span>Profile: {health?.llm.profile ?? "mock"}</span>
-              <span>
+              <span className="font-mono">Profile: {health?.llm.profile ?? "mock"}</span>
+              <span className="tabular font-mono">
                 Indexed chunks: {formatNumber(health?.vector_store.total_vectors ?? 0)}
               </span>
             </div>
@@ -340,6 +368,6 @@ export function LoginScreen({ health }: { health: HealthResponse | null }) {
           </p>
         </section>
       </div>
-    </div>
+    </main>
   );
 }

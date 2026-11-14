@@ -19,7 +19,7 @@ export function TooltipContent({
       <TooltipPrimitive.Content
         sideOffset={sideOffset}
         className={cn(
-          "z-50 max-w-64 rounded-[var(--r-sm)] border border-line-strong bg-canvas-raised px-3 py-1.5 text-xs leading-relaxed text-ink-soft shadow-[var(--elev-md)]",
+          "z-50 max-w-64 rounded-[var(--r-sm)] bg-surface px-3 py-2 text-xs leading-relaxed text-ink-soft shadow-[var(--elev-2)]",
           "data-[state=delayed-open]:animate-enter",
           className,
         )}

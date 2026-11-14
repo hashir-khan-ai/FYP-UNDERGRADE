@@ -182,10 +182,10 @@ export function UploadDialog({
                     acceptFile(event.dataTransfer.files?.[0]);
                   }}
                   className={cn(
-                    "mt-1.5 flex flex-col items-center justify-center rounded-[var(--r-md)] border border-dashed px-4 py-6 text-center transition-colors",
+                    "mt-1.5 flex flex-col items-center justify-center rounded-[var(--r-lg)] border border-dashed px-4 py-6 text-center transition-colors",
                     dragging
                       ? "border-line-accent bg-accent-soft"
-                      : "border-line-strong bg-[rgba(3,6,10,0.3)] hover:border-line-accent",
+                      : "border-line-strong bg-inset hover:border-line-accent",
                   )}
                 >
                   <input
@@ -262,7 +262,7 @@ export function UploadDialog({
                     value={docType}
                     onChange={(event) => setDocType(event.target.value)}
                     disabled={busy}
-                    className="mt-1.5 h-10 w-full rounded-[var(--r-sm)] border border-line bg-[rgba(3,6,10,0.44)] px-3 text-sm text-ink outline-none focus:border-line-accent focus:shadow-[0_0_0_3px_rgba(120,169,255,0.12)] disabled:opacity-50"
+                    className="mt-1.5 h-11 min-h-[44px] w-full rounded-[var(--r-md)] bg-inset px-3.5 text-sm text-ink shadow-[var(--inner-inset)] outline-none focus:shadow-[0_0_0_2px_var(--accent)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-50"
                   >
                     {DOCUMENT_TYPES.map((type) => (
                       <option key={type} value={type}>
@@ -291,10 +291,10 @@ export function UploadDialog({
                             );
                           }}
                           className={cn(
-                            "rounded-full border px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-50",
+                            "inline-flex min-h-[40px] items-center rounded-full px-3.5 py-1.5 text-xs font-medium ring-1 ring-inset transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-50",
                             checked
-                              ? "border-line-accent bg-accent-soft text-accent"
-                              : "border-line bg-surface-2 text-faint hover:text-ink",
+                              ? "bg-accent-soft text-accent-link ring-line-accent"
+                              : "bg-surface-2 text-muted ring-line hover:text-ink",
                           )}
                         >
                           {roleLabel(role)}

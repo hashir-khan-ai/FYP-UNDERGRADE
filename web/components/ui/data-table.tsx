@@ -5,6 +5,7 @@ import {
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Columns3,
@@ -37,6 +38,7 @@ export interface DataTableProps<T> {
   data: T[];
   columns: ColumnDef<T>[];
   getRowId: (row: T) => string;
+  selectable?: boolean;
   emptyState?: React.ReactNode;
   bulkActions?: (selectedIds: string[], clearSelection: () => void) => React.ReactNode;
   pageSize?: number;
@@ -47,6 +49,7 @@ export function DataTable<T>({
   data,
   columns,
   getRowId,
+  selectable = true,
   emptyState,
   bulkActions,
   pageSize: initialPageSize = 10,
@@ -189,37 +192,45 @@ export function DataTable<T>({
           <label className="sr-only" htmlFor="page-size-select">
             Rows per page
           </label>
-          <select
-            id="page-size-select"
-            value={pageSize}
-            onChange={(e) => {
-              setPageSize(Number(e.target.value));
-              setCurrentPage(1);
-            }}
-            className="h-8 rounded-[var(--r-sm)] border border-line bg-surface px-2 text-xs text-ink outline-none focus:border-line-accent"
-          >
-            <option value={10}>10 / page</option>
-            <option value={25}>25 / page</option>
-            <option value={50}>50 / page</option>
-          </select>
+          <div className="relative inline-flex items-center">
+            <select
+              id="page-size-select"
+              value={pageSize}
+              onChange={(e) => {
+                setPageSize(Number(e.target.value));
+                setCurrentPage(1);
+              }}
+              className="h-10 min-h-[40px] appearance-none rounded-[var(--r-md)] bg-inset pl-3 pr-8 text-xs font-medium text-ink shadow-[var(--inner-inset)] outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            >
+              <option value={10}>10 / page</option>
+              <option value={25}>25 / page</option>
+              <option value={50}>50 / page</option>
+            </select>
+            <ChevronDown
+              className="pointer-events-none absolute right-2.5 size-3.5 text-faint"
+              aria-hidden="true"
+            />
+          </div>
         </div>
       </div>
 
       {/* Desktop / Tablet Table View */}
-      <div className="hidden md:block overflow-hidden rounded-[var(--r-md)] border border-line bg-surface/50">
+      <div className="hidden overflow-hidden rounded-[var(--r-lg)] bg-surface shadow-[var(--elev-1)] md:block">
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-left text-xs">
             <thead>
-              <tr className="border-b border-line bg-surface-2/60">
-                <th scope="col" className="w-10 px-3 py-2.5">
-                  <input
-                    type="checkbox"
-                    checked={allCurrentPageSelected}
-                    onChange={toggleSelectAll}
-                    aria-label="Select all rows on this page"
-                    className="size-4 rounded border-line text-accent focus:ring-accent"
-                  />
-                </th>
+              <tr className="border-b border-line bg-surface-2/65">
+                {selectable ? (
+                  <th scope="col" className="w-10 px-2.5 py-3">
+                    <input
+                      type="checkbox"
+                      checked={allCurrentPageSelected}
+                      onChange={toggleSelectAll}
+                      aria-label="Select all rows on this page"
+                      className="size-4 rounded border-line text-accent focus:ring-accent"
+                    />
+                  </th>
+                ) : null}
                 {activeColumns.map((col) => {
                   const isSorted = sortColumn === col.id;
                   const ariaSort = isSorted
@@ -234,7 +245,7 @@ export function DataTable<T>({
                       scope="col"
                       aria-sort={col.sortable ? ariaSort : undefined}
                       className={cn(
-                        "px-3 py-2.5 font-semibold uppercase tracking-[0.08em] text-faint",
+                        "px-2.5 py-3 font-mono text-xs font-semibold uppercase tracking-[0.08em] text-faint",
                         col.className,
                       )}
                     >
@@ -242,18 +253,18 @@ export function DataTable<T>({
                         <button
                           type="button"
                           onClick={() => handleSort(col.id)}
-                          className="group inline-flex items-center gap-1.5 hover:text-ink focus:outline-none"
+                          className="group inline-flex min-h-[32px] items-center gap-1.5 uppercase tracking-[0.08em] hover:text-ink focus:outline-none"
                         >
                           <span>{col.header}</span>
                           {isSorted ? (
                             sortDirection === "asc" ? (
-                              <ArrowUp className="size-3 text-accent" aria-hidden="true" />
+                              <ArrowUp className="size-3.5 text-accent" aria-hidden="true" />
                             ) : (
-                              <ArrowDown className="size-3 text-accent" aria-hidden="true" />
+                              <ArrowDown className="size-3.5 text-accent" aria-hidden="true" />
                             )
                           ) : (
                             <ArrowUpDown
-                              className="size-3 text-faint opacity-0 group-hover:opacity-100"
+                              className="size-3.5 text-faint opacity-0 group-hover:opacity-100"
                               aria-hidden="true"
                             />
                           )}
@@ -269,7 +280,7 @@ export function DataTable<T>({
             <tbody>
               {paginatedData.length === 0 ? (
                 <tr>
-                  <td colSpan={activeColumns.length + 1} className="py-8 text-center text-muted">
+                  <td colSpan={activeColumns.length + (selectable ? 1 : 0)} className="py-10 text-center text-sm text-muted">
                     {emptyState ?? "No items found."}
                   </td>
                 </tr>
@@ -282,19 +293,21 @@ export function DataTable<T>({
                     <tr
                       key={id}
                       className={cn(
-                        "border-b border-line/60 transition-colors last:border-0 hover:bg-surface-2/40",
-                        isSelected && "bg-accent/5",
+                        "border-b border-line/60 transition-colors last:border-0 hover:bg-surface-2/50",
+                        isSelected && "bg-accent-soft/60",
                       )}
                     >
-                      <td className="w-10 px-3 py-2.5">
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => toggleRow(id)}
-                          aria-label={`Select row ${id}`}
-                          className="size-4 rounded border-line text-accent focus:ring-accent"
-                        />
-                      </td>
+                      {selectable ? (
+                        <td className="w-10 px-2.5 py-3">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleRow(id)}
+                            aria-label={`Select row ${id}`}
+                            className="size-4 rounded border-line text-accent focus:ring-accent"
+                          />
+                        </td>
+                      ) : null}
                       {activeColumns.map((col) => {
                         const cellContent = col.cell
                           ? col.cell(row)
@@ -302,7 +315,7 @@ export function DataTable<T>({
                             ? String((row as any)[col.accessorKey] ?? "")
                             : null;
                         return (
-                          <td key={col.id} className={cn("px-3 py-2.5", col.className)}>
+                          <td key={col.id} className={cn("px-2.5 py-3", col.className)}>
                             {cellContent}
                           </td>
                         );
@@ -317,9 +330,9 @@ export function DataTable<T>({
       </div>
 
       {/* Mobile Card View (< 768px) */}
-      <div className="space-y-2 md:hidden">
+      <div className="space-y-3 md:hidden">
         {paginatedData.length === 0 ? (
-          <div className="rounded-[var(--r-md)] border border-dashed border-line p-6 text-center text-xs text-muted">
+          <div className="rounded-[var(--r-lg)] bg-inset p-6 text-center text-sm text-muted shadow-[var(--inner-inset)]">
             {emptyState ?? "No items found."}
           </div>
         ) : (
@@ -331,22 +344,24 @@ export function DataTable<T>({
               <div
                 key={id}
                 className={cn(
-                  "rounded-[var(--r-md)] border border-line bg-surface/60 p-3 space-y-2 text-xs",
-                  isSelected && "border-accent/40 bg-accent/5",
+                  "space-y-2.5 rounded-[var(--r-lg)] bg-surface p-4 text-xs shadow-[var(--elev-1)]",
+                  isSelected && "bg-accent-soft/75 ring-1 ring-inset ring-line-accent",
                 )}
               >
-                <div className="flex items-center justify-between border-b border-line/50 pb-2">
-                  <label className="flex items-center gap-2 font-mono text-[11px] text-faint">
-                    <input
-                      type="checkbox"
-                      checked={isSelected}
-                      onChange={() => toggleRow(id)}
-                      aria-label={`Select row ${id}`}
-                      className="size-4 rounded border-line text-accent focus:ring-accent"
-                    />
-                    <span>{id.slice(0, 10)}</span>
-                  </label>
-                </div>
+                {selectable ? (
+                  <div className="flex items-center justify-between border-b border-line/60 pb-2">
+                    <label className="flex min-h-[32px] items-center gap-2.5 font-mono text-xs text-faint">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => toggleRow(id)}
+                        aria-label={`Select row ${id}`}
+                        className="size-4 rounded border-line text-accent focus:ring-accent"
+                      />
+                      <span>{id.slice(0, 10)}</span>
+                    </label>
+                  </div>
+                ) : null}
                 {activeColumns.map((col) => {
                   const content = col.cardRender
                     ? col.cardRender(row)
@@ -356,11 +371,11 @@ export function DataTable<T>({
                         ? String((row as any)[col.accessorKey] ?? "")
                         : null;
                   return (
-                    <div key={col.id} className="flex items-start justify-between gap-2">
-                      <span className="font-semibold uppercase tracking-wider text-[10px] text-faint">
+                    <div key={col.id} className="flex items-start justify-between gap-3">
+                      <span className="shrink-0 font-mono text-xs font-medium uppercase tracking-wider text-faint">
                         {col.header}
                       </span>
-                      <div className="text-right text-ink">{content}</div>
+                      <div className="min-w-0 text-right text-ink">{content}</div>
                     </div>
                   );
                 })}
@@ -377,7 +392,7 @@ export function DataTable<T>({
           <span className="tabular font-medium text-ink">{totalPages}</span>
         </span>
 
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-2">
           <Button
             variant="secondary"
             size="sm"
@@ -385,7 +400,7 @@ export function DataTable<T>({
             disabled={currentPage <= 1}
             aria-label="Previous page"
           >
-            <ChevronLeft className="size-3.5" aria-hidden="true" /> Previous
+            <ChevronLeft className="size-4" aria-hidden="true" /> Previous
           </Button>
           <Button
             variant="secondary"
@@ -394,20 +409,20 @@ export function DataTable<T>({
             disabled={currentPage >= totalPages}
             aria-label="Next page"
           >
-            Next <ChevronRight className="size-3.5" aria-hidden="true" />
+            Next <ChevronRight className="size-4" aria-hidden="true" />
           </Button>
         </div>
       </div>
 
       {/* Sticky Bulk Action Bar */}
-      {selectedIds.size > 0 && bulkActions ? (
+      {selectable && selectedIds.size > 0 && bulkActions ? (
         <div
           role="region"
           aria-label="Bulk actions"
-          className="sticky bottom-4 z-20 flex items-center justify-between gap-3 rounded-[var(--r-md)] border border-line-accent bg-canvas-raised p-3 shadow-xl backdrop-blur-md"
+          className="sticky bottom-4 z-20 flex flex-wrap items-center justify-between gap-3 rounded-[var(--r-lg)] bg-surface-2 p-3.5 shadow-[var(--elev-3)] ring-1 ring-inset ring-line-accent backdrop-blur-md"
         >
           <div aria-live="polite" className="flex items-center gap-2 text-xs font-medium text-ink">
-            <span className="tabular flex size-5 items-center justify-center rounded-full bg-accent text-[11px] font-bold text-accent-ink">
+            <span className="tabular flex size-6 items-center justify-center rounded-full bg-accent text-xs font-bold text-accent-ink">
               {selectedIds.size}
             </span>
             <span>{selectedIds.size === 1 ? "item" : "items"} selected</span>

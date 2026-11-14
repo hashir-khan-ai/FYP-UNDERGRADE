@@ -91,7 +91,13 @@ def evaluate_retrieval_by_difficulty(
 
     # 2. Load gold items
     with open(gold_path, "r", encoding="utf-8") as f:
-        items = [json.loads(line) for line in f if line.strip()]
+        items = [
+            row
+            for line in f
+            if line.strip()
+            for row in [json.loads(line)]
+            if row.get("status") != "rejected" and row.get("review_status") != "rejected"
+        ]
 
     tagged_items = []
     bucket_items = defaultdict(list)

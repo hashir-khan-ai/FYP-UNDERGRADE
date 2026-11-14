@@ -50,13 +50,16 @@ ROUTES = [
 async def cdp_command(ws, method: str, params: dict | None = None, req_id: int = 1) -> dict:
     payload = {"id": req_id, "method": method, "params": params or {}}
     await ws.write_message(json.dumps(payload))
+    deadline = asyncio.get_running_loop().time() + 18.0
     while True:
-        resp_raw = await ws.read_message()
+        remaining = max(0.1, deadline - asyncio.get_running_loop().time())
+        resp_raw = await asyncio.wait_for(ws.read_message(), timeout=remaining)
         if not resp_raw:
             break
         resp = json.loads(resp_raw)
         if resp.get("id") == req_id:
             return resp.get("result", {})
+    return {}
 
 
 async def set_auth_cookie(ws, token: str):
@@ -156,23 +159,38 @@ async def test_keyboard_flows(ws) -> dict[str, bool]:
     await cdp_command(ws, "Page.navigate", {"url": "http://localhost:3000/chat"}, req_id=30)
     await asyncio.sleep(1.5)
 
-    # 1. Command Palette open via Ctrl+K and close via Escape
-    open_palette_js = """
-    (() => {
-        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }));
-        return Boolean(document.querySelector('[role="dialog"]') || document.querySelector('[placeholder*="Type a command"]'));
-    })()
-    """
-    res = await cdp_command(ws, "Runtime.evaluate", {"expression": open_palette_js, "returnByValue": True}, req_id=31)
+    # 1. Command Palette open via Ctrl+K and close via Escape (real CDP keys so React commits cleanly)
+    await cdp_command(
+        ws,
+        "Input.dispatchKeyEvent",
+        {"type": "keyDown", "modifiers": 2, "key": "k", "code": "KeyK", "windowsVirtualKeyCode": 75},
+        req_id=31,
+    )
+    await cdp_command(
+        ws,
+        "Input.dispatchKeyEvent",
+        {"type": "keyUp", "modifiers": 2, "key": "k", "code": "KeyK", "windowsVirtualKeyCode": 75},
+        req_id=32,
+    )
+    await asyncio.sleep(0.25)
+    check_palette_js = "Boolean(document.querySelector('[role=\"dialog\"]') || document.querySelector('[placeholder*=\"Type a command\"]'))"
+    res = await cdp_command(ws, "Runtime.evaluate", {"expression": check_palette_js, "returnByValue": True}, req_id=33)
     results["palette_open_ctrl_k"] = bool(res.get("result", {}).get("value"))
 
-    close_palette_js = """
-    (() => {
-        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-        return !Boolean(document.querySelector('[placeholder*="Type a command"]'));
-    })()
-    """
-    res = await cdp_command(ws, "Runtime.evaluate", {"expression": close_palette_js, "returnByValue": True}, req_id=32)
+    await cdp_command(
+        ws,
+        "Input.dispatchKeyEvent",
+        {"type": "keyDown", "key": "Escape", "code": "Escape", "windowsVirtualKeyCode": 27},
+        req_id=34,
+    )
+    await cdp_command(
+        ws,
+        "Input.dispatchKeyEvent",
+        {"type": "keyUp", "key": "Escape", "code": "Escape", "windowsVirtualKeyCode": 27},
+        req_id=35,
+    )
+    await asyncio.sleep(0.65)
+    res = await cdp_command(ws, "Runtime.evaluate", {"expression": f"!{check_palette_js}", "returnByValue": True}, req_id=36)
     results["palette_close_escape"] = bool(res.get("result", {}).get("value"))
 
     # 2. Sidebar collapse via Ctrl+B
@@ -206,6 +224,38 @@ async def test_keyboard_flows(ws) -> dict[str, bool]:
     return results
 
 
+async def apply_theme(ws, theme: str, holder: dict) -> None:
+    prev_id = holder.get("id")
+    if prev_id:
+        await cdp_command(ws, "Page.removeScriptToEvaluateOnNewDocument", {"identifier": prev_id}, req_id=14)
+    res = await cdp_command(
+        ws,
+        "Page.addScriptToEvaluateOnNewDocument",
+        {
+            "source": (
+                f"try{{window.localStorage.setItem('crcs_theme',{json.dumps(theme)});}}catch(e){{}}"
+                f"if(document.documentElement)document.documentElement.dataset.theme={json.dumps(theme)};"
+            )
+        },
+        req_id=15,
+    )
+    holder["id"] = res.get("identifier")
+
+
+def wait_for_next(timeout_sec: float = 25.0) -> bool:
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    deadline = time.time() + timeout_sec
+    while time.time() < deadline:
+        try:
+            with opener.open("http://localhost:3000/login", timeout=1.5) as resp:
+                if resp.status < 500:
+                    return True
+        except Exception:
+            pass
+        time.sleep(0.4)
+    return False
+
+
 async def main():
     if not AXE_JS_PATH.exists():
         print(f"Error: axe.min.js not found at {AXE_JS_PATH}")
@@ -213,6 +263,17 @@ async def main():
 
     axe_source = AXE_JS_PATH.read_text(encoding="utf-8")
     print(f"Loaded axe-core library: {AXE_JS_PATH} ({len(axe_source)} bytes)")
+
+    next_proc = None
+    if not wait_for_next(timeout_sec=1.2):
+        npm_cmd = "npm.cmd" if os.name == "nt" else "npm"
+        next_proc = subprocess.Popen(
+            [npm_cmd, "--prefix", str(PROJECT_ROOT / "web"), "run", "start", "--", "-p", "3000"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        if not wait_for_next(timeout_sec=25.0):
+            raise RuntimeError("Next.js server failed to start on port 3000.")
 
     # Generate tokens for analyst and auditor
     with get_db_connection() as conn:
@@ -243,6 +304,8 @@ async def main():
     proc = subprocess.Popen(chrome_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     proxy_handler = urllib.request.ProxyHandler({})
     opener = urllib.request.build_opener(proxy_handler)
+    total_violations_count = 0
+    ws = None
 
     try:
         tabs = None
@@ -262,34 +325,39 @@ async def main():
 
         ws_url = tabs[0]["webSocketDebuggerUrl"]
         ws = await tornado.websocket.websocket_connect(ws_url, max_message_size=50 * 1024 * 1024)
+        await cdp_command(ws, "Page.enable", req_id=5)
 
         all_results = {}
         total_violations_count = 0
+        theme_holder: dict = {}
 
-        for vp_name, width, height, is_mobile in VIEWPORTS:
-            for route_path, role, label in ROUTES:
-                key = f"{label} ({route_path}) [{vp_name}]"
-                print(f"Running axe-core on {key}...")
+        for theme in ("light", "dark"):
+            await apply_theme(ws, theme, theme_holder)
+            print(f"\n--- Theme: {theme} ---")
+            for vp_name, width, height, is_mobile in VIEWPORTS:
+                for route_path, role, label in ROUTES:
+                    key = f"{theme} | {label} ({route_path}) [{vp_name}]"
+                    print(f"Running axe-core on {key}...")
 
-                # Set appropriate session cookie
-                if role == "unauth":
-                    await clear_auth_cookie(ws)
-                elif role == "analyst":
-                    await set_auth_cookie(ws, analyst_token)
-                elif role == "auditor":
-                    await set_auth_cookie(ws, auditor_token)
+                    # Set appropriate session cookie
+                    if role == "unauth":
+                        await clear_auth_cookie(ws)
+                    elif role == "analyst":
+                        await set_auth_cookie(ws, analyst_token)
+                    elif role == "auditor":
+                        await set_auth_cookie(ws, auditor_token)
 
-                violations = await run_axe_on_page(ws, axe_source, route_path, width, height, is_mobile)
-                all_results[key] = violations
-                total_violations_count += len(violations)
-                print(f"  -> {len(violations)} violations found.")
-                if violations:
-                    for v in violations:
-                        print(f"     [Violation] {v['id']}: {v['help']} (impact: {v.get('impact')}, nodes: {len(v.get('nodes', []))})")
-                        for node in v.get('nodes', []):
-                            print(f"       Node target: {node.get('target')}")
-                            print(f"       Node HTML: {node.get('html')}")
-                            print(f"       Failure: {node.get('failureSummary')}")
+                    violations = await run_axe_on_page(ws, axe_source, route_path, width, height, is_mobile)
+                    all_results[key] = violations
+                    total_violations_count += len(violations)
+                    print(f"  -> {len(violations)} violations found.")
+                    if violations:
+                        for v in violations:
+                            print(f"     [Violation] {v['id']}: {v['help']} (impact: {v.get('impact')}, nodes: {len(v.get('nodes', []))})")
+                            for node in v.get('nodes', []):
+                                print(f"       Node target: {node.get('target')}")
+                                print(f"       Node HTML: {node.get('html')}")
+                                print(f"       Failure: {node.get('failureSummary')}")
 
         print("\nTesting keyboard flows...")
         await set_auth_cookie(ws, analyst_token)
@@ -299,16 +367,41 @@ async def main():
 
         print("\n========================================================")
         print(f"AXE-CORE ACCESSIBILITY AUDIT SUMMARY (axe-core v4.14.0)")
-        print(f"Total violations across 8 route/viewport combinations: {total_violations_count}")
+        print(f"Total violations across {len(all_results)} route/viewport/theme combinations: {total_violations_count}")
         print("========================================================")
-
-        ws.close()
     finally:
-        proc.terminate()
-        try:
-            proc.wait(timeout=3)
-        except Exception:
-            proc.kill()
+        if ws is not None:
+            try:
+                await asyncio.wait_for(cdp_command(ws, "Browser.close", {}, req_id=999), timeout=3.0)
+            except Exception:
+                pass
+            try:
+                ws.close()
+            except Exception:
+                pass
+        for child_proc in (proc, next_proc):
+            if child_proc is None:
+                continue
+            try:
+                if os.name == "nt":
+                    subprocess.run(
+                        ["taskkill", "/F", "/T", "/PID", str(child_proc.pid)],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                        timeout=4,
+                        check=False,
+                    )
+                else:
+                    child_proc.terminate()
+            except Exception:
+                try:
+                    child_proc.kill()
+                except Exception:
+                    pass
+        import shutil
+        shutil.rmtree(user_data_dir, ignore_errors=True)
+        if total_violations_count > 0:
+            sys.exit(1)
 
 
 if __name__ == "__main__":

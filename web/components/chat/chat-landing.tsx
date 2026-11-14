@@ -15,7 +15,7 @@ export function ChatLanding({ name }: { name: string }) {
 
   return (
     <div className="mx-auto flex min-h-[calc(100dvh-3.5rem)] w-full max-w-4xl flex-col items-center justify-center px-4 py-10 lg:min-h-dvh">
-      <div className="w-full rounded-[var(--r-xl)] border border-line bg-surface/55 p-5 shadow-[var(--elev-md)] sm:p-8">
+      <div className="w-full rounded-[var(--r-xl)] bg-surface p-6 shadow-[var(--elev-2)] sm:p-8">
         <div className="grid items-center gap-6 lg:grid-cols-[1.05fr_0.95fr]">
           <div>
             <Badge tone="accent" className="mb-3">
@@ -44,9 +44,9 @@ export function ChatLanding({ name }: { name: string }) {
               create one here.
             </p>
           </div>
-          <div className="rounded-[var(--r-lg)] border border-line bg-[rgba(3,6,10,0.3)] p-3">
+          <div className="rounded-[var(--r-lg)] bg-canvas-raised p-4 shadow-[var(--elev-1)]">
             <TrustMap />
-            <p className="mt-1 text-center text-xs text-faint">
+            <p className="mt-2 text-center text-xs text-faint">
               Corpus → role gate → relevance grader → verified answer
             </p>
           </div>

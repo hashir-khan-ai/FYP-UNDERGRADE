@@ -2,7 +2,7 @@ import { cn, initials } from "@/lib/utils";
 
 const SIZES = {
   sm: "size-8 text-xs font-semibold",
-  md: "size-9.5 text-xs",
+  md: "size-10 text-xs",
   lg: "size-11 text-sm",
 } as const;
 
@@ -19,7 +19,7 @@ export function Avatar({
     <span
       aria-hidden="true"
       className={cn(
-        "inline-flex shrink-0 items-center justify-center rounded-full border border-line-accent bg-[linear-gradient(135deg,rgba(120,169,255,0.24),rgba(84,214,196,0.12))] font-semibold tracking-[0.02em] text-ink",
+        "inline-flex shrink-0 items-center justify-center rounded-full bg-accent-soft font-semibold tracking-[0.02em] text-accent-link ring-1 ring-inset ring-line-accent",
         SIZES[size],
         className,
       )}

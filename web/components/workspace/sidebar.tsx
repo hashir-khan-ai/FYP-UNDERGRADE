@@ -3,12 +3,14 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   Check,
   FileText,
   Lock,
   LogOut,
   MessageSquare,
+  Moon,
   MoreHorizontal,
   PanelLeftClose,
   PanelLeftOpen,
@@ -17,7 +19,7 @@ import {
   Search,
   ServerCog,
   ShieldCheck,
-  Sparkles,
+  Sun,
   Trash2,
   X,
 } from "lucide-react";
@@ -46,10 +48,12 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useSessions } from "@/components/providers/sessions-provider";
+import { useTheme } from "@/components/providers/theme-provider";
 import { canViewAudit, roleLabel, roleScope } from "@/lib/auth";
 import { api } from "@/lib/api-client";
 import { formatRelative } from "@/lib/format";
 import { useDebouncedValue } from "@/lib/hooks/use-debounce";
+import { MOTION_DURATION, MOTION_EASING, MOTION_SPRING } from "@/lib/motion";
 import type { AdminConfig, HealthResponse, SessionSummary, UserProfile } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -89,7 +93,7 @@ function NavItem({
           <TooltipTrigger asChild>
             <div
               aria-disabled="true"
-              className="flex size-10 items-center justify-center rounded-[var(--r-sm)] text-faint/50 cursor-not-allowed"
+              className="flex size-11 cursor-not-allowed items-center justify-center rounded-[var(--r-md)] text-faint/50"
             >
               <Icon className="size-5" aria-hidden="true" />
             </div>
@@ -104,7 +108,7 @@ function NavItem({
       <div
         aria-disabled="true"
         title={hint}
-        className="flex min-h-[44px] items-center gap-3 rounded-[var(--r-sm)] px-3 text-xs font-medium text-faint/70"
+        className="flex min-h-[44px] items-center gap-3 rounded-[var(--r-md)] px-3 text-xs font-medium text-faint/70"
       >
         <Icon className="size-4.5" aria-hidden="true" />
         <span className="flex-1">{label}</span>
@@ -123,10 +127,10 @@ function NavItem({
             aria-current={active ? "page" : undefined}
             aria-label={label}
             className={cn(
-              "flex size-10 items-center justify-center rounded-[var(--r-sm)] transition-colors duration-[var(--duration-fast)]",
+              "flex size-11 items-center justify-center rounded-[var(--r-md)] transition-[background-color,color,box-shadow] duration-[var(--duration-fast)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
               active
-                ? "bg-surface-2 text-accent shadow-[inset_0_1px_0_rgba(255,255,255,0.035)]"
-                : "text-muted hover:bg-surface-2/70 hover:text-ink",
+                ? "bg-surface text-accent-link shadow-[var(--elev-1)]"
+                : "text-muted hover:bg-surface-2/80 hover:text-ink",
             )}
           >
             <Icon className="size-5" aria-hidden="true" />
@@ -145,13 +149,13 @@ function NavItem({
       onClick={onNavigate}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "flex min-h-[44px] items-center gap-3 rounded-[var(--r-sm)] px-3 text-xs font-medium transition-colors duration-[var(--duration-fast)]",
+        "flex min-h-[44px] items-center gap-3 rounded-[var(--r-md)] px-3 text-xs font-medium transition-[background-color,color,box-shadow] duration-[var(--duration-fast)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
         active
-          ? "bg-surface-2 text-ink shadow-[inset_0_1px_0_rgba(255,255,255,0.035)]"
-          : "text-muted hover:bg-surface-2/70 hover:text-ink",
+          ? "bg-surface text-ink shadow-[var(--elev-1)]"
+          : "text-muted hover:bg-surface-2/80 hover:text-ink",
       )}
     >
-      <Icon className={cn("size-4.5", active ? "text-accent" : "text-faint")} aria-hidden="true" />
+      <Icon className={cn("size-4.5", active ? "text-accent-link" : "text-faint")} aria-hidden="true" />
       <span className="flex-1">{label}</span>
     </Link>
   );
@@ -281,7 +285,7 @@ function SessionRow({
         >
           {session.title}
         </span>
-        <span className="mt-0.5 block truncate text-[11px] text-faint">
+        <span className="mt-0.5 block truncate text-xs text-faint">
           {formatRelative(session.updated_at ?? session.created_at)}
         </span>
       </Link>
@@ -469,7 +473,8 @@ function SidebarBody({
             </nav>
           </div>
 
-          <div className="flex flex-col items-center gap-3">
+          <div className="flex flex-col items-center gap-2.5">
+            <ThemeToggle collapsed />
             <SystemSheet
               health={health}
               config={config}
@@ -522,7 +527,7 @@ function SidebarBody({
 
   // Expanded Standard Sidebar View
   return (
-    <div className="flex h-full min-h-0 flex-col bg-canvas-raised/60">
+    <div className="flex h-full min-h-0 flex-col bg-canvas-raised/95">
       <div className="flex items-center gap-2 px-4 pb-1 pt-4">
         <Logo showWordmark className="min-w-0 flex-1" />
         {onToggleCollapsed ? (
@@ -619,7 +624,7 @@ function SidebarBody({
 
       <div className="mt-2 min-h-0 flex-1 overflow-y-auto px-2 pb-3">
         {filtered.length === 0 ? (
-          <div className="mx-2 mt-3 rounded-[var(--r-sm)] border border-dashed border-line px-3 py-4 text-center">
+          <div className="mx-2 mt-3 rounded-[var(--r-md)] bg-inset px-3.5 py-4 text-center shadow-[var(--inner-inset)]">
             <p className="text-xs font-medium text-ink-soft">
               {sessions.length === 0 ? "No sessions yet" : "No matching sessions"}
             </p>
@@ -646,7 +651,7 @@ function SidebarBody({
           <div className="space-y-2">
             {dateGroups.today.length > 0 ? (
               <div>
-                <div className="px-2 pb-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-faint">
+                <div className="px-2 pb-1 font-mono text-xs font-semibold uppercase tracking-[0.08em] text-faint">
                   Today
                 </div>
                 <div className="space-y-1">
@@ -664,7 +669,7 @@ function SidebarBody({
 
             {dateGroups.previous7Days.length > 0 ? (
               <div>
-                <div className="px-2 pt-2 pb-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-faint">
+                <div className="px-2 pt-2 pb-1 font-mono text-xs font-semibold uppercase tracking-[0.08em] text-faint">
                   Previous 7 days
                 </div>
                 <div className="space-y-1">
@@ -682,7 +687,7 @@ function SidebarBody({
 
             {dateGroups.older.length > 0 ? (
               <div>
-                <div className="px-2 pt-2 pb-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-faint">
+                <div className="px-2 pt-2 pb-1 font-mono text-xs font-semibold uppercase tracking-[0.08em] text-faint">
                   Older
                 </div>
                 <div className="space-y-1">
@@ -702,26 +707,28 @@ function SidebarBody({
       </div>
 
       <div className="border-t border-line px-3 py-3">
-        <div className="mb-2 flex flex-wrap items-center gap-1.5">
-          <Badge tone="accent">{roleLabel(role)}</Badge>
-          <Badge tone={config?.profile === "mock" ? "neutral" : "warning"}>
-            <Sparkles /> {config?.profile ?? "mock"}
-          </Badge>
-          <Badge tone={health ? "success" : "warning"}>
-            <span
-              className={cn("size-1.5 rounded-full", health ? "bg-success" : "bg-warning")}
-              aria-hidden="true"
-            />
-            {health ? "Live" : "Offline"}
-          </Badge>
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <Badge tone="accent">{roleLabel(role)}</Badge>
+            <Badge tone={health ? "success" : "warning"}>
+              <span
+                className={cn("size-2 rounded-full", health ? "bg-success" : "bg-warning")}
+                aria-hidden="true"
+              />
+              {health ? "Live" : "Offline"}
+            </Badge>
+          </div>
+          <ThemeToggle />
         </div>
-        <p className="mb-2 text-xs leading-relaxed text-faint">{roleScope(role)}</p>
+        <p className="mb-2.5 text-xs leading-relaxed text-faint">
+          {roleScope(role)} · Profile {config?.profile ?? "mock"}
+        </p>
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
               type="button"
-              className="flex min-h-[44px] w-full items-center gap-2.5 rounded-[var(--r-sm)] border border-line bg-surface-2/60 p-2 text-left transition-colors hover:border-line-strong hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+              className="flex min-h-[44px] w-full items-center gap-2.5 rounded-[var(--r-md)] bg-surface p-2 text-left shadow-[var(--elev-1)] transition-[background-color,box-shadow] duration-[var(--duration-fast)] hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             >
               <Avatar name={user.full_name} size="sm" />
               <span className="min-w-0 flex-1">
@@ -764,6 +771,57 @@ function SidebarBody({
   );
 }
 
+function ThemeToggle({ collapsed = false }: { collapsed?: boolean }) {
+  const { theme, preference, toggleTheme, setPreference } = useTheme();
+  const isLight = theme === "light";
+  const label = isLight ? "Switch to dark theme" : "Switch to light theme";
+
+  if (collapsed) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={toggleTheme}
+            aria-label={label}
+            aria-pressed={isLight}
+          >
+            {isLight ? <Moon className="size-4" /> : <Sun className="size-4" />}
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="right">{label}</TooltipContent>
+      </Tooltip>
+    );
+  }
+
+  return (
+    <div className="inline-flex items-center gap-1">
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={toggleTheme}
+        aria-label={label}
+        aria-pressed={isLight}
+        className="px-2.5 text-xs text-muted hover:text-ink"
+      >
+        {isLight ? <Moon className="size-4" /> : <Sun className="size-4" />}
+        <span>{isLight ? "Dark" : "Light"}</span>
+      </Button>
+      {preference !== "system" ? (
+        <button
+          type="button"
+          onClick={() => setPreference("system")}
+          title="Follow system appearance"
+          className="inline-flex min-h-[40px] items-center rounded-[var(--r-sm)] px-2 text-xs text-faint transition-colors hover:bg-surface-2 hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        >
+          Auto
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
 export function Sidebar({
   user,
   config,
@@ -775,11 +833,11 @@ export function Sidebar({
 }: SidebarProps) {
   return (
     <>
-      <aside
-        className={cn(
-          "fixed inset-y-0 left-0 z-30 hidden border-r border-line lg:block transition-[width] duration-200",
-          collapsed ? "w-16" : "w-[var(--sidebar-width)]",
-        )}
+      <motion.aside
+        initial={false}
+        animate={{ width: collapsed ? 64 : 300 }}
+        transition={MOTION_SPRING.sidebar}
+        className="fixed inset-y-0 left-0 z-30 hidden overflow-hidden shadow-[var(--elev-2)] lg:block"
       >
         <SidebarBody
           user={user}
@@ -788,38 +846,44 @@ export function Sidebar({
           collapsed={collapsed}
           onToggleCollapsed={onToggleCollapsed}
         />
-      </aside>
+      </motion.aside>
 
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="Workspace navigation"
-        className={cn(
-          "fixed inset-0 z-50 lg:hidden transition-opacity duration-200",
-          mobileOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none",
-        )}
-      >
-        <div
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm"
-          onClick={() => onMobileOpenChange(false)}
-          aria-hidden="true"
-        />
-        <div
-          className={cn(
-            "fixed inset-y-0 left-0 w-[min(88vw,340px)] bg-canvas-raised shadow-2xl transition-transform duration-200",
-            mobileOpen ? "translate-x-0" : "-translate-x-full",
-          )}
-        >
-          <SidebarBody
-            user={user}
-            config={config}
-            health={health}
-            collapsed={false}
-            onNavigate={() => onMobileOpenChange(false)}
-            onClose={() => onMobileOpenChange(false)}
-          />
-        </div>
-      </div>
+      <AnimatePresence>
+        {mobileOpen ? (
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Workspace navigation"
+            className="fixed inset-0 z-50 lg:hidden"
+          >
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: MOTION_DURATION.fast, ease: MOTION_EASING.standard }}
+              className="fixed inset-0 bg-black/65 backdrop-blur-sm"
+              onClick={() => onMobileOpenChange(false)}
+              aria-hidden="true"
+            />
+            <motion.div
+              initial={{ x: "-100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "-100%" }}
+              transition={MOTION_SPRING.sidebar}
+              className="fixed inset-y-0 left-0 w-[min(88vw,340px)] bg-canvas-raised shadow-[var(--elev-3)]"
+            >
+              <SidebarBody
+                user={user}
+                config={config}
+                health={health}
+                collapsed={false}
+                onNavigate={() => onMobileOpenChange(false)}
+                onClose={() => onMobileOpenChange(false)}
+              />
+            </motion.div>
+          </div>
+        ) : null}
+      </AnimatePresence>
     </>
   );
 }

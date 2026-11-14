@@ -1,6 +1,7 @@
 import * as React from "react";
-import { AlertCircle, RefreshCw, Flag, Check } from "lucide-react";
+import { AlertCircle, Check, Flag, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { QuotaErrorIllustration } from "@/components/visual/illustrations";
 import { cn } from "@/lib/utils";
 
 export interface ErrorStateProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -30,7 +31,22 @@ export function ErrorState({
     title = "Rate Limit or Spend Cap Reached";
     explanation =
       "The system has reached the allocated safety quota for this run or session. Your live usage budget will reset shortly. You can start a new session or retry in a few moments.";
-  } else if (statusCode === 503 || errorCode === "SERVICE_UNAVAILABLE") {
+  } else if (errorCode === "LLM_AUTH_ERROR") {
+    title = "LLM Provider Authentication Failed";
+    explanation =
+      message ||
+      "The configured LLM provider rejected the server credentials. Verify LLM_PROFILE and your API key in .env (or switch to mock/local) and restart the backend server.";
+  } else if (errorCode === "LLM_UNAVAILABLE") {
+    title = "LLM Provider Unavailable";
+    explanation =
+      message ||
+      "The configured LLM provider could not be reached. Verify your provider endpoint in .env or switch to mock/local.";
+  } else if (errorCode === "MODEL_WEIGHTS_MISSING") {
+    title = "Local Model Weights Missing";
+    explanation =
+      message ||
+      "Local embedding or re-ranking model weights could not be loaded on the backend server.";
+  } else if (statusCode === 503 || errorCode === "SERVICE_UNAVAILABLE" || errorCode === "BACKEND_UNREACHABLE") {
     title = "Compliance Service Offline";
     explanation =
       "The local compliance API or embedded vector service is currently unavailable. Please check that the backend server is active on localhost:8000 and try again.";
@@ -65,31 +81,42 @@ export function ErrorState({
     setTimeout(() => setReported(false), 3000);
   };
 
+  const isQuotaOrRate =
+    statusCode === 429 ||
+    errorCode === "RATE_OR_SPEND_LIMIT" ||
+    errorCode === "RATE_LIMIT_EXCEEDED";
+
   return (
     <div
       role="alert"
       aria-live="assertive"
       className={cn(
-        "flex flex-col items-center justify-center p-8 text-center rounded-xl",
-        "border border-[var(--status-danger-border)] bg-[var(--status-danger-subtle)] text-[var(--text-primary)]",
-        className
+        "flex flex-col items-center justify-center rounded-[var(--r-xl)] p-6 text-center shadow-[var(--elev-2)] sm:p-8",
+        isQuotaOrRate
+          ? "bg-surface text-ink ring-1 ring-inset ring-line-accent"
+          : "bg-surface text-ink ring-1 ring-inset ring-danger/25",
+        className,
       )}
       {...props}
     >
-      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[var(--surface-primary)] text-[var(--status-danger)] mb-4 shadow-xs">
-        <AlertCircle className="h-7 w-7" aria-hidden="true" />
-      </div>
+      {isQuotaOrRate ? (
+        <QuotaErrorIllustration className="mb-3" />
+      ) : (
+        <div className="mb-4 flex size-14 items-center justify-center rounded-[var(--r-lg)] bg-danger-soft text-danger shadow-[var(--elev-1)]">
+          <AlertCircle className="h-7 w-7" aria-hidden="true" />
+        </div>
+      )}
 
-      <h3 className="text-base font-semibold text-[var(--text-primary)]">
+      <h3 className="font-display text-lg font-semibold text-ink">
         {title}
       </h3>
 
-      <p className="mt-2 max-w-md text-sm text-[var(--text-secondary)] leading-relaxed">
+      <p className="mt-2 max-w-md text-sm leading-relaxed text-muted">
         {explanation}
       </p>
 
       {errorCode && (
-        <p className="mt-1 text-xs font-mono text-[var(--text-muted)]">
+        <p className="mt-2 font-mono text-xs text-faint">
           Error code: {errorCode}
         </p>
       )}
@@ -117,12 +144,12 @@ export function ErrorState({
           >
             {reported ? (
               <>
-                <Check className="h-3.5 w-3.5 text-[var(--status-success)]" aria-hidden="true" />
+                <Check className="h-4 w-4 text-success" aria-hidden="true" />
                 <span>Diagnostic Copied!</span>
               </>
             ) : (
               <>
-                <Flag className="h-3.5 w-3.5" aria-hidden="true" />
+                <Flag className="h-4 w-4" aria-hidden="true" />
                 <span>Report an Issue</span>
               </>
             )}

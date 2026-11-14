@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 
-/** Compact institutional mark: three stacked corpus layers behind a role gate. */
+/** Compliance Ledger institutional monogram: three archival tiers behind a Safety Orange gate. */
 export function Logo({
   className,
   showWordmark = false,
@@ -9,33 +9,58 @@ export function Logo({
   showWordmark?: boolean;
 }) {
   return (
-    <span className={cn("inline-flex items-center gap-2.5", className)}>
+    <span className={cn("inline-flex items-center gap-3 shrink-0", className)}>
       <svg
         viewBox="0 0 32 32"
+        width={32}
+        height={32}
         role="img"
-        aria-label="Regulatory Compliance workspace"
+        aria-label="Compliance Desk workspace"
         className="size-8 shrink-0"
       >
-        <defs>
-          <linearGradient id="logo-gate" x1="6" y1="5" x2="26" y2="27" gradientUnits="userSpaceOnUse">
-            <stop stopColor="#9cc0ff" />
-            <stop offset="0.55" stopColor="#78a9ff" />
-            <stop offset="1" stopColor="#54d6c4" />
-          </linearGradient>
-        </defs>
-        <rect x="1" y="1" width="30" height="30" rx="9" fill="rgba(120,169,255,0.08)" stroke="rgba(120,169,255,0.28)" />
-        <path d="M9 11.2 16 7.8l7 3.4-7 3.4-7-3.4Z" fill="url(#logo-gate)" opacity="0.9" />
-        <path d="M9 15.8 16 19.2l7-3.4" stroke="url(#logo-gate)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" opacity="0.72" />
-        <path d="M9 20.2 16 23.6l7-3.4" stroke="url(#logo-gate)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" opacity="0.45" />
-        <circle cx="16" cy="16" r="2.15" fill="#070b11" stroke="url(#logo-gate)" strokeWidth="1.5" />
+        <rect
+          x="1"
+          y="1"
+          width="30"
+          height="30"
+          rx="6"
+          fill="var(--surface, #26292E)"
+          stroke="var(--line-strong, #5A6068)"
+          strokeWidth="1.5"
+        />
+        <path d="M9 11L16 7.5L23 11L16 14.5L9 11Z" fill="var(--ink, #F1F3F4)" />
+        <path
+          d="M9 16L16 19.5L23 16"
+          stroke="var(--muted, #B6BCC4)"
+          strokeWidth="1.75"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill="none"
+        />
+        <path
+          d="M9 21L16 24.5L23 21"
+          stroke="var(--storm, #5A6068)"
+          strokeWidth="1.75"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill="none"
+        />
+        <circle
+          cx="16"
+          cy="16"
+          r="2.25"
+          fill="var(--canvas, #1C1D20)"
+          stroke="var(--accent, #FF5F00)"
+          strokeWidth="1.75"
+        />
       </svg>
       {showWordmark ? (
-        <span className="flex flex-col leading-none">
-          <span className="text-sm font-semibold tracking-[-0.01em] text-ink">
+        <span className="flex flex-col leading-tight min-w-0">
+          <span className="font-editorial text-base font-semibold tracking-[-0.02em] text-ink whitespace-nowrap">
             Compliance Desk
           </span>
-          <span className="mt-0.5 text-xs font-medium uppercase tracking-[0.08em] text-faint">
-            Regulatory intelligence
+          <span className="text-xs font-medium text-faint whitespace-nowrap">
+            Regulatory Ledger
           </span>
         </span>
       ) : null}

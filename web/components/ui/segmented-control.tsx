@@ -46,7 +46,7 @@ export function SegmentedControl<T extends string>({
       aria-label={ariaLabel}
       onKeyDown={handleKeyDown}
       className={cn(
-        "inline-flex items-center gap-0.5 rounded-[var(--r-md)] border border-line bg-[rgba(3,6,10,0.4)] p-0.5",
+        "inline-flex items-center gap-1 rounded-[var(--r-md)] bg-surface-2 p-1 shadow-[var(--inner-inset)]",
         className,
       )}
     >
@@ -66,13 +66,13 @@ export function SegmentedControl<T extends string>({
             tabIndex={active ? 0 : -1}
             onClick={() => onValueChange(option.value)}
             className={cn(
-              "rounded-[var(--r-sm)] font-medium transition-[background-color,color,box-shadow] duration-[var(--duration-fast)] ease-[var(--ease-out)] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent",
+              "rounded-[var(--r-sm)] font-medium transition-[background-color,color,box-shadow] duration-[var(--duration-fast)] ease-[var(--ease-out)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
               size === "sm"
-                ? "min-h-[38px] px-3 text-xs sm:min-h-[40px]"
-                : "min-h-[44px] px-4 text-xs sm:text-sm",
+                ? "min-h-[32px] px-3 text-xs sm:min-h-[36px]"
+                : "min-h-[36px] px-3.5 text-xs sm:text-sm",
               active
-                ? "bg-surface-3 text-ink shadow-[var(--elev-sm),inset_0_1px_0_rgba(255,255,255,0.05)]"
-                : "text-faint hover:text-ink-soft",
+                ? "bg-surface text-ink shadow-[var(--elev-1)]"
+                : "text-muted hover:text-ink",
             )}
           >
             {option.label}

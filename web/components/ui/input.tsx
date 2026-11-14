@@ -8,7 +8,7 @@ export const Input = React.forwardRef<HTMLInputElement, React.InputHTMLAttribute
       ref={ref}
       type={type}
       className={cn(
-        "h-10 w-full rounded-[var(--r-sm)] border border-line bg-[rgba(3,6,10,0.44)] px-3 text-sm text-ink shadow-[inset_0_1px_0_rgba(255,255,255,0.02)] outline-none transition-[border-color,box-shadow] duration-[var(--duration-fast)] placeholder:text-faint hover:border-line-strong focus:border-line-accent focus:shadow-[0_0_0_3px_rgba(120,169,255,0.12)] disabled:cursor-not-allowed disabled:opacity-50",
+        "h-11 min-h-[44px] w-full rounded-[var(--r-md)] bg-inset px-3.5 text-sm text-ink shadow-[var(--inner-inset)] outline-none transition-[box-shadow,background-color] duration-[var(--duration-fast)] ease-[var(--ease-out)] placeholder:text-faint hover:bg-surface focus:shadow-[0_0_0_2px_var(--accent)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50",
         className,
       )}
       {...props}
@@ -24,7 +24,7 @@ export const Textarea = React.forwardRef<
   <textarea
     ref={ref}
     className={cn(
-      "w-full resize-none rounded-[var(--r-md)] border border-line bg-[rgba(3,6,10,0.34)] px-3.5 py-3 text-sm leading-relaxed text-ink outline-none transition-[border-color,box-shadow] duration-[var(--duration-fast)] placeholder:text-faint hover:border-line-strong focus:border-line-accent focus:shadow-[0_0_0_3px_rgba(120,169,255,0.1)] disabled:cursor-not-allowed disabled:opacity-50",
+      "w-full resize-none rounded-[var(--r-lg)] bg-inset px-4 py-3 text-sm leading-relaxed text-ink shadow-[var(--inner-inset)] outline-none transition-[box-shadow,background-color] duration-[var(--duration-fast)] ease-[var(--ease-out)] placeholder:text-faint hover:bg-surface focus:shadow-[0_0_0_2px_var(--accent)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50",
       className,
     )}
     {...props}

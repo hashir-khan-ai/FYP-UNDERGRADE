@@ -1,0 +1,506 @@
+[
+  {
+    "name": "01_login_390px.png",
+    "width": 390,
+    "height": 844,
+    "is_mobile": true,
+    "scrollWidth": 390,
+    "innerWidth": 390,
+    "overflow": false
+  },
+  {
+    "name": "01_login_768px.png",
+    "width": 768,
+    "height": 1024,
+    "is_mobile": true,
+    "scrollWidth": 768,
+    "innerWidth": 768,
+    "overflow": false
+  },
+  {
+    "name": "01_login_1440px.png",
+    "width": 1440,
+    "height": 900,
+    "is_mobile": false,
+    "scrollWidth": 1440,
+    "innerWidth": 1440,
+    "overflow": false
+  },
+  {
+    "name": "01_login_1920px.png",
+    "width": 1920,
+    "height": 1080,
+    "is_mobile": false,
+    "scrollWidth": 1920,
+    "innerWidth": 1920,
+    "overflow": false
+  },
+  {
+    "name": "02_empty_chat_390px.png",
+    "width": 390,
+    "height": 844,
+    "is_mobile": true,
+    "scrollWidth": 390,
+    "innerWidth": 390,
+    "overflow": false
+  },
+  {
+    "name": "02_empty_chat_768px.png",
+    "width": 768,
+    "height": 1024,
+    "is_mobile": true,
+    "scrollWidth": 768,
+    "innerWidth": 768,
+    "overflow": false
+  },
+  {
+    "name": "02_empty_chat_1440px.png",
+    "width": 1440,
+    "height": 900,
+    "is_mobile": false,
+    "scrollWidth": 1440,
+    "innerWidth": 1440,
+    "overflow": false
+  },
+  {
+    "name": "02_empty_chat_1920px.png",
+    "width": 1920,
+    "height": 1080,
+    "is_mobile": false,
+    "scrollWidth": 1920,
+    "innerWidth": 1920,
+    "overflow": false
+  },
+  {
+    "name": "03_answer_citations_390px.png",
+    "width": 390,
+    "height": 844,
+    "is_mobile": true,
+    "scrollWidth": 390,
+    "innerWidth": 390,
+    "overflow": false
+  },
+  {
+    "name": "03_answer_citations_768px.png",
+    "width": 768,
+    "height": 1024,
+    "is_mobile": true,
+    "scrollWidth": 768,
+    "innerWidth": 768,
+    "overflow": false
+  },
+  {
+    "name": "03_answer_citations_1440px.png",
+    "width": 1440,
+    "height": 900,
+    "is_mobile": false,
+    "scrollWidth": 1440,
+    "innerWidth": 1440,
+    "overflow": false
+  },
+  {
+    "name": "03_answer_citations_1920px.png",
+    "width": 1920,
+    "height": 1080,
+    "is_mobile": false,
+    "scrollWidth": 1920,
+    "innerWidth": 1920,
+    "overflow": false
+  },
+  {
+    "name": "04_documents_390px.png",
+    "width": 390,
+    "height": 844,
+    "is_mobile": true,
+    "scrollWidth": 390,
+    "innerWidth": 390,
+    "overflow": false
+  },
+  {
+    "name": "04_documents_768px.png",
+    "width": 768,
+    "height": 1024,
+    "is_mobile": true,
+    "scrollWidth": 768,
+    "innerWidth": 768,
+    "overflow": false
+  },
+  {
+    "name": "04_documents_1440px.png",
+    "width": 1440,
+    "height": 900,
+    "is_mobile": false,
+    "scrollWidth": 1430,
+    "innerWidth": 1440,
+    "overflow": false
+  },
+  {
+    "name": "04_documents_1920px.png",
+    "width": 1920,
+    "height": 1080,
+    "is_mobile": false,
+    "scrollWidth": 1910,
+    "innerWidth": 1920,
+    "overflow": false
+  },
+  {
+    "name": "05_audit_390px.png",
+    "width": 390,
+    "height": 844,
+    "is_mobile": true,
+    "scrollWidth": 390,
+    "innerWidth": 390,
+    "overflow": false
+  },
+  {
+    "name": "05_audit_768px.png",
+    "width": 768,
+    "height": 1024,
+    "is_mobile": true,
+    "scrollWidth": 768,
+    "innerWidth": 768,
+    "overflow": false
+  },
+  {
+    "name": "05_audit_1440px.png",
+    "width": 1440,
+    "height": 900,
+    "is_mobile": false,
+    "scrollWidth": 1430,
+    "innerWidth": 1440,
+    "overflow": false
+  },
+  {
+    "name": "05_audit_1920px.png",
+    "width": 1920,
+    "height": 1080,
+    "is_mobile": false,
+    "scrollWidth": 1910,
+    "innerWidth": 1920,
+    "overflow": false
+  },
+  {
+    "name": "06_not_found_390px.png",
+    "width": 390,
+    "height": 844,
+    "is_mobile": true,
+    "scrollWidth": 390,
+    "innerWidth": 390,
+    "overflow": false
+  },
+  {
+    "name": "06_not_found_768px.png",
+    "width": 768,
+    "height": 1024,
+    "is_mobile": true,
+    "scrollWidth": 768,
+    "innerWidth": 768,
+    "overflow": false
+  },
+  {
+    "name": "06_not_found_1440px.png",
+    "width": 1440,
+    "height": 900,
+    "is_mobile": false,
+    "scrollWidth": 1440,
+    "innerWidth": 1440,
+    "overflow": false
+  },
+  {
+    "name": "06_not_found_1920px.png",
+    "width": 1920,
+    "height": 1080,
+    "is_mobile": false,
+    "scrollWidth": 1920,
+    "innerWidth": 1920,
+    "overflow": false
+  },
+  {
+    "name": "07_command_palette_390px.png",
+    "width": 390,
+    "height": 844,
+    "is_mobile": true,
+    "scrollWidth": 390,
+    "innerWidth": 390,
+    "overflow": false
+  },
+  {
+    "name": "07_command_palette_1440px.png",
+    "width": 1440,
+    "height": 900,
+    "is_mobile": false,
+    "scrollWidth": 1440,
+    "innerWidth": 1440,
+    "overflow": false
+  },
+  {
+    "name": "08_mobile_drawer_390px.png",
+    "width": 390,
+    "height": 844,
+    "is_mobile": true,
+    "scrollWidth": 390,
+    "innerWidth": 390,
+    "overflow": false
+  },
+  {
+    "name": "08_mobile_drawer_768px.png",
+    "width": 768,
+    "height": 1024,
+    "is_mobile": true,
+    "scrollWidth": 768,
+    "innerWidth": 768,
+    "overflow": false
+  },
+  {
+    "name": "01_login_390px.png",
+    "width": 390,
+    "height": 844,
+    "is_mobile": true,
+    "scrollWidth": 390,
+    "innerWidth": 390,
+    "overflow": false
+  },
+  {
+    "name": "01_login_768px.png",
+    "width": 768,
+    "height": 1024,
+    "is_mobile": true,
+    "scrollWidth": 768,
+    "innerWidth": 768,
+    "overflow": false
+  },
+  {
+    "name": "01_login_1440px.png",
+    "width": 1440,
+    "height": 900,
+    "is_mobile": false,
+    "scrollWidth": 1440,
+    "innerWidth": 1440,
+    "overflow": false
+  },
+  {
+    "name": "01_login_1920px.png",
+    "width": 1920,
+    "height": 1080,
+    "is_mobile": false,
+    "scrollWidth": 1920,
+    "innerWidth": 1920,
+    "overflow": false
+  },
+  {
+    "name": "02_empty_chat_390px.png",
+    "width": 390,
+    "height": 844,
+    "is_mobile": true,
+    "scrollWidth": 390,
+    "innerWidth": 390,
+    "overflow": false
+  },
+  {
+    "name": "02_empty_chat_768px.png",
+    "width": 768,
+    "height": 1024,
+    "is_mobile": true,
+    "scrollWidth": 768,
+    "innerWidth": 768,
+    "overflow": false
+  },
+  {
+    "name": "02_empty_chat_1440px.png",
+    "width": 1440,
+    "height": 900,
+    "is_mobile": false,
+    "scrollWidth": 1440,
+    "innerWidth": 1440,
+    "overflow": false
+  },
+  {
+    "name": "02_empty_chat_1920px.png",
+    "width": 1920,
+    "height": 1080,
+    "is_mobile": false,
+    "scrollWidth": 1920,
+    "innerWidth": 1920,
+    "overflow": false
+  },
+  {
+    "name": "03_answer_citations_390px.png",
+    "width": 390,
+    "height": 844,
+    "is_mobile": true,
+    "scrollWidth": 390,
+    "innerWidth": 390,
+    "overflow": false
+  },
+  {
+    "name": "03_answer_citations_768px.png",
+    "width": 768,
+    "height": 1024,
+    "is_mobile": true,
+    "scrollWidth": 768,
+    "innerWidth": 768,
+    "overflow": false
+  },
+  {
+    "name": "03_answer_citations_1440px.png",
+    "width": 1440,
+    "height": 900,
+    "is_mobile": false,
+    "scrollWidth": 1440,
+    "innerWidth": 1440,
+    "overflow": false
+  },
+  {
+    "name": "03_answer_citations_1920px.png",
+    "width": 1920,
+    "height": 1080,
+    "is_mobile": false,
+    "scrollWidth": 1920,
+    "innerWidth": 1920,
+    "overflow": false
+  },
+  {
+    "name": "04_documents_390px.png",
+    "width": 390,
+    "height": 844,
+    "is_mobile": true,
+    "scrollWidth": 390,
+    "innerWidth": 390,
+    "overflow": false
+  },
+  {
+    "name": "04_documents_768px.png",
+    "width": 768,
+    "height": 1024,
+    "is_mobile": true,
+    "scrollWidth": 768,
+    "innerWidth": 768,
+    "overflow": false
+  },
+  {
+    "name": "04_documents_1440px.png",
+    "width": 1440,
+    "height": 900,
+    "is_mobile": false,
+    "scrollWidth": 1430,
+    "innerWidth": 1440,
+    "overflow": false
+  },
+  {
+    "name": "04_documents_1920px.png",
+    "width": 1920,
+    "height": 1080,
+    "is_mobile": false,
+    "scrollWidth": 1910,
+    "innerWidth": 1920,
+    "overflow": false
+  },
+  {
+    "name": "05_audit_390px.png",
+    "width": 390,
+    "height": 844,
+    "is_mobile": true,
+    "scrollWidth": 390,
+    "innerWidth": 390,
+    "overflow": false
+  },
+  {
+    "name": "05_audit_768px.png",
+    "width": 768,
+    "height": 1024,
+    "is_mobile": true,
+    "scrollWidth": 768,
+    "innerWidth": 768,
+    "overflow": false
+  },
+  {
+    "name": "05_audit_1440px.png",
+    "width": 1440,
+    "height": 900,
+    "is_mobile": false,
+    "scrollWidth": 1430,
+    "innerWidth": 1440,
+    "overflow": false
+  },
+  {
+    "name": "05_audit_1920px.png",
+    "width": 1920,
+    "height": 1080,
+    "is_mobile": false,
+    "scrollWidth": 1910,
+    "innerWidth": 1920,
+    "overflow": false
+  },
+  {
+    "name": "06_not_found_390px.png",
+    "width": 390,
+    "height": 844,
+    "is_mobile": true,
+    "scrollWidth": 390,
+    "innerWidth": 390,
+    "overflow": false
+  },
+  {
+    "name": "06_not_found_768px.png",
+    "width": 768,
+    "height": 1024,
+    "is_mobile": true,
+    "scrollWidth": 768,
+    "innerWidth": 768,
+    "overflow": false
+  },
+  {
+    "name": "06_not_found_1440px.png",
+    "width": 1440,
+    "height": 900,
+    "is_mobile": false,
+    "scrollWidth": 1440,
+    "innerWidth": 1440,
+    "overflow": false
+  },
+  {
+    "name": "06_not_found_1920px.png",
+    "width": 1920,
+    "height": 1080,
+    "is_mobile": false,
+    "scrollWidth": 1920,
+    "innerWidth": 1920,
+    "overflow": false
+  },
+  {
+    "name": "07_command_palette_390px.png",
+    "width": 390,
+    "height": 844,
+    "is_mobile": true,
+    "scrollWidth": 390,
+    "innerWidth": 390,
+    "overflow": false
+  },
+  {
+    "name": "07_command_palette_1440px.png",
+    "width": 1440,
+    "height": 900,
+    "is_mobile": false,
+    "scrollWidth": 1440,
+    "innerWidth": 1440,
+    "overflow": false
+  },
+  {
+    "name": "08_mobile_drawer_390px.png",
+    "width": 390,
+    "height": 844,
+    "is_mobile": true,
+    "scrollWidth": 390,
+    "innerWidth": 390,
+    "overflow": false
+  },
+  {
+    "name": "08_mobile_drawer_768px.png",
+    "width": 768,
+    "height": 1024,
+    "is_mobile": true,
+    "scrollWidth": 768,
+    "innerWidth": 768,
+    "overflow": false
+  }
+]

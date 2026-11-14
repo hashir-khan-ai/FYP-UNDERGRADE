@@ -75,9 +75,9 @@ export function Composer({
   }
 
   return (
-    <div className="glass-bar border-t px-3 pb-4 pt-3 sm:px-5 lg:px-8">
+    <div className="composer-fade sticky bottom-0 z-10 border-t border-line/70 px-3 pb-3 pt-2.5 sm:px-5 sm:pb-4 sm:pt-3.5 lg:px-8">
       <div className="mx-auto w-full max-w-[var(--reading-width)]">
-        <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2.5">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-2.5">
             <SegmentedControl
               ariaLabel="Retrieval scope"
@@ -111,10 +111,10 @@ export function Composer({
             submit();
           }}
           className={cn(
-            "rounded-[var(--r-lg)] border bg-[rgba(3,6,10,0.5)] p-2 transition-[border-color,box-shadow] duration-[var(--duration-fast)]",
+            "rounded-[var(--r-lg)] bg-surface p-2.5 shadow-[var(--elev-2)] transition-[box-shadow,background-color] duration-[var(--duration-base)] ease-[var(--ease-out)]",
             focused
-              ? "border-line-accent shadow-[0_0_0_3px_rgba(120,169,255,0.1)]"
-              : "border-line hover:border-line-strong",
+              ? "ring-2 ring-accent/70 shadow-[var(--elev-3)]"
+              : "ring-1 ring-inset ring-line hover:ring-line-strong",
           )}
         >
           <Textarea
@@ -134,7 +134,7 @@ export function Composer({
             placeholder="Ask a compliance question…"
             aria-label="Compliance question"
             disabled={offline}
-            className="max-h-[192px] min-h-[56px] border-0 bg-transparent px-3 py-3 text-base shadow-none focus:shadow-none placeholder:text-muted leading-relaxed"
+            className="max-h-[192px] min-h-[48px] rounded-[var(--r-md)] border-0 bg-transparent px-3 py-2.5 text-base leading-relaxed shadow-none placeholder:text-faint hover:bg-transparent focus:shadow-none focus-visible:outline-none sm:min-h-[56px] sm:py-3"
           />
           <div className="flex items-center justify-between gap-2 px-1.5 pb-1 pt-1.5">
             <div className="flex min-w-0 items-center gap-2 text-xs text-faint">
@@ -152,7 +152,7 @@ export function Composer({
             <div className="flex items-center gap-2">
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <span className="hidden items-center gap-1.5 rounded-full border border-line px-2.5 py-1 text-xs text-faint sm:inline-flex">
+                  <span className="hidden h-7 items-center gap-1.5 rounded-full bg-inset px-3 text-xs font-medium text-faint shadow-[var(--inner-inset)] sm:inline-flex">
                     <Sparkles className="size-3.5" aria-hidden="true" />
                     {modeMeta.shortLabel}
                   </span>
@@ -177,7 +177,7 @@ export function Composer({
           </div>
         </form>
 
-        <p className="mt-2 flex items-center justify-center gap-1.5 text-center text-xs leading-relaxed text-faint">
+        <p className="mt-2 hidden items-center justify-center gap-1.5 text-center text-xs leading-relaxed text-faint sm:flex">
           <LockKeyhole className="size-3 shrink-0" aria-hidden="true" />
           Role filtering runs server-side. Restricted passages never enter the model context.
           {offline ? (

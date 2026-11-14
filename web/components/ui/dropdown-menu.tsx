@@ -21,7 +21,7 @@ export function DropdownMenuContent({
         sideOffset={sideOffset}
         align={align}
         className={cn(
-          "z-50 min-w-44 overflow-hidden rounded-[var(--r-md)] border border-line-strong bg-canvas-raised p-1 shadow-[var(--elev-md)] data-[state=open]:animate-enter",
+          "z-50 min-w-44 overflow-hidden rounded-[var(--r-lg)] bg-surface p-1.5 shadow-[var(--elev-2)] data-[state=open]:animate-enter",
           className,
         )}
         {...props}
@@ -38,7 +38,7 @@ export function DropdownMenuItem({
   return (
     <DropdownMenuPrimitive.Item
       className={cn(
-        "flex cursor-default select-none items-center gap-2 rounded-[var(--r-xs)] px-2.5 py-1.5 text-xs text-ink-soft outline-none transition-colors data-[highlighted]:bg-surface-2 data-[highlighted]:text-ink data-[disabled]:pointer-events-none data-[disabled]:opacity-45 [&_svg]:size-3.5 [&_svg]:text-faint",
+        "flex min-h-[40px] cursor-default select-none items-center gap-2 rounded-[var(--r-sm)] px-3 py-2 text-xs text-ink-soft outline-none transition-colors duration-[var(--duration-fast)] data-[highlighted]:bg-surface-2 data-[highlighted]:text-ink data-[disabled]:pointer-events-none data-[disabled]:opacity-45 [&_svg]:size-3.5 [&_svg]:text-faint",
         inset && "pl-8",
         className,
       )}
@@ -56,7 +56,7 @@ export function DropdownMenuCheckboxItem({
   return (
     <DropdownMenuPrimitive.CheckboxItem
       className={cn(
-        "relative flex cursor-default select-none items-center rounded-[var(--r-xs)] py-1.5 pl-7 pr-2.5 text-xs text-ink-soft outline-none transition-colors data-[highlighted]:bg-surface-2 data-[highlighted]:text-ink data-[disabled]:pointer-events-none data-[disabled]:opacity-45",
+        "relative flex min-h-[40px] cursor-default select-none items-center rounded-[var(--r-sm)] py-2 pl-8 pr-3 text-xs text-ink-soft outline-none transition-colors duration-[var(--duration-fast)] data-[highlighted]:bg-surface-2 data-[highlighted]:text-ink data-[disabled]:pointer-events-none data-[disabled]:opacity-45",
         className,
       )}
       checked={checked}

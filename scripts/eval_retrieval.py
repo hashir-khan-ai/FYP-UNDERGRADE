@@ -203,7 +203,7 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    questions = load_gold_set(args.gold_set)
+    questions = load_gold_set(args.gold_set, include_rejected=False)
     answerable = [q for q in questions if q.expected_behaviour == "answer"]
     doc_count, chunks = load_corpus_chunks("data")
 

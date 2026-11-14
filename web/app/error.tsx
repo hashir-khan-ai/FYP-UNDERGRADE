@@ -19,7 +19,7 @@ export default function AppError({
 
   return (
     <div className="flex min-h-[60dvh] flex-col items-center justify-center px-4 text-center">
-      <p className="font-mono text-[0.6875rem] uppercase tracking-[0.16em] text-faint">
+      <p className="font-mono text-xs uppercase tracking-[0.14em] text-faint">
         Workspace error
       </p>
       <h1 className="mt-2 text-xl font-semibold tracking-[-0.025em] text-ink">

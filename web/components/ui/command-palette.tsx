@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   FileText,
   Layers,
@@ -14,6 +15,7 @@ import {
 
 import { useSessions } from "@/components/providers/sessions-provider";
 import { canViewAudit } from "@/lib/auth";
+import { MOTION_DURATION, MOTION_EASING, MOTION_SPRING } from "@/lib/motion";
 import type { SessionSummary } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -23,6 +25,7 @@ export interface CommandPaletteProps {
   userRole: string;
   onSelectKnowledgeScope?: (scope: string) => void;
   onSelectResponseStyle?: (style: string) => void;
+  onSelectAction?: (actionId: string) => void;
 }
 
 interface PaletteAction {
@@ -40,6 +43,7 @@ export function CommandPalette({
   userRole,
   onSelectKnowledgeScope,
   onSelectResponseStyle,
+  onSelectAction,
 }: CommandPaletteProps) {
   const router = useRouter();
   const { sessions, createSession } = useSessions();
@@ -195,7 +199,9 @@ export function CommandPalette({
     } else if (e.key === "Enter") {
       e.preventDefault();
       if (filteredActions[selectedIndex]) {
-        filteredActions[selectedIndex].perform();
+        const chosen = filteredActions[selectedIndex];
+        onSelectAction?.(chosen.id);
+        chosen.perform();
         onOpenChange(false);
       }
     } else if (e.key === "Escape") {
@@ -204,50 +210,63 @@ export function CommandPalette({
     }
   }
 
-  if (!open) return null;
-
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label="Command palette"
-      className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-[12vh] sm:pt-[15vh]"
-    >
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
-        onClick={() => onOpenChange(false)}
-        aria-hidden="true"
-      />
-
-      {/* Modal Dialog */}
-      <div
-        className="relative flex w-full max-w-xl flex-col rounded-[var(--r-md)] border border-line-strong bg-canvas-raised shadow-2xl focus:outline-none"
-        onKeyDown={handleKeyDown}
-      >
-        {/* Search Input bar */}
-        <div className="flex items-center gap-3 border-b border-line px-4 py-3">
-          <Search className="size-4 shrink-0 text-faint" aria-hidden="true" />
-          <input
-            ref={inputRef}
-            type="text"
-            role="combobox"
-            aria-expanded={true}
-            aria-controls="palette-results"
-            aria-activedescendant={
-              filteredActions[selectedIndex]
-                ? `action-${filteredActions[selectedIndex].id}`
-                : undefined
-            }
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Type a command or search sessions..."
-            className="w-full bg-transparent text-sm text-ink placeholder-faint outline-none"
+    <AnimatePresence>
+      {open ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Command palette"
+          className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-[10vh] sm:pt-[14vh]"
+        >
+          {/* Backdrop */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: MOTION_DURATION.fast, ease: MOTION_EASING.standard }}
+            className="fixed inset-0 bg-black/65 backdrop-blur-sm"
+            onClick={() => onOpenChange(false)}
+            aria-hidden="true"
           />
-          <kbd className="rounded border border-line bg-surface-2 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-faint">
-            ESC
-          </kbd>
-        </div>
+
+          {/* Modal Dialog */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.96, y: -8 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.97, y: -4 }}
+            transition={MOTION_SPRING.overlay}
+            className="relative flex w-full max-w-xl flex-col overflow-hidden rounded-[var(--r-xl)] bg-surface shadow-[var(--elev-3)] focus:outline-none"
+            onKeyDown={handleKeyDown}
+          >
+            {/* Search Input bar */}
+            <div className="flex items-center gap-3 border-b border-line px-4 py-3">
+              <Search className="size-4 shrink-0 text-faint" aria-hidden="true" />
+              <input
+                ref={inputRef}
+                type="text"
+                role="combobox"
+                aria-expanded={true}
+                aria-controls="palette-results"
+                aria-activedescendant={
+                  filteredActions[selectedIndex]
+                    ? `action-${filteredActions[selectedIndex].id}`
+                    : undefined
+                }
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Type a command or search sessions…"
+                className="min-h-[36px] w-full bg-transparent text-sm text-ink placeholder-faint outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => onOpenChange(false)}
+                aria-label="Close command palette"
+                className="inline-flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-[var(--r-xs)] border border-line bg-surface-2 px-2.5 font-mono text-xs font-semibold text-faint transition-colors hover:border-line-strong hover:text-ink"
+              >
+                ESC
+              </button>
+            </div>
 
         {/* Results List */}
         <div
@@ -273,32 +292,33 @@ export function CommandPalette({
                   aria-selected={isSelected}
                   data-palette-index={idx}
                   onClick={() => {
+                    onSelectAction?.(action.id);
                     action.perform();
                     onOpenChange(false);
                   }}
                   onMouseEnter={() => setSelectedIndex(idx)}
                   className={cn(
-                    "flex cursor-pointer items-center gap-3 rounded-[var(--r-sm)] px-3 py-2 text-xs transition-colors",
+                    "flex min-h-[44px] cursor-pointer items-center gap-3 rounded-[var(--r-sm)] px-3.5 py-2.5 text-xs transition-colors",
                     isSelected
-                      ? "bg-accent/15 text-accent-ink font-medium"
+                      ? "bg-accent-soft text-ink font-medium ring-1 ring-inset ring-line-accent"
                       : "text-muted hover:bg-surface-2 hover:text-ink",
                   )}
                 >
                   <Icon
                     className={cn(
                       "size-4 shrink-0",
-                      isSelected ? "text-accent" : "text-faint",
+                      isSelected ? "text-accent-link" : "text-faint",
                     )}
                   />
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-ink font-medium">{action.title}</div>
+                    <div className="truncate font-medium text-ink">{action.title}</div>
                     {action.subtitle ? (
-                      <div className="truncate text-[11px] text-faint">
+                      <div className="truncate text-xs text-faint">
                         {action.subtitle}
                       </div>
                     ) : null}
                   </div>
-                  <span className="shrink-0 text-[10px] uppercase tracking-wider text-faint">
+                  <span className="shrink-0 font-mono text-xs uppercase tracking-wider text-faint">
                     {action.category}
                   </span>
                 </div>
@@ -308,11 +328,13 @@ export function CommandPalette({
         </div>
 
         {/* Footer tip */}
-        <div className="flex items-center justify-between border-t border-line px-4 py-2 text-[11px] text-faint">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line px-4 py-2.5 text-xs text-faint">
           <span>Use ↑↓ to navigate, Enter to select</span>
           <span>Security: Document content never indexed in palette</span>
         </div>
-      </div>
-    </div>
+          </motion.div>
+        </div>
+      ) : null}
+    </AnimatePresence>
   );
 }

@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { AlertTriangle, ArrowUpRight, RefreshCw, X } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
 
 import { ChatEmptyState } from "@/components/chat/chat-empty-state";
 import { Composer } from "@/components/chat/composer";
@@ -11,6 +11,7 @@ import { ThinkingPanel } from "@/components/chat/thinking-panel";
 import { useSessions } from "@/components/providers/sessions-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ErrorState } from "@/components/ui/error-state";
 import { useThrottledCallback } from "@/lib/hooks/use-throttle";
 import { ApiError, api } from "@/lib/api-client";
 import { roleLabel, roleScope } from "@/lib/auth";
@@ -21,6 +22,7 @@ import { cn } from "@/lib/utils";
 interface ChatError {
   message: string;
   code: string;
+  status?: number;
   retryText: string;
 }
 
@@ -75,7 +77,11 @@ export function ChatView({
   const scrollToBottom = useThrottledCallback(rawScrollToBottom, 150);
 
   React.useEffect(() => {
-    scrollToBottom(messages.length > 0 ? "smooth" : "auto");
+    if (messages.length > 0 || sending || error) {
+      scrollToBottom(messages.length > 0 ? "smooth" : "auto");
+    } else if (scrollRef.current) {
+      scrollRef.current.scrollTop = 0;
+    }
   }, [messages.length, sending, error, scrollToBottom]);
 
   function startStages() {
@@ -146,12 +152,24 @@ export function ChatView({
       setMessages((current) => current.filter((message) => message.id !== optimistic.id));
       setDraft(query);
       if (caught instanceof ApiError) {
-        setError({ message: caught.message, code: caught.code, retryText: query });
-        if (caught.code === "BACKEND_UNREACHABLE" || caught.status === 503) setOffline(true);
+        setError({
+          message: caught.message,
+          code: caught.code,
+          status: caught.status,
+          retryText: query,
+        });
+        if (
+          caught.code === "BACKEND_UNREACHABLE" ||
+          caught.code === "SERVICE_UNAVAILABLE" ||
+          (caught.status === 503 && !caught.code.startsWith("LLM_") && caught.code !== "MODEL_WEIGHTS_MISSING")
+        ) {
+          setOffline(true);
+        }
       } else {
         setError({
           message: "The answer could not be completed. Try again.",
           code: "UNKNOWN_ERROR",
+          status: 500,
           retryText: query,
         });
       }
@@ -178,11 +196,11 @@ export function ChatView({
   const role = String(user.role ?? "").toLowerCase();
 
   return (
-    <div className="flex h-[calc(100dvh-3.5rem)] flex-col lg:h-dvh">
-      <header className="flex h-14 shrink-0 items-center gap-3 border-b border-line px-3 sm:px-5 lg:px-8">
+    <div className="flex h-[calc(100dvh-7rem)] flex-col md:h-[calc(100dvh-3.5rem)] lg:h-dvh">
+      <header className="flex h-12 shrink-0 items-center gap-3 border-b border-line px-3 sm:h-14 sm:px-5 lg:px-8">
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <h1 className="truncate text-sm sm:text-base font-semibold tracking-[-0.01em] text-ink">
+          <div className="flex items-center gap-2.5">
+            <h1 className="truncate font-display text-[clamp(1.0625rem,1.4vw,1.25rem)] font-semibold tracking-[-0.01em] text-ink">
               {title}
             </h1>
             <Badge tone="success" className="hidden sm:inline-flex">
@@ -197,9 +215,9 @@ export function ChatView({
           <Badge tone="neutral">Sources collapsed by default</Badge>
           <Link
             href="/documents"
-            className="inline-flex min-h-[44px] items-center gap-1 rounded-[var(--r-xs)] px-2 py-1 text-xs text-muted transition-colors hover:text-ink"
+            className="inline-flex min-h-[44px] items-center gap-1 rounded-[var(--r-xs)] px-2 py-1 text-xs font-medium text-muted transition-colors hover:text-ink"
           >
-            Catalog <ArrowUpRight className="size-3.5" aria-hidden="true" />
+            Catalog <ArrowUpRight className="size-4" aria-hidden="true" />
           </Link>
         </div>
       </header>
@@ -237,37 +255,26 @@ export function ChatView({
           ) : null}
 
           {error ? (
-            <div
-              role="alert"
-              className="mt-4 rounded-[var(--r-md)] border border-[rgba(255,133,133,0.28)] bg-danger-soft p-3.5"
-            >
-              <div className="flex items-start gap-2.5">
-                <AlertTriangle className="mt-0.5 size-4 shrink-0 text-danger" aria-hidden="true" />
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-ink">The answer could not be completed</p>
-                  <p className="mt-1 text-xs leading-relaxed text-muted">{error.message}</p>
-                  <p className="mt-1 font-mono text-xs text-faint">{error.code}</p>
-                  <div className="mt-2.5 flex flex-wrap gap-2">
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => {
-                        setError(null);
-                        void runQuery(error.retryText);
-                      }}
-                    >
-                      <RefreshCw /> Try again
-                    </Button>
-                    {error.code === "UNAUTHENTICATED" ? (
-                      <Button size="sm" variant="primary" asChild>
-                        <Link href="/login">Sign in again</Link>
-                      </Button>
-                    ) : null}
-                    <Button size="sm" variant="ghost" onClick={() => setError(null)}>
-                      <X /> Dismiss
-                    </Button>
-                  </div>
-                </div>
+            <div className="mt-5 space-y-2.5">
+              <ErrorState
+                statusCode={error.status}
+                errorCode={error.code}
+                message={error.message}
+                onRetry={() => {
+                  const retry = error.retryText;
+                  setError(null);
+                  void runQuery(retry);
+                }}
+              />
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                {error.code === "UNAUTHENTICATED" ? (
+                  <Button size="sm" variant="primary" asChild>
+                    <Link href="/login">Sign in again</Link>
+                  </Button>
+                ) : null}
+                <Button size="sm" variant="ghost" onClick={() => setError(null)}>
+                  Dismiss error
+                </Button>
               </div>
             </div>
           ) : null}

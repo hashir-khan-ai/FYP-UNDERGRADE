@@ -53,6 +53,10 @@ class GoldQuestionItem(BaseModel):
     paired_id: str | None = Field(default=None)
     expected_route: str | None = Field(default=None)
     unauthorized_keywords: list[str] = Field(default_factory=list)
+    human_notes: str | None = Field(default=None)
+    original_gold_answer: str | None = Field(default=None)
+    original_clause: str | None = Field(default=None)
+    original_gold_chunk_ids: list[str] | None = Field(default=None)
 
     @field_validator("gold_chunk_ids")
     @classmethod
@@ -86,7 +90,20 @@ def load_indexed_chunks(bm25_path: str | Path | None = None) -> list[dict[str, A
     return list(payload.get("chunks", []))
 
 
-def load_gold_set(path: str | Path = "data/eval/gold_set.jsonl") -> list[GoldQuestionItem]:
+def exclude_rejected_questions(items: list[GoldQuestionItem]) -> list[GoldQuestionItem]:
+    """Return all gold items not marked rejected by human review."""
+    return [
+        item
+        for item in items
+        if item.status != "rejected" and item.review_status != "rejected"
+    ]
+
+
+def load_gold_set(
+    path: str | Path = "data/eval/gold_set.jsonl",
+    *,
+    include_rejected: bool = True,
+) -> list[GoldQuestionItem]:
     """Read and parse all JSONL rows from ``path`` into ``GoldQuestionItem`` objects."""
     file_path = Path(path)
     if not file_path.exists():
@@ -102,7 +119,7 @@ def load_gold_set(path: str | Path = "data/eval/gold_set.jsonl") -> list[GoldQue
                 items.append(GoldQuestionItem.model_validate(data))
             except Exception as exc:
                 raise ValueError(f"Line {line_no}: {exc}") from exc
-    return items
+    return items if include_rejected else exclude_rejected_questions(items)
 
 
 def validate_gold_set_file(
@@ -261,7 +278,9 @@ def select_reviewed_questions(
             questions carry ``status == "reviewed"`` and ``reviewed_by in ("student", "human")``.
     """
     reviewed = [
-        item for item in items if item.status == "reviewed" and item.reviewed_by in ("student", "human")
+        item
+        for item in exclude_rejected_questions(items)
+        if item.status == "reviewed" and item.reviewed_by in ("student", "human")
     ]
     if len(reviewed) < min_reviewed:
         human_count = sum(1 for item in items if item.status == "reviewed" and item.reviewed_by == "human")
