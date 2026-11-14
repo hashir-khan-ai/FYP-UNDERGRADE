@@ -216,3 +216,123 @@ def test_upload_error_is_sanitized_and_file_path_omits_directories(
     assert "C:\\secret" not in exc_info.value.message
     assert "qdrant" not in exc_info.value.message
 
+
+def test_empty_or_missing_roles_means_deny_by_default() -> None:
+    """Missing or empty allowed_roles metadata on a chunk MUST mean DENY (excluded for every role)."""
+    from src.core.security import chunk_visible_to_role, enforce_role_visibility
+
+    # Chunk with empty roles
+    empty_roles_chunk = {"chunk_id": "DENY-01", "allowed_roles": [], "text_content": "Secret text"}
+    for role in ("analyst", "manager", "auditor"):
+        assert chunk_visible_to_role(empty_roles_chunk, role) is False, (
+            f"Chunk with empty roles must be denied for role '{role}'"
+        )
+
+    # Chunk with None roles
+    none_roles_chunk = {"chunk_id": "DENY-02", "allowed_roles": None, "text_content": "Secret text"}
+    for role in ("analyst", "manager", "auditor"):
+        assert chunk_visible_to_role(none_roles_chunk, role) is False, (
+            f"Chunk with None roles must be denied for role '{role}'"
+        )
+
+    # Re-ranking drop verification
+    permitted, dropped = enforce_role_visibility([empty_roles_chunk, none_roles_chunk], "auditor")
+    assert len(permitted) == 0
+    assert dropped == 2
+
+
+def test_dual_index_consistency_verification_catches_divergence() -> None:
+    """Dual-index verification raises IngestionConsistencyError if chunk IDs or role metadata mismatch."""
+    from src.ingestion.chunker import DocumentChunk
+    from src.ingestion.upload_ingest import IngestionConsistencyError, verify_dual_index_consistency
+
+    chunk = DocumentChunk(
+        chunk_id="CHK-001",
+        doc_id="D-1",
+        doc_title="Policy",
+        section_label="S1",
+        clause_label="C1",
+        page=1,
+        source_path="data/test.md",
+        allowed_roles=["manager", "auditor"],
+        text_content="Policy body",
+    )
+
+    # 1. Chunk ID missing in BM25 staged list -> raises IngestionConsistencyError
+    with pytest.raises(IngestionConsistencyError, match="missing from staged BM25 index"):
+        verify_dual_index_consistency([chunk], [])
+
+    # 2. Role metadata mismatch -> raises IngestionConsistencyError
+    mismatched_bm25_chunk = {
+        "chunk_id": "CHK-001",
+        "allowed_roles": ["analyst"],  # Diverged roles!
+    }
+    with pytest.raises(IngestionConsistencyError, match="Role metadata mismatch"):
+        verify_dual_index_consistency([chunk], [mismatched_bm25_chunk])
+
+    # 3. Exact match -> passes cleanly
+    matched_bm25_chunk = {
+        "chunk_id": "CHK-001",
+        "allowed_roles": ["manager", "auditor"],
+    }
+    verify_dual_index_consistency([chunk], [matched_bm25_chunk])
+
+
+def test_simulated_ingestion_failure_rolls_back_and_leaves_index_intact(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Failure mid-upload rolls back staging, unlinks temp files, and leaves previous live index intact."""
+    from src.ingestion.chunker import DocumentChunk
+    from src.ingestion.upload_ingest import IngestionConsistencyError, ingest_uploaded_document
+
+    # 1. Create an initial live index with 1 chunk
+    bm25_path = tmp_path / "live_bm25.pkl"
+    bm25 = BM25Indexer(index_path=str(bm25_path))
+    initial_chunk = DocumentChunk(
+        chunk_id="ORIG-001",
+        doc_id="DOC-ORIG",
+        doc_title="Original Policy",
+        section_label="S1",
+        clause_label="C1",
+        page=1,
+        source_path="data/orig.md",
+        allowed_roles=["analyst", "manager", "auditor"],
+        text_content="Original established policy content.",
+    )
+    bm25.build_and_save([initial_chunk])
+    assert len(bm25.chunks) == 1
+    assert bm25_path.exists()
+
+    qdrant = QdrantIndexer(
+        storage_path=str(tmp_path / "qdrant_test"),
+        embedder=FakeEmbeddingGenerator(),
+    )
+    qdrant.index_chunks([initial_chunk])
+
+    # 2. Attempt ingestion with SIMULATE_INGESTION_FAILURE=True
+    monkeypatch.setattr(settings, "SIMULATE_INGESTION_FAILURE", True)
+    monkeypatch.setattr(settings, "UPLOAD_DIR", str(tmp_path / "uploads"))
+
+    new_content = b"# New Policy\n\nSection 1\n\nThis is new policy content to ingest."
+    with pytest.raises(IngestionConsistencyError, match="SIMULATED_INGESTION_CRASH_BEFORE_SWAP"):
+        ingest_uploaded_document(
+            file_bytes=new_content,
+            filename="new_policy.md",
+            user_id=2,
+            user_role="manager",
+            allowed_roles=["manager", "auditor"],
+            bm25_indexer=bm25,
+            qdrant_indexer=qdrant,
+        )
+
+    # 3. Verify rollback: Live BM25 file was not overwritten; staging temp files were unlinked
+    bm25.load()
+    assert len(bm25.chunks) == 1
+    assert bm25.chunks[0]["chunk_id"] == "ORIG-001"
+
+    # Verify no dangling .tmp or .staging files remain
+    staging_files = list(tmp_path.glob("*.tmp*"))
+    assert len(staging_files) == 0, f"Found dangling staging files: {staging_files}"
+
+

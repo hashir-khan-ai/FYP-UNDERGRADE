@@ -141,7 +141,17 @@ CREATE TABLE IF NOT EXISTS llm_cache (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS idx_cache_prompt_hash ON llm_cache(prompt_hash);
+CREATE TABLE IF NOT EXISTS saved_views (
+    id TEXT PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    view_name TEXT NOT NULL,
+    page TEXT NOT NULL,
+    filters_json TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_saved_views_user_page ON saved_views(user_id, page);
 
 -- 8. LLM Calls Telemetry (Spend Guard & Audit)
 -- The first six telemetry columns mirror the Phase 1 table. The remaining
@@ -270,6 +280,18 @@ def apply_migrations(conn: sqlite3.Connection) -> None:
     cur.execute("CREATE INDEX IF NOT EXISTS idx_llm_calls_step ON llm_calls(step);")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_llm_calls_profile ON llm_calls(llm_profile);")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_llm_calls_audit_id ON llm_calls(audit_id);")
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS saved_views (
+            id TEXT PRIMARY KEY,
+            user_id INTEGER NOT NULL,
+            view_name TEXT NOT NULL,
+            page TEXT NOT NULL,
+            filters_json TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+    """)
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_saved_views_user_page ON saved_views(user_id, page);")
 
     # Backfill hash chain for any legacy audit_log entries lacking entry_hash
     from src.core.audit_chain import AUDIT_HASH_COLUMNS, GENESIS_PREV_HASH, compute_audit_hash

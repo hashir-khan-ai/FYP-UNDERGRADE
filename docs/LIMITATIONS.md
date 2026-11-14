@@ -48,8 +48,13 @@ In adherence to academic integrity and rigorous systems engineering principles, 
 
 ### 2.6 Cryptographic Audit Log & Unanchored Chain Limitation
 - **Mechanism:** The SQLite `audit_log` records an append-only SHA-256 hash chain where each entry includes the previous entry's hash: `entry_hash = SHA256(prev_hash || row_data)`.
-- **Limitation:** While this chain detects row tampering, out-of-order reordering, or deletion within an untampered database, **an adversary or malicious insider with direct database write access (e.g., SQLite DB file access) could rewrite past rows and recompute all subsequent hash links from scratch**, producing an internally self-consistent chain that passes simple linear verification.
+- **Limitation:** The audit chain is only tamper-evident when its head hash is published elsewhere. While this chain detects row tampering, out-of-order reordering, or deletion within an untampered database, **an adversary or malicious insider with direct database write access (e.g., SQLite DB file access) could rewrite past rows and recompute all subsequent hash links from scratch**, producing an internally self-consistent chain that passes simple linear verification unless anchored externally.
 - **Mitigation & External Anchoring:** To prevent undetected history rewriting, external audit anchors must be periodically exported (`scripts/export_audit_anchor.py`) and stored off-system (e.g. write-once storage, Git commit trees, or timestamping authorities). Verification via `scripts/verify_audit.py --anchor reports/audit_anchor_latest.json` checks the database head against the trusted external anchor, immediately detecting any recomputation or rollback.
+
+### 2.7 Unencrypted On-Disk Cache Storage
+- **Mechanism:** The SQLite `llm_cache` table caches completion responses keyed by SHA-256 digests incorporating prompt, model, system prompt, temperature, role, user scope, and corpus ACL manifest version.
+- **Limitation:** Cached answers are stored unencrypted on disk within the SQLite database.
+- **Production Gap & Threat:** While cached entries are partitioned cryptographically by role and ACL version at the application query layer, an adversary with direct filesystem access to `data/sqlite/app.db` could inspect raw plaintext regulatory answers and synthesized advice. Production enterprise deployments require transparent data encryption at rest (e.g., SQLCipher or OS-level BitLocker/dm-crypt) and envelope encryption for sensitive regulatory cached outputs.
 
 ---
 

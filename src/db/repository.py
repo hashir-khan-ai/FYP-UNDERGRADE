@@ -546,6 +546,125 @@ class Repository:
         cur.execute("SELECT * FROM documents ORDER BY id ASC;")
         return cur.fetchall()
 
+    def get_document(self, doc_id: str) -> sqlite3.Row | None:
+        """Fetch a single document from the catalog by its ID."""
+        cur = self.conn.cursor()
+        cur.execute("SELECT * FROM documents WHERE id = ?;", (doc_id,))
+        return cur.fetchone()
+
+    def update_document_metadata(
+        self,
+        doc_id: str,
+        title: str | None = None,
+        allowed_roles: list[str] | None = None,
+    ) -> bool:
+        """Update a document's title or allowed roles."""
+        cur = self.conn.cursor()
+        updates = []
+        params = []
+        if title is not None:
+            updates.append("filename = ?")
+            params.append(title)
+        if allowed_roles is not None:
+            updates.append("allowed_roles = ?")
+            params.append(json.dumps(allowed_roles))
+        if not updates:
+            return False
+        params.append(doc_id)
+        cur.execute(f"UPDATE documents SET {', '.join(updates)} WHERE id = ?;", tuple(params))
+        return cur.rowcount > 0
+
+    def delete_document(self, doc_id: str) -> bool:
+        """Delete a document from the catalog."""
+        cur = self.conn.cursor()
+        cur.execute("DELETE FROM documents WHERE id = ?;", (doc_id,))
+        return cur.rowcount > 0
+
+    # --------------------------------------------------------------------------
+    # Saved Views (Scoped strictly by user ID)
+    # --------------------------------------------------------------------------
+    def save_user_view(
+        self,
+        user_id: int,
+        view_name: str,
+        page: str,
+        filters_json: str,
+        view_id: str | None = None,
+    ) -> str:
+        """Save or update a named filter view scoped strictly to user_id."""
+        import uuid
+        cur = self.conn.cursor()
+        if view_id:
+            cur.execute("SELECT user_id FROM saved_views WHERE id = ?;", (view_id,))
+            row = cur.fetchone()
+            if row and int(row[0]) != int(user_id):
+                raise PermissionError("Cannot overwrite a saved view owned by another user.")
+            final_id = view_id
+        else:
+            final_id = f"view_{uuid.uuid4().hex[:12]}"
+
+        cur.execute(
+            """
+            INSERT OR REPLACE INTO saved_views (id, user_id, view_name, page, filters_json)
+            VALUES (?, ?, ?, ?, ?);
+            """,
+            (final_id, user_id, view_name.strip()[:100], page.strip()[:50], filters_json),
+        )
+        return final_id
+
+    def get_user_view(self, user_id: int, view_id: str) -> sqlite3.Row | None:
+        """Fetch a single saved view strictly verifying ownership by user_id."""
+        cur = self.conn.cursor()
+        cur.execute("SELECT * FROM saved_views WHERE id = ? AND user_id = ?;", (view_id, user_id))
+        return cur.fetchone()
+
+    def update_user_view(
+        self,
+        user_id: int,
+        view_id: str,
+        view_name: str | None = None,
+        filters_json: str | None = None,
+    ) -> bool:
+        """Update a saved view strictly verifying ownership by user_id."""
+        cur = self.conn.cursor()
+        updates = []
+        params = []
+        if view_name is not None:
+            updates.append("view_name = ?")
+            params.append(view_name.strip()[:100])
+        if filters_json is not None:
+            updates.append("filters_json = ?")
+            params.append(filters_json)
+        if not updates:
+            return False
+        params.extend([view_id, user_id])
+        cur.execute(
+            f"UPDATE saved_views SET {', '.join(updates)} WHERE id = ? AND user_id = ?;",
+            tuple(params),
+        )
+        return cur.rowcount > 0
+
+    def list_user_views(self, user_id: int, page: str | None = None) -> list[sqlite3.Row]:
+        """List saved filter views scoped strictly to user_id."""
+        cur = self.conn.cursor()
+        if page:
+            cur.execute(
+                "SELECT * FROM saved_views WHERE user_id = ? AND page = ? ORDER BY created_at DESC;",
+                (user_id, page),
+            )
+        else:
+            cur.execute(
+                "SELECT * FROM saved_views WHERE user_id = ? ORDER BY created_at DESC;",
+                (user_id,),
+            )
+        return cur.fetchall()
+
+    def delete_user_view(self, user_id: int, view_id: str) -> bool:
+        """Delete a saved view verifying ownership by user_id."""
+        cur = self.conn.cursor()
+        cur.execute("DELETE FROM saved_views WHERE id = ? AND user_id = ?;", (view_id, user_id))
+        return cur.rowcount > 0
+
     # --------------------------------------------------------------------------
     # On-Disk LLM Cache & Telemetry
     # --------------------------------------------------------------------------
@@ -558,6 +677,12 @@ class Repository:
         """Delete one invalidated or malformed cache entry."""
         cur = self.conn.cursor()
         cur.execute("DELETE FROM llm_cache WHERE cache_key = ?;", (cache_key,))
+
+    def clear_all_llm_cache(self) -> int:
+        """Purge all cached LLM answers across all models and roles."""
+        cur = self.conn.cursor()
+        cur.execute("DELETE FROM llm_cache;")
+        return cur.rowcount
 
     def set_cached_llm(
         self,

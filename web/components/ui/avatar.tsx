@@ -1,7 +1,7 @@
 import { cn, initials } from "@/lib/utils";
 
 const SIZES = {
-  sm: "size-8 text-[0.6875rem]",
+  sm: "size-8 text-xs font-semibold",
   md: "size-9.5 text-xs",
   lg: "size-11 text-sm",
 } as const;

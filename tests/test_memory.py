@@ -228,3 +228,76 @@ def test_chat_without_memory_does_not_pay_for_a_rewrite(
     )
     assert second.status_code == 200
     assert second.json()["llm_stats"]["calls"] == 1
+
+
+def test_cache_key_isolation_across_roles_and_users() -> None:
+    """Cache keys must be strictly isolated across roles and users to prevent cross-tenant/cross-role leakage."""
+    base_kwargs = {
+        "profile": "mock",
+        "model": "mock-compliance-v1",
+        "prompt": "Explain the internal risk tolerance thresholds under Stress Testing Policy.",
+        "system_prompt": "You are a regulatory compliance assistant.",
+        "temperature": 0.0,
+        "max_tokens": 512,
+        "step": "answer",
+    }
+
+    key_analyst_user1 = llm_client._compute_cache_key(
+        **base_kwargs, role="analyst", user_id=1
+    )
+    key_manager_user1 = llm_client._compute_cache_key(
+        **base_kwargs, role="manager", user_id=1
+    )
+    key_auditor_user1 = llm_client._compute_cache_key(
+        **base_kwargs, role="auditor", user_id=1
+    )
+    key_analyst_user2 = llm_client._compute_cache_key(
+        **base_kwargs, role="analyst", user_id=2
+    )
+
+    # 1. Cross-role isolation: identical user and prompt, different role -> distinct keys
+    assert key_analyst_user1 != key_manager_user1
+    assert key_manager_user1 != key_auditor_user1
+    assert key_analyst_user1 != key_auditor_user1
+
+    # 2. Cross-user isolation: identical role and prompt, different user_id -> distinct keys
+    assert key_analyst_user1 != key_analyst_user2
+
+
+def test_session_turns_and_titles_isolated_across_users(seeded_auth_users) -> None:
+    """Session history and titles must remain strictly partitioned by user_id in SQLite."""
+    with get_db_connection() as conn:
+        repo = Repository(conn)
+        analyst_id = seeded_auth_users["analyst"]["id"]
+        manager_id = seeded_auth_users["manager"]["id"]
+
+        session_id = "mem-cross-user-isolation-test"
+        if repo.get_session(session_id) is None:
+            repo.create_session(session_id, analyst_id, "Analyst Capital Research")
+        else:
+            repo.rename_session_for_user(session_id, analyst_id, "Analyst Capital Research")
+
+        repo.add_message(session_id, "user", "What is the countercyclical capital buffer?", user_role="analyst")
+        repo.add_message(session_id, "assistant", "The countercyclical capital buffer is currently 1.0%.", user_role="analyst")
+
+        # 1. Analyst sees both turns
+        analyst_turns = load_recent_turns(repo, session_id, analyst_id, 10)
+        assert len(analyst_turns) == 2
+        analyst_contents = [t["content"] for t in analyst_turns]
+        assert "What is the countercyclical capital buffer?" in analyst_contents
+        assert "The countercyclical capital buffer is currently 1.0%." in analyst_contents
+
+        # 2. Manager cannot see analyst turns even with the exact session_id
+        manager_turns = load_recent_turns(repo, session_id, manager_id, 10)
+        assert manager_turns == []
+
+        # 3. Manager's session list does not contain analyst's session
+        manager_sessions = repo.list_sessions_by_user(manager_id)
+        assert all(s["id"] != session_id for s in manager_sessions)
+
+        # 4. Analyst's session list contains the session
+        analyst_sessions = repo.list_sessions_by_user(analyst_id)
+        matching = [s for s in analyst_sessions if s["id"] == session_id]
+        assert len(matching) == 1
+        assert matching[0]["title"] == "Analyst Capital Research"
+

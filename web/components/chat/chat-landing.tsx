@@ -39,14 +39,14 @@ export function ChatLanding({ name }: { name: string }) {
                 </Link>
               </Button>
             </div>
-            <p className="mt-4 text-[0.625rem] leading-relaxed text-faint">
+            <p className="mt-4 text-xs leading-relaxed text-faint">
               No session exists yet. The login flow normally creates one automatically; you can also
               create one here.
             </p>
           </div>
           <div className="rounded-[var(--r-lg)] border border-line bg-[rgba(3,6,10,0.3)] p-3">
             <TrustMap />
-            <p className="mt-1 text-center text-[0.625rem] text-faint">
+            <p className="mt-1 text-center text-xs text-faint">
               Corpus → role gate → relevance grader → verified answer
             </p>
           </div>

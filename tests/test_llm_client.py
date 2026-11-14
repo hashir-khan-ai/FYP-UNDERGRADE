@@ -346,3 +346,146 @@ def test_offline_missing_weights_raise_actionable_error(monkeypatch: pytest.Monk
         reranker.rerank("q", [{"chunk_id": "1", "text_content": "a"}, {"chunk_id": "2", "text_content": "b"}])
 
 
+def test_revoke_role_on_document_invalidates_cached_answer() -> None:
+    """(a) Revoking a role on a document alters the ACL version, making previous cached answers unreachable."""
+    from src.core.acl_version import compute_index_acl_version
+    from src.db.repository import Repository
+
+    client = ResilientLLMClient()
+    prompt = "Unique prompt for permission revocation test 998877"
+
+    with get_db_connection() as conn:
+        from src.db.repository import Repository
+        repo = Repository(conn)
+        # Register test document with auditor + manager roles
+        repo.register_document(
+            doc_id="DOC-REVOKE-TEST",
+            filename="confidential_audit.md",
+            source_jurisdiction="INTERNAL_UK",
+            doc_type="AUDIT_REPORT",
+            version="1.0",
+            allowed_roles=["manager", "auditor"],
+            file_path="data/synthetic/confidential_audit.md",
+            total_chunks=5,
+        )
+        conn.commit()
+
+        v1 = compute_index_acl_version(conn)
+        key_before = client._compute_cache_key(
+            profile="mock",
+            model="mock-v1",
+            prompt=prompt,
+            system_prompt="sys",
+            temperature=0.0,
+            max_tokens=100,
+            step="answer",
+            role="manager",
+            index_acl_version=v1,
+        )
+
+        # Populate cache with answer
+        repo.set_cached_llm(key_before, "prompt_hash", "mock-v1", "Cached manager answer for doc", 10, 20)
+        conn.commit()
+
+        # Manager gets cached hit
+        cached_row = repo.get_cached_llm(key_before)
+        assert cached_row is not None
+        assert cached_row["response_text"] == "Cached manager answer for doc"
+
+        # REVOCATION: Revoke manager role, leaving only auditor
+        repo.register_document(
+            doc_id="DOC-REVOKE-TEST",
+            filename="confidential_audit.md",
+            source_jurisdiction="INTERNAL_UK",
+            doc_type="AUDIT_REPORT",
+            version="1.0",
+            allowed_roles=["auditor"],  # Manager role revoked!
+            file_path="data/synthetic/confidential_audit.md",
+            total_chunks=5,
+        )
+        conn.commit()
+
+        v2 = compute_index_acl_version(conn)
+        assert v1 != v2, "ACL index version must change when roles are revoked"
+
+        key_after = client._compute_cache_key(
+            profile="mock",
+            model="mock-v1",
+            prompt=prompt,
+            system_prompt="sys",
+            temperature=0.0,
+            max_tokens=100,
+            step="answer",
+            role="manager",
+            index_acl_version=v2,
+        )
+        assert key_before != key_after
+
+        # Previously cached answer is NOT served for the revoked role
+        cached_after = repo.get_cached_llm(key_after)
+        assert cached_after is None, "Cached answer must be unreachable after permission revocation!"
+
+
+def test_cache_entries_expire_after_ttl_and_purged() -> None:
+    """(b) Cache entries older than TTL expire and are removed by purge_expired_cache routine."""
+    from src.config import settings
+    from src.core.llm_client import purge_expired_cache
+    from src.db.repository import Repository
+
+    client = ResilientLLMClient()
+    prompt = "Unique prompt for TTL expiration test 334455"
+    key = client._compute_cache_key("mock", "mock-v1", prompt, None, 0.0, 100, "answer", role="analyst")
+
+    with get_db_connection() as conn:
+        from src.db.repository import Repository
+        repo = Repository(conn)
+        repo.set_cached_llm(key, "hash_ttl", "mock-v1", "Expiring answer", 10, 20)
+        conn.commit()
+
+        # Simulate backdating row created_at to 48 hours ago
+        conn.execute(
+            "UPDATE llm_cache SET created_at = datetime('now', '-48 hours') WHERE cache_key = ?;",
+            (key,),
+        )
+        conn.commit()
+
+        # 1. Freshness check: row is stale against 24h TTL
+        stale_row = conn.execute("SELECT created_at FROM llm_cache WHERE cache_key = ?;", (key,)).fetchone()
+        assert client._cache_row_is_fresh(stale_row["created_at"]) is False
+
+        # 2. Startup purge routine purges entries older than TTL
+        purged_count = purge_expired_cache(conn=conn, ttl_hours=24)
+        assert purged_count >= 1
+
+        # 3. Entry is completely deleted from database
+        assert repo.get_cached_llm(key) is None
+
+
+def test_cache_never_returns_answer_across_roles() -> None:
+    """(c) The cache strictly partitions entries by role; an answer cached for auditor is never served to analyst."""
+    client = ResilientLLMClient()
+    prompt = "Explain confidential capital liquidity requirements."
+
+    key_analyst = client._compute_cache_key("mock", "mock-v1", prompt, None, 0.0, 100, "answer", role="analyst")
+    key_manager = client._compute_cache_key("mock", "mock-v1", prompt, None, 0.0, 100, "answer", role="manager")
+    key_auditor = client._compute_cache_key("mock", "mock-v1", prompt, None, 0.0, 100, "answer", role="auditor")
+
+    assert key_analyst != key_manager != key_auditor
+
+    with get_db_connection() as conn:
+        from src.db.repository import Repository
+        repo = Repository(conn)
+        repo.set_cached_llm(key_auditor, "hash_audit", "mock-v1", "Auditor-only confidential answer", 15, 30)
+        conn.commit()
+
+        # Auditor hit
+        assert repo.get_cached_llm(key_auditor)["response_text"] == "Auditor-only confidential answer"
+
+        # Analyst miss
+        assert repo.get_cached_llm(key_analyst) is None
+
+        # Manager miss
+        assert repo.get_cached_llm(key_manager) is None
+
+
+

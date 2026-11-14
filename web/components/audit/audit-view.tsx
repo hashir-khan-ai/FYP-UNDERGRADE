@@ -3,19 +3,43 @@
 import * as React from "react";
 import {
   AlertTriangle,
+  Bookmark,
+  BookmarkPlus,
+  Download,
   FileCheck2,
   Filter,
+  Plus,
   RefreshCw,
   ShieldCheck,
   Timer,
+  Trash2,
   Users,
+  X,
 } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+import { toast } from "sonner";
 
 import { PageHeader } from "@/components/workspace/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { ColumnDef, DataTable } from "@/components/ui/data-table";
+import {
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input, Label } from "@/components/ui/input";
 import { ApiError, api } from "@/lib/api-client";
 import {
   formatCompactNumber,
@@ -25,7 +49,9 @@ import {
   formatPercent,
   formatScore,
 } from "@/lib/format";
+import { useDebouncedValue } from "@/lib/hooks/use-debounce";
 import type { AuditLogEntry, UserProfile } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 function Kpi({
   label,
@@ -37,7 +63,7 @@ function Kpi({
   label: string;
   value: string;
   hint: string;
-  icon: LucideIcon;
+  icon: React.ComponentType<{ className?: string }>;
   tone?: "neutral" | "success" | "accent" | "warning";
 }) {
   const toneClass =
@@ -52,15 +78,23 @@ function Kpi({
   return (
     <div className="rounded-[var(--r-md)] border border-line bg-surface/55 p-3.5">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[0.625rem] font-semibold uppercase tracking-[0.09em] text-faint">
+        <span className="text-xs font-semibold uppercase tracking-[0.09em] text-faint">
           {label}
         </span>
-        <Icon className={`size-3.5 ${toneClass}`} aria-hidden="true" />
+        <Icon className={cn("size-3.5", toneClass)} />
       </div>
       <div className="tabular mt-1.5 text-lg font-semibold tracking-[-0.02em] text-ink">{value}</div>
-      <div className="mt-0.5 text-[0.625rem] leading-relaxed text-faint">{hint}</div>
+      <div className="mt-0.5 text-xs leading-relaxed text-faint">{hint}</div>
     </div>
   );
+}
+
+interface SavedViewItem {
+  id: string;
+  view_name: string;
+  page: string;
+  filters_json: string;
+  created_at?: string;
 }
 
 export function AuditView({
@@ -73,44 +107,282 @@ export function AuditView({
   initialStatus: number;
 }) {
   const [logs, setLogs] = React.useState(initialLogs);
-  const [limit, setLimit] = React.useState(50);
-  const [userId, setUserId] = React.useState("");
-  const [filterUserId, setFilterUserId] = React.useState<number | undefined>(undefined);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(
     initialStatus >= 500 ? "Audit summaries could not be loaded." : null,
   );
 
-  async function refresh(next?: { limit?: number; userId?: number | undefined }) {
-    const nextLimit = next?.limit ?? limit;
-    const nextUserId = next && "userId" in next ? next.userId : filterUserId;
+  // Filters
+  const [roleFilter, setRoleFilter] = React.useState<string>("all");
+  const [routeFilter, setRouteFilter] = React.useState<string>("all");
+  const [userIdFilter, setUserIdFilter] = React.useState<string>("");
+  const debouncedUserId = useDebouncedValue(userIdFilter, 300);
+
+  // Saved Views
+  const [savedViews, setSavedViews] = React.useState<SavedViewItem[]>([]);
+  const [activeViewName, setActiveViewName] = React.useState<string | null>(null);
+  const [saveDialogOpen, setSaveDialogOpen] = React.useState(false);
+  const [newViewName, setNewViewName] = React.useState("");
+  const [savingView, setSavingView] = React.useState(false);
+
+  // Load saved views on mount
+  React.useEffect(() => {
+    let active = true;
+    api
+      .getSavedViews("audit")
+      .then((views) => {
+        if (active) setSavedViews(views);
+      })
+      .catch(() => {
+        // Silently tolerate if views store is fresh
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  async function refresh(nextLimit = 100) {
     setLoading(true);
     setError(null);
     try {
-      const fresh = await api.getAuditLogs(nextLimit, nextUserId);
+      const fresh = await api.getAuditLogs(nextLimit);
       setLogs(fresh);
-      setLimit(nextLimit);
-      setFilterUserId(nextUserId);
     } catch (caught) {
       setError(
-        caught instanceof ApiError
-          ? caught.message
-          : "The audit summaries could not be refreshed.",
+        caught instanceof ApiError ? caught.message : "The audit summaries could not be refreshed.",
       );
     } finally {
       setLoading(false);
     }
   }
 
+  // Filter application
+  const filteredLogs = React.useMemo(() => {
+    return logs.filter((log) => {
+      if (roleFilter !== "all" && log.user_role.toLowerCase() !== roleFilter.toLowerCase()) {
+        return false;
+      }
+      if (routeFilter !== "all" && log.final_route !== routeFilter) {
+        return false;
+      }
+      if (debouncedUserId.trim()) {
+        if (String(log.user_id) !== debouncedUserId.trim()) return false;
+      }
+      return true;
+    });
+  }, [logs, roleFilter, routeFilter, debouncedUserId]);
+
+  async function handleSaveCurrentView() {
+    const trimmed = newViewName.trim();
+    if (!trimmed) return;
+    setSavingView(true);
+    try {
+      const filters = {
+        roleFilter,
+        routeFilter,
+        userIdFilter: debouncedUserId.trim(),
+      };
+      const created = await api.saveView({
+        view_name: trimmed,
+        page: "audit",
+        filters_json: JSON.stringify(filters),
+      });
+      setSavedViews((prev) => [
+        ...prev,
+        {
+          id: created.id,
+          view_name: created.view_name,
+          page: created.page,
+          filters_json: JSON.stringify(filters),
+        },
+      ]);
+      setActiveViewName(trimmed);
+      setSaveDialogOpen(false);
+      setNewViewName("");
+      toast.success(`Saved view "${trimmed}" created.`);
+    } catch {
+      toast.error("Failed to save view.");
+    } finally {
+      setSavingView(false);
+    }
+  }
+
+  function applySavedView(view: SavedViewItem) {
+    try {
+      const parsed = JSON.parse(view.filters_json);
+      setRoleFilter(parsed.roleFilter ?? "all");
+      setRouteFilter(parsed.routeFilter ?? "all");
+      setUserIdFilter(parsed.userIdFilter ?? "");
+      setActiveViewName(view.view_name);
+      toast.info(`Applied view: ${view.view_name}`);
+    } catch {
+      toast.error("Invalid saved view configuration.");
+    }
+  }
+
+  async function handleDeleteSavedView(viewId: string, name: string) {
+    try {
+      await api.deleteSavedView(viewId);
+      setSavedViews((prev) => prev.filter((v) => v.id !== viewId));
+      if (activeViewName === name) setActiveViewName(null);
+      toast.success(`View "${name}" deleted.`);
+    } catch {
+      toast.error("Failed to delete view.");
+    }
+  }
+
+  function clearAllFilters() {
+    setRoleFilter("all");
+    setRouteFilter("all");
+    setUserIdFilter("");
+    setActiveViewName(null);
+  }
+
+  const hasActiveFilters =
+    roleFilter !== "all" || routeFilter !== "all" || Boolean(userIdFilter.trim());
+
+  // Metrics
   const totalTurns = logs.length;
   const totalCitations = logs.reduce((sum, row) => sum + (row.citation_count ?? 0), 0);
   const totalDropped = logs.reduce((sum, row) => sum + (row.citations_dropped ?? 0), 0);
   const totalFiltered = logs.reduce((sum, row) => sum + (row.candidates_filtered ?? 0), 0);
   const avgLatency =
-    totalTurns > 0
-      ? logs.reduce((sum, row) => sum + (row.latency_ms ?? 0), 0) / totalTurns
-      : 0;
+    totalTurns > 0 ? logs.reduce((sum, row) => sum + (row.latency_ms ?? 0), 0) / totalTurns : 0;
   const roles = Array.from(new Set(logs.map((row) => row.user_role)));
+  const availableRoutes = Array.from(new Set(logs.map((row) => row.final_route).filter(Boolean)));
+
+  // Column definitions for DataTable
+  const columns: ColumnDef<AuditLogEntry>[] = React.useMemo(
+    () => [
+      {
+        id: "audit_id",
+        header: "Audit ID",
+        sortable: true,
+        accessorKey: "audit_id",
+        cell: (row) => <span className="font-mono text-muted">#{row.audit_id}</span>,
+      },
+      {
+        id: "created_at",
+        header: "Timestamp",
+        sortable: true,
+        accessorKey: "created_at",
+        cell: (row) => (
+          <span className="whitespace-nowrap text-muted">{formatDateTime(row.created_at)}</span>
+        ),
+      },
+      {
+        id: "user_role",
+        header: "Role",
+        sortable: true,
+        accessorKey: "user_role",
+        cell: (row) => (
+          <Badge
+            tone={
+              row.user_role === "auditor"
+                ? "info"
+                : row.user_role === "manager"
+                  ? "warning"
+                  : "neutral"
+            }
+          >
+            {row.user_role}
+          </Badge>
+        ),
+      },
+      {
+        id: "final_route",
+        header: "Route",
+        sortable: true,
+        accessorKey: "final_route",
+        cell: (row) => <span className="font-mono text-ink-soft">{row.final_route}</span>,
+      },
+      {
+        id: "retrieved_chunk_ids",
+        header: "Chunks",
+        sortable: true,
+        cell: (row) => (
+          <span
+            className="tabular text-muted"
+            title={
+              row.retrieved_chunk_ids.length > 0
+                ? row.retrieved_chunk_ids.join("\n")
+                : "No chunks"
+            }
+          >
+            {formatNumber(row.retrieved_chunk_ids.length)}
+          </span>
+        ),
+      },
+      {
+        id: "citation_count",
+        header: "Citations",
+        sortable: true,
+        accessorKey: "citation_count",
+        cell: (row) => (
+          <span className="tabular text-ink-soft">{formatNumber(row.citation_count ?? 0)}</span>
+        ),
+      },
+      {
+        id: "citations_dropped",
+        header: "Dropped",
+        sortable: true,
+        accessorKey: "citations_dropped",
+        cell: (row) => (
+          <span className="tabular text-muted">{formatNumber(row.citations_dropped ?? 0)}</span>
+        ),
+      },
+      {
+        id: "candidates_filtered",
+        header: "Role Filtered",
+        sortable: true,
+        accessorKey: "candidates_filtered",
+        cell: (row) => (
+          <span className="tabular text-muted">{formatNumber(row.candidates_filtered)}</span>
+        ),
+      },
+      {
+        id: "router_confidence",
+        header: "Router",
+        cell: (row) => (
+          <span className="tabular text-muted">
+            {row.router_confidence != null ? formatScore(row.router_confidence) : "—"}
+            {row.router_fallback_reason ? (
+              <span className="ml-1 text-faint" title={row.router_fallback_reason}>
+                (fallback)
+              </span>
+            ) : null}
+          </span>
+        ),
+      },
+      {
+        id: "latency_ms",
+        header: "Latency",
+        sortable: true,
+        accessorKey: "latency_ms",
+        cell: (row) => (
+          <span className="tabular whitespace-nowrap text-muted">
+            {formatLatency(row.latency_ms)}
+          </span>
+        ),
+      },
+      {
+        id: "llm_profile",
+        header: "Profile",
+        sortable: true,
+        accessorKey: "llm_profile",
+        cell: (row) => (
+          <div className="flex flex-col text-xs text-muted">
+            <span>{row.llm_profile}</span>
+            <span className="text-[11px] text-faint">
+              {formatCompactNumber(row.tokens_prompt + row.tokens_completion)} tok ·{" "}
+              {formatCompactNumber(row.llm_calls)} calls
+            </span>
+          </div>
+        ),
+      },
+    ],
+    [],
+  );
 
   return (
     <div>
@@ -118,12 +390,18 @@ export function AuditView({
         eyebrow="Auditor only"
         title="Audit & RBAC summary"
         description="Sanitised turn summaries only. Query text and answer text are deliberately excluded from this endpoint; only routing, chunk IDs, citation counters and telemetry are shown."
+        role={user.role}
         actions={
           <>
             <Badge tone="success">
               <ShieldCheck /> Zero conversation text
             </Badge>
-            <Button variant="secondary" size="sm" onClick={() => void refresh()} disabled={loading}>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => void refresh()}
+              disabled={loading}
+            >
               <RefreshCw className={loading ? "animate-spin" : undefined} /> Refresh
             </Button>
           </>
@@ -139,16 +417,17 @@ export function AuditView({
             <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
             <div className="flex-1">
               <p className="font-medium text-ink">Audit summaries unavailable</p>
-              <p className="mt-0.5 text-[0.6875rem] text-muted">{error}</p>
+              <p className="mt-0.5 text-xs text-muted">{error}</p>
             </div>
           </div>
         ) : null}
 
+        {/* KPIs */}
         <div className="grid grid-cols-2 gap-2.5 xl:grid-cols-4">
           <Kpi
             label="Audited turns"
             value={formatNumber(totalTurns)}
-            hint="Rows in the current window"
+            hint="Total verified query records"
             icon={FileCheck2}
             tone="accent"
           />
@@ -173,189 +452,206 @@ export function AuditView({
           />
         </div>
 
-        <div className="mt-3 rounded-[var(--r-md)] border border-line bg-surface/45 px-3.5 py-3">
-          <p className="text-[0.6875rem] leading-relaxed text-muted">
-            Across <strong className="text-ink">{formatNumber(totalTurns)}</strong> audited turn(s),
-            server-side Qdrant and BM25 filters excluded{" "}
-            <strong className="text-ink">{formatNumber(totalFiltered)}</strong> restricted candidate
-            passage(s) before generation, and citation verification dropped{" "}
-            <strong className="text-ink">{formatNumber(totalDropped)}</strong> unsupported or
-            unpermitted reference(s). Roles observed: {roles.length > 0 ? roles.join(", ") : "none"}.
-          </p>
-        </div>
+        {/* Filter Chips & Saved Views Controls */}
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-[var(--r-md)] border border-line bg-surface/40 p-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-semibold uppercase tracking-wider text-faint flex items-center gap-1.5">
+              <Filter className="size-3.5" /> Filters:
+            </span>
 
-        <div className="mt-4 flex flex-wrap items-end gap-2">
-          <div className="w-36">
-            <label htmlFor="audit-limit" className="mb-1 block text-[0.625rem] font-medium text-faint">
-              Max rows
-            </label>
+            {/* Role Filter Chip / Select */}
             <select
-              id="audit-limit"
-              value={limit}
-              onChange={(event) => void refresh({ limit: Number(event.target.value) })}
-              className="h-9 w-full rounded-[var(--r-sm)] border border-line bg-[rgba(3,6,10,0.44)] px-2.5 text-xs text-ink outline-none focus:border-line-accent"
+              value={roleFilter}
+              onChange={(e) => setRoleFilter(e.target.value)}
+              className="h-8 rounded-[var(--r-sm)] border border-line bg-surface-2 px-2.5 text-xs text-ink outline-none focus:border-line-accent"
+              aria-label="Filter by user role"
             >
-              {[25, 50, 100, 200].map((value) => (
-                <option key={value} value={value}>
-                  {value} rows
+              <option value="all">All Roles</option>
+              {roles.map((r) => (
+                <option key={r} value={r}>
+                  Role: {r}
                 </option>
               ))}
             </select>
-          </div>
-          <div className="w-44">
-            <label htmlFor="audit-user" className="mb-1 block text-[0.625rem] font-medium text-faint">
-              Filter by user ID
-            </label>
+
+            {/* Route Filter Chip / Select */}
+            <select
+              value={routeFilter}
+              onChange={(e) => setRouteFilter(e.target.value)}
+              className="h-8 rounded-[var(--r-sm)] border border-line bg-surface-2 px-2.5 text-xs text-ink outline-none focus:border-line-accent"
+              aria-label="Filter by routing outcome"
+            >
+              <option value="all">All Routes</option>
+              {availableRoutes.map((rt) => (
+                <option key={rt} value={rt}>
+                  Route: {rt}
+                </option>
+              ))}
+            </select>
+
+            {/* User ID input */}
             <Input
-              id="audit-user"
-              value={userId}
-              onChange={(event) => setUserId(event.target.value.replace(/[^0-9]/g, ""))}
-              placeholder="Any user"
-              inputMode="numeric"
-              className="h-9 text-xs"
+              value={userIdFilter}
+              onChange={(e) => setUserIdFilter(e.target.value)}
+              placeholder="User ID..."
+              className="h-8 w-24 text-xs"
+              aria-label="Filter by user ID"
             />
+
+            {hasActiveFilters ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={clearAllFilters}
+                className="h-8 text-xs text-faint hover:text-ink"
+              >
+                <X className="size-3" /> Clear filters
+              </Button>
+            ) : null}
           </div>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() =>
-              void refresh({
-                userId: userId.trim() ? Number(userId.trim()) : undefined,
-              })
-            }
-            disabled={loading}
-          >
-            <Filter /> Apply filter
-          </Button>
-          {filterUserId !== undefined ? (
+
+          {/* Saved Views Section */}
+          <div className="flex items-center gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="secondary" size="sm">
+                  <Bookmark className="size-3.5" />
+                  {activeViewName ? `View: ${activeViewName}` : "Saved views"}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>Your saved views</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {savedViews.length === 0 ? (
+                  <div className="p-2 text-center text-xs text-muted">No saved views yet</div>
+                ) : (
+                  savedViews.map((view) => (
+                    <div
+                      key={view.id}
+                      className="flex items-center justify-between px-2 py-1.5 hover:bg-surface-2 text-xs"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => applySavedView(view)}
+                        className="truncate flex-1 text-left text-ink hover:text-accent font-medium"
+                      >
+                        {view.view_name}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleDeleteSavedView(view.id, view.view_name)}
+                        className="text-faint hover:text-danger p-1"
+                        aria-label={`Delete saved view ${view.view_name}`}
+                      >
+                        <Trash2 className="size-3" />
+                      </button>
+                    </div>
+                  ))
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={() => setSaveDialogOpen(true)}>
+                  <BookmarkPlus className="size-3.5" /> Save current view…
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => {
-                setUserId("");
-                void refresh({ userId: undefined });
-              }}
-              disabled={loading}
+              onClick={() => setSaveDialogOpen(true)}
+              aria-label="Save view"
             >
-              Clear
+              <BookmarkPlus className="size-3.5" /> Save view
             </Button>
-          ) : null}
-          <span className="ml-auto text-[0.625rem] text-faint">
-            Signed in as @{user.username} · {user.role}
-          </span>
+          </div>
         </div>
 
-        {logs.length === 0 ? (
-          <div className="mt-5 rounded-[var(--r-lg)] border border-dashed border-line px-6 py-12 text-center">
-            <Users className="mx-auto mb-3 size-6 text-faint" aria-hidden="true" />
-            <p className="text-sm font-medium text-ink-soft">No audit rows match this filter</p>
-            <p className="mx-auto mt-1 max-w-sm text-xs leading-relaxed text-muted">
-              Run a compliance query, then refresh this view. The summary appears after the turn is
-              persisted.
-            </p>
-          </div>
-        ) : (
-          <div className="mt-4 overflow-hidden rounded-[var(--r-lg)] border border-line">
-            <div className="max-h-[34rem] overflow-auto">
-              <table className="w-full min-w-[980px] border-collapse text-left">
-                <thead className="sticky top-0 z-10">
-                  <tr className="border-b border-line bg-canvas-raised">
-                    {[
-                      "Audit",
-                      "Timestamp",
-                      "Role",
-                      "Route",
-                      "Chunks",
-                      "Citations",
-                      "Dropped",
-                      "Role filtered",
-                      "Router",
-                      "Latency",
-                      "Profile",
-                    ].map((heading) => (
-                      <th
-                        key={heading}
-                        scope="col"
-                        className="whitespace-nowrap px-3 py-2.5 text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-faint"
-                      >
-                        {heading}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {logs.map((row) => (
-                    <tr
-                      key={row.audit_id}
-                      className="border-b border-line/70 transition-colors last:border-0 hover:bg-surface-2/40"
-                    >
-                      <td className="tabular px-3 py-2.5 font-mono text-[0.6875rem] text-muted">
-                        #{row.audit_id}
-                      </td>
-                      <td className="whitespace-nowrap px-3 py-2.5 text-[0.6875rem] text-muted">
-                        {formatDateTime(row.created_at)}
-                      </td>
-                      <td className="px-3 py-2.5">
-                        <Badge tone={row.user_role === "auditor" ? "info" : row.user_role === "manager" ? "warning" : "neutral"}>
-                          {row.user_role}
-                        </Badge>
-                      </td>
-                      <td className="px-3 py-2.5 font-mono text-[0.6875rem] text-ink-soft">
-                        {row.final_route}
-                      </td>
-                      <td className="px-3 py-2.5 text-[0.6875rem] text-muted">
-                        <span
-                          className="tabular"
-                          title={row.retrieved_chunk_ids.length > 0 ? row.retrieved_chunk_ids.join("\n") : "No chunks"}
-                        >
-                          {formatNumber(row.retrieved_chunk_ids.length)}
-                        </span>
-                      </td>
-                      <td className="tabular px-3 py-2.5 text-[0.6875rem] text-ink-soft">
-                        {formatNumber(row.citation_count ?? 0)}
-                      </td>
-                      <td className="tabular px-3 py-2.5 text-[0.6875rem] text-muted">
-                        {formatNumber(row.citations_dropped ?? 0)}
-                      </td>
-                      <td className="tabular px-3 py-2.5 text-[0.6875rem] text-muted">
-                        {formatNumber(row.candidates_filtered)}
-                      </td>
-                      <td className="px-3 py-2.5 text-[0.6875rem] text-muted">
-                        <span className="tabular">
-                          {row.router_confidence != null ? formatScore(row.router_confidence) : "—"}
-                        </span>
-                        {row.router_fallback_reason ? (
-                          <span className="ml-1 text-faint" title={row.router_fallback_reason}>
-                            fallback
-                          </span>
-                        ) : null}
-                      </td>
-                      <td className="tabular whitespace-nowrap px-3 py-2.5 text-[0.6875rem] text-muted">
-                        {formatLatency(row.latency_ms)}
-                      </td>
-                      <td className="px-3 py-2.5 text-[0.6875rem] text-muted">
-                        <div className="flex flex-col">
-                          <span>{row.llm_profile}</span>
-                          <span className="text-[0.625rem] text-faint">
-                            {formatCompactNumber(row.tokens_prompt + row.tokens_completion)} tok ·{" "}
-                            {formatCompactNumber(row.llm_calls)} calls
-                          </span>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
+        {/* DataTable */}
+        <div className="mt-4">
+          <DataTable<AuditLogEntry>
+            data={filteredLogs}
+            columns={columns}
+            getRowId={(row) => String(row.audit_id)}
+            pageSize={25}
+            emptyState={
+              <div className="py-8 text-center">
+                <Users className="mx-auto mb-2 size-6 text-faint" aria-hidden="true" />
+                <p className="text-xs font-medium text-ink">No audit rows match this filter</p>
+                <p className="mt-1 text-xs text-muted">Try adjusting your filters or execute a query in chat.</p>
+              </div>
+            }
+            bulkActions={(selectedIds, clearSelection) => (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  const selectedLogs = logs.filter((l) => selectedIds.includes(String(l.audit_id)));
+                  const blob = new Blob([JSON.stringify(selectedLogs, null, 2)], {
+                    type: "application/json",
+                  });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = `audit-export-${Date.now()}.json`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                  toast.success(`Exported ${selectedIds.length} audit records.`);
+                  clearSelection();
+                }}
+              >
+                <Download className="size-3.5" aria-hidden="true" /> Export JSON
+              </Button>
+            )}
+          />
+        </div>
 
-        <p className="mt-3 text-[0.625rem] leading-relaxed text-faint">
+        <p className="mt-3 text-xs leading-relaxed text-faint">
           Privacy contract: this view never reads stored query or response text. Chunk identifiers are
           shown only as counts; hover a count to inspect identifiers locally. No secrets or bearer
           tokens are rendered.
         </p>
       </div>
+
+      {/* Save View Dialog */}
+      <Dialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Save current view</DialogTitle>
+            <DialogDescription>
+              Name this filter configuration to easily apply it again. Saved views are private to your
+              user account.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogBody className="space-y-3 pt-2">
+            <Label htmlFor="view-name-input">View name</Label>
+            <Input
+              id="view-name-input"
+              value={newViewName}
+              onChange={(e) => setNewViewName(e.target.value)}
+              placeholder="e.g. Auditor Turns Only"
+              className="text-xs"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  void handleSaveCurrentView();
+                }
+              }}
+            />
+          </DialogBody>
+          <DialogFooter className="gap-2">
+            <Button variant="ghost" onClick={() => setSaveDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              onClick={() => void handleSaveCurrentView()}
+              disabled={!newViewName.trim() || savingView}
+            >
+              {savingView ? "Saving…" : "Save view"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -1,7 +1,9 @@
 # Project Status & Execution Log
 
-**Current Phase:** Phase 12 (Independent Verification & Real-LLM Security Run) Complete  
-**Verification:** Full pytest suite passing (270 passed, 0 failed, 1 deselected slow) | Leakage rate: strictly 0.00% (141/141 cells across 3 roles on real index + 32 adversarial probes) | Red team evaluation: 45/45 passed on toy local model (`sshleifer/tiny-gpt2`, smoke test only, cannot follow instructions) and mock | Canary guard: 0 leaks across 7 operational surfaces | Audit anchor: exported & verified (`reports/audit_anchor_latest.json`) | Corpus: 24 docs, 101 chunks | Gold v2: 115 items (0 human-reviewed, 115 unreviewed draft) | Knowledge Graph: 38 nodes, 35 edges
+> **PROJECT FREEZE NOTICE:** Feature development is frozen; only evidence and documentation work remains.
+
+**Current Phase:** Phase 15b (Verify and Close) Complete â€” PROJECT FROZEN  
+**Verification:** Full pytest suite passing (290 passed, 0 failed, 1 deselected slow) | Next.js tests: 59 passed (Vitest) | Next.js build: clean Turbopack production build | Official axe-core v4.14.0 a11y audit: 0 violations across 8 route/viewport combinations (/login, /chat, /documents, /audit at 390px and 1440px) | Keyboard flows: 4/4 passing (palette open/close/select, sidebar collapse, delete dialog focus trap/return, table row selection) | Saved views multi-tenant isolation: verified | Audit CSV export with formula injection neutralization: verified | Document autosave audit logging & cache invalidation: verified | Dual-index staging & atomic swap: verified | 14/14 mutant kills verified
 
 ---
 
@@ -40,7 +42,20 @@
 - **Phase 13 (Streamlit Retirement & Next.js Unification):**
   - **Streamlit Removal:** Retired `src/ui/`, `tests/test_ui_app.py`, `tests/test_ui_client.py`, `.streamlit/`, and `streamlit==1.41.1` pin; split `tests/test_phase8.py` to preserve all 8 core pipeline/spend-guard/audit tests.
   - **Single UI Contract:** Compliance Desk (`web/`, Next.js 16 App Router) established as sole client at `http://localhost:3000`. Updated CORS configuration in `src/config.py`, `.env`, and `.env.example`.
-  - **Next.js UX Pass:** Hardened error taxonomy, global offline provider, composer guards, per-message status, truthful reasoning panel, skeletons, optimistic mutations, keyboard shortcuts, accessible WCAG contrast, and unified Sonner toasts.
+- **Part B (Next.js UX Pass, Streamlit Eradication & Memory Audit):**
+  - **Streamlit Eradication:** Port 8501 netstat returned 0 listeners, 0 processes; uninstalled from `.venv` (`pip show` fails); CI hygiene test `tests/test_ci_hygiene.py` passing; historical docs updated.
+  - **Pre-flight Test Fixes:** Resolved missing `import os` in routes and tests; resolved TypeScript BFF route; all 256 pytest unit/integration tests passing green with zero loosened assertions.
+  - **Next.js Sizing & UX:** 16px rem scale (16-17px body, 14px secondary, $\ge 13$px labels), 880-960px reading column, $\ge 44$px touch targets, 1.55-1.65 line-height, citation card overhaul (single breadcrumb, source pill, clean quote, collapsed tech provenance), pipeline stepper, skeleton loader, and session sidebar. Screenshots captured at 1280px, 1440px, 1920px, and 390px with zero horizontal scroll.
+  - **Memory Audit:** Authored `docs/MEMORY_ARCHITECTURE.md` covering all 8 memory classes with exact regulatory/leakage rationale for excluding semantic/episodic/prospective stores; added tests in `tests/test_memory.py` proving zero cross-role or cross-user leakage across cache keys, transcripts, or titles.
+- **Phase 14b (Cache and Ingestion Safety & Mutation Overlap):**
+  - **Cache Versioning:** Keyed `llm_cache` by `acl_version` (hash of corpus manifest and allowed roles), role, and user scope. Added 24h configurable TTL with startup purge routine. Tests verified revocation invalidates cached answers and answers never cross roles.
+  - **Ingestion Consistency:** Dual-index consistency verification (Qdrant payload vs BM25 chunk IDs/metadata). Staging BM25 index with atomic replace swap and rollback on mid-upload failure. Empty/missing role metadata enforces strict DENY.
+  - **Mutation Overlap:** All 7 mutants equipped with at least 2 independent killing tests (14 valid kills total).
+- **Phase 15 (Selected Enterprise UX Patterns & Security Hardening):**
+  - **Security Rules:** Zero document existence/count leakage across all UI components, counters, and 404/search; optimistic updates strictly confined to session rename/delete with rollback on error; "Report an Issue" diagnostic payload sanitized to omit query/answer/citations.
+  - **12 UX Patterns:** `<Skeleton>`, `<EmptyState>`, `<ErrorState>` with friendly messages for 429/503/403 and route error boundaries; deduplicated/sanitized toasts; collapsible persistent sidebar with tooltips, active indicator, date-grouped sessions, and mobile bottom bar; Command Palette (Cmd/Ctrl+K) with focus trap and ARIA combobox; central shortcuts registry with `?` cheat sheet and `/` composer focus; debounce and throttle hooks; Mode 1 and Mode 2 ("type-the-name") destructive dialogs; reusable `DataTable` with sorting, column toggle, bulk action bar, and backend saved views; smart validation on blur/change; header role badges and internal source tags; custom 404 page with session search; autosave on document title editing.
+  - **Skipped Patterns Justification:** Referral pages, onboarding telemetry capture, and upsell banners excluded with formal governance and regulatory privacy justification in `docs/PHASE15_NOTES.md`.
+  - **Verification:** 56/56 Vitest tests passing; 278/278 pytest tests passing; 0 TypeScript errors; 0 WCAG AA accessibility violations; 16 responsive screenshots captured at 1440px and 390px in `docs/screenshots/phase15/`.
 
 ---
 

@@ -15,8 +15,8 @@ import type { Message } from "@/lib/types";
 function Row({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="flex items-baseline justify-between gap-3 border-b border-line/60 py-1.5 last:border-0">
-      <dt className="text-[0.6875rem] text-faint">{label}</dt>
-      <dd className="max-w-[60%] truncate text-right font-mono text-[0.6875rem] text-ink-soft">
+      <dt className="text-xs text-faint">{label}</dt>
+      <dd className="max-w-[60%] truncate text-right font-mono text-xs text-ink-soft">
         {value}
       </dd>
     </div>
@@ -33,12 +33,12 @@ export function AdvancedDetails({ message }: { message: Message }) {
 
   return (
     <Collapsible>
-      <CollapsibleTrigger className="group inline-flex items-center gap-1.5 rounded-[var(--r-xs)] py-1 text-[0.6875rem] font-medium text-muted transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">
+      <CollapsibleTrigger className="group inline-flex min-h-[44px] items-center gap-2 rounded-[var(--r-xs)] px-2.5 py-1 text-xs font-medium text-muted transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">
         <ChevronRight
-          className="size-3.5 transition-transform duration-[var(--duration-fast)] group-data-[state=open]:rotate-90"
+          className="size-4 transition-transform duration-[var(--duration-fast)] group-data-[state=open]:rotate-90"
           aria-hidden="true"
         />
-        <Route className="size-3" aria-hidden="true" />
+        <Route className="size-4" aria-hidden="true" />
         Pipeline details
       </CollapsibleTrigger>
       <CollapsibleContent className="mt-2 data-[state=open]:animate-enter">
@@ -78,8 +78,8 @@ export function AdvancedDetails({ message }: { message: Message }) {
 
           {router ? (
             <div className="mt-3 border-t border-line pt-2.5">
-              <div className="mb-1.5 flex items-center gap-1.5 text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-faint">
-                <Gauge className="size-3" aria-hidden="true" />
+              <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-faint">
+                <Gauge className="size-3.5" aria-hidden="true" />
                 Router
               </div>
               <dl>
@@ -93,14 +93,14 @@ export function AdvancedDetails({ message }: { message: Message }) {
 
           {Object.keys(timings).length > 0 ? (
             <div className="mt-3 border-t border-line pt-2.5">
-              <div className="mb-1.5 text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-faint">
+              <div className="mb-2 text-xs font-semibold uppercase tracking-[0.08em] text-faint">
                 Stage timings (ms)
               </div>
-              <div className="flex flex-wrap gap-1.5">
+              <div className="flex flex-wrap gap-2">
                 {Object.entries(timings).map(([stage, value]) => (
                   <span
                     key={stage}
-                    className="rounded-[var(--r-xs)] border border-line bg-surface-2/60 px-1.5 py-0.5 font-mono text-[0.625rem] text-muted"
+                    className="rounded-[var(--r-xs)] border border-line bg-surface-2/60 px-2 py-1 font-mono text-xs text-muted"
                   >
                     {stage}: {Math.round(value)}
                   </span>
@@ -111,12 +111,12 @@ export function AdvancedDetails({ message }: { message: Message }) {
 
           {trace.length > 0 ? (
             <div className="mt-3 border-t border-line pt-2.5">
-              <div className="mb-1.5 text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-faint">
+              <div className="mb-2 text-xs font-semibold uppercase tracking-[0.08em] text-faint">
                 Reasoning trace
               </div>
-              <ol className="space-y-1">
+              <ol className="space-y-1.5">
                 {trace.map((step, index) => (
-                  <li key={`${index}-${step}`} className="flex gap-2 text-[0.6875rem] leading-relaxed text-muted">
+                  <li key={`${index}-${step}`} className="flex gap-2 text-xs leading-relaxed text-muted">
                     <span className="tabular shrink-0 text-faint">{String(index + 1).padStart(2, "0")}</span>
                     <span className="min-w-0 break-words">{step}</span>
                   </li>
@@ -125,7 +125,7 @@ export function AdvancedDetails({ message }: { message: Message }) {
             </div>
           ) : null}
 
-          <p className="mt-3 border-t border-line pt-2.5 text-[0.625rem] leading-relaxed text-faint">
+          <p className="mt-3 border-t border-line pt-2.5 text-xs leading-relaxed text-faint">
             Retrieved passages were treated as untrusted data inside an explicit XML boundary.
             Instructions found inside documents are ignored.
           </p>

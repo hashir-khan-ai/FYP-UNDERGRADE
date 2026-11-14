@@ -67,7 +67,9 @@ export function SegmentedControl<T extends string>({
             onClick={() => onValueChange(option.value)}
             className={cn(
               "rounded-[var(--r-sm)] font-medium transition-[background-color,color,box-shadow] duration-[var(--duration-fast)] ease-[var(--ease-out)] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent",
-              size === "sm" ? "h-6.5 px-2.5 text-[0.6875rem]" : "h-8 px-3 text-xs",
+              size === "sm"
+                ? "min-h-[38px] px-3 text-xs sm:min-h-[40px]"
+                : "min-h-[44px] px-4 text-xs sm:text-sm",
               active
                 ? "bg-surface-3 text-ink shadow-[var(--elev-sm),inset_0_1px_0_rgba(255,255,255,0.05)]"
                 : "text-faint hover:text-ink-soft",

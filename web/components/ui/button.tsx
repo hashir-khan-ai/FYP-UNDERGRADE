@@ -4,7 +4,7 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex select-none items-center justify-center gap-2 whitespace-nowrap rounded-[var(--r-sm)] font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-[var(--duration-fast)] ease-[var(--ease-out)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:pointer-events-none disabled:opacity-45 active:translate-y-px [&_svg]:shrink-0",
+  "inline-flex select-none items-center justify-center gap-2 whitespace-nowrap rounded-[var(--r-sm)] font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-[var(--duration-fast)] ease-[var(--ease-out)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:pointer-events-none disabled:opacity-45 active:translate-y-px [&_svg]:shrink-0 min-h-[44px] min-w-[44px]",
   {
     variants: {
       variant: {
@@ -20,11 +20,11 @@ const buttonVariants = cva(
           "border border-[rgba(255,133,133,0.32)] bg-danger-soft text-danger hover:bg-[rgba(255,133,133,0.16)]",
       },
       size: {
-        sm: "h-8 px-3 text-xs [&_svg]:size-3.5",
-        md: "h-9.5 px-4 text-[0.8125rem] [&_svg]:size-4",
-        lg: "h-11 px-5 text-sm [&_svg]:size-4",
-        icon: "size-9 [&_svg]:size-4",
-        "icon-sm": "size-7 [&_svg]:size-3.5",
+        sm: "min-h-[44px] px-3.5 text-xs [&_svg]:size-4",
+        md: "min-h-[44px] px-4 text-sm [&_svg]:size-4",
+        lg: "min-h-[48px] px-5 text-base [&_svg]:size-5",
+        icon: "size-11 min-h-[44px] min-w-[44px] p-0 [&_svg]:size-4.5",
+        "icon-sm": "size-11 min-h-[44px] min-w-[44px] p-0 [&_svg]:size-4",
       },
     },
     defaultVariants: {

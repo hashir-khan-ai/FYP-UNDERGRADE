@@ -44,3 +44,27 @@ This document catalogues all third-party software packages, pre-trained neural m
 | **Basel III Capital & Liquidity Framework** | Bank for International Settlements (BCBS) | BIS Copyright (unverified commercial redistribution) | Public international standards, educational quotation |
 | **Internal Bank Policies & SOPs** (`data/synthetic/`) | Project Author (Hashir Khan) | MIT | 100% Synthetic fixtures created for testing RBAC |
 
+---
+
+## 4. Next.js Frontend Software Dependencies
+
+| Package | Version | Licence | Verified Licence URL | Notes / Usage |
+| :--- | :--- | :--- | :--- | :--- |
+| **next** | 16.4.6 | MIT | https://github.com/vercel/next.js/blob/canary/license.md | React framework with App Router, Turbopack, and SSR |
+| **react** | 19.3.1 | MIT | https://github.com/facebook/react/blob/main/LICENSE | Core UI component runtime |
+| **react-dom** | 19.3.1 | MIT | https://github.com/facebook/react/blob/main/LICENSE | DOM rendering engine for React |
+| **@radix-ui/react-dialog** | 1.3.1 | MIT | https://github.com/radix-ui/primitives/blob/main/LICENSE | Accessible headless dialog & modal primitive |
+| **@radix-ui/react-dropdown-menu** | 2.2.1 | MIT | https://github.com/radix-ui/primitives/blob/main/LICENSE | Accessible dropdown menu primitive |
+| **@radix-ui/react-tooltip** | 1.4.1 | MIT | https://github.com/radix-ui/primitives/blob/main/LICENSE | Accessible tooltip provider & portal |
+| **@radix-ui/react-collapsible** | 1.2.1 | MIT | https://github.com/radix-ui/primitives/blob/main/LICENSE | Accessible collapsible layout primitive |
+| **@radix-ui/react-slot** | 1.3.1 | MIT | https://github.com/radix-ui/primitives/blob/main/LICENSE | Polymorphic `asChild` composition helper |
+| **lucide-react** | 1.72.0 | ISC | https://github.com/lucide-icons/lucide/blob/main/LICENSE | Accessible vector icon set |
+| **sonner** | 2.0.8 | MIT | https://github.com/emilkowalski/sonner/blob/main/LICENSE | Toast notification dispatcher |
+| **tailwindcss** | 4.3.5 | MIT | https://github.com/tailwindlabs/tailwindcss/blob/main/LICENSE | Utility-first CSS engine |
+| **clsx** | 2.1.1 | MIT | https://github.com/lukeed/clsx/blob/master/license | Conditional className utility |
+| **tailwind-merge** | 3.7.0 | MIT | https://github.com/dcastil/tailwind-merge/blob/v3.7.0/LICENSE | Intelligent Tailwind class conflict resolver |
+| **framer-motion** | 14.13.0 | MIT | https://github.com/motiondivision/motion/blob/main/LICENSE.md | Physics-based fluid transition engine |
+| **react-markdown** | 10.1.0 | MIT | https://github.com/remarkjs/react-markdown/blob/main/license | Safe Markdown rendering component |
+| **remark-gfm** | 4.0.1 | MIT | https://github.com/remarkjs/remark-gfm/blob/main/license | GitHub Flavored Markdown plugin |
+| **axe-core** | 4.14.0 | MPL-2.0 | https://github.com/dequelabs/axe-core/blob/develop/LICENSE | Official automated WCAG accessibility test engine |
+

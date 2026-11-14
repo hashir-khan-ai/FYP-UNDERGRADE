@@ -7,6 +7,29 @@ made where the specification was silent. Newest phase first within each section.
 
 ---
 
+## Part N — Phase 15 Closeout (Selected UX Patterns & Zero-Leak UI Enforcement)
+
+### N1. Scope Boundaries for Selected UX Patterns
+**Decision:** Built 12 enterprise-grade UX patterns (`<Skeleton>`, `<EmptyState>`, `<ErrorState>`, deduplicated toasts, persistent collapsible sidebar with date grouping and mobile bottom bar, Command Palette `Cmd/Ctrl+K`, central shortcuts registry, debounce/throttle hooks, Mode 1 and Mode 2 destructive dialogs, reusable `DataTable` with backend saved views, smart validation on blur/change, role indicators with zero teaser counts, custom 404 page, and autosave on document titles). Deliberately skipped referral/affiliate pages, onboarding telemetry, and subscription tier upsells.
+
+**Why:** out of scope; adds privacy surface; legal basis to be checked by the author. Document access is governed strictly by cryptographic RBAC clearance.
+
+**Verification:** 56 Vitest tests passing; 278 pytest tests passing; 0 TypeScript errors; 0 WCAG AA accessibility violations; 16 responsive screenshots captured at 1440px and 390px in `docs/screenshots/phase15/`.
+
+---
+
+## Part M — Phase 14b Closeout (Cache/Ingestion Safety & Dual Mutant Overlap)
+
+### M1. Cache Key Index/ACL Versioning
+**Decision:** Computed `acl_version` hash over database documents catalog, synthetic sidecars, and BM25 index state; integrated `acl_version` into the cache key alongside role and user scope. Added 24-hour TTL with startup purge.
+
+**Why:** Prevents serving stale cached answers after document permissions are revoked or corpus indices are updated.
+
+### M2. Dual-Index Consistency & Atomic Swap
+**Decision:** Verified dual-index consistency between Qdrant vector payload and BM25 chunks prior to atomic swap via staging index. Enforced strict DENY on empty/missing role metadata.
+
+---
+
 ## Part A — Phase 2 Closeout
 
 ### A1. Embedded Qdrant lifecycle (shutdown warning fix)
@@ -780,6 +803,18 @@ in LaTeX thesis documents without manual transcription errors.
 **Decision (2026-11-13):** Completely removed the legacy Streamlit client (`src/ui/`, `tests/test_ui_app.py`, `tests/test_ui_client.py`, `.streamlit/`, and the `streamlit==1.41.1` dependency) and established Compliance Desk (`web/`, Next.js 16 App Router) as the sole, authoritative frontend client for the FastAPI backend.
 **Why:** Maintaining two parallel frontends caused synchronization overhead, duplicate test fixtures, and diverging UX contracts. The Next.js 16 client provides a unified institutional workstation, keyboard-first navigation, accessible WCAG contrast, optimistic mutations, and strict Separation of Concerns.
 **Note on Dependencies:** Dropping unused transitive packages requires `pip-sync` or a clean `pip install -r requirements.txt`.
+
+---
+
+## Part Q — Next.js Enterprise UX Pass & Memory Architecture Audit (Part B)
+
+### 81. Next.js Enterprise Typography, 44px Ergonomics, and Citation Redesign
+**Decision (2026-11-14):** Upgraded Next.js frontend with 16px base font size, rem-based typography scale (`body 16-17px`, `secondary 14px`, `labels >= 13px`), wider reading column (`880-960px clamp`), 44px minimum tap targets across all interactive elements, and comfortable line height (`1.55-1.65`). Redesigned citation cards to show breadcrumb once, source pill (`Public` vs `Internal + permitted roles`), clean quote block, and collapsed technical details. Verified zero horizontal scroll across 1280px, 1440px, 1920px, and 390px mobile viewports.
+**Why:** Improves readability for dense statutory banking text, adheres strictly to WCAG 2.5.5 / 2.5.8 touch target standards, and prevents information overload by collapsing technical provenance by default.
+
+### 82. Memory Architecture Classification & Multi-Tenant Boundary Enforcement
+**Decision (2026-11-14):** Authored `docs/MEMORY_ARCHITECTURE.md` establishing cognitive memory taxonomy across eight classes. Formally excluded semantic memory (cross-session user embeddings), episodic memory (experience replay), and prospective memory (background task scheduling) from project scope. Added automated tests in `tests/test_memory.py` proving zero cross-role or cross-user leakage across cache keys, transcripts, or titles.
+**Why:** Financial compliance requires point-in-time statutory determinism and strict non-leakage. Semantic and episodic memory introduce severe regulatory drift, hallucination propagation, and cross-role data leakage risks: out of scope; adds privacy surface; legal basis to be checked by the author. Cache keys and session memory must be strictly partitioned by `role` and `user_id`.
 
 
 

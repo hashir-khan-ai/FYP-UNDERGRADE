@@ -33,6 +33,42 @@ class UploadValidationError(ValueError):
     """Raised when an uploaded document fails format, size, or role validation."""
 
 
+class IngestionConsistencyError(RuntimeError):
+    """Raised when staged dual-index verification fails or ingestion encounters an error."""
+
+
+def verify_dual_index_consistency(
+    new_chunks: list[DocumentChunk],
+    staged_bm25_chunks: list[dict[str, Any] | DocumentChunk],
+) -> None:
+    """Verify that staged BM25 chunks contain exact chunk IDs and role metadata matching new chunks.
+
+    Raises:
+        IngestionConsistencyError: if chunk IDs, counts, or role metadata diverge.
+    """
+    staged_map: dict[str, Any] = {}
+    for c in staged_bm25_chunks:
+        if isinstance(c, DocumentChunk):
+            staged_map[c.chunk_id] = {"chunk_id": c.chunk_id, "allowed_roles": c.allowed_roles}
+        elif isinstance(c, dict):
+            staged_map[c.get("chunk_id", "")] = c
+
+    for chunk in new_chunks:
+        cid = chunk.chunk_id
+        if cid not in staged_map:
+            raise IngestionConsistencyError(
+                f"Dual-index inconsistency: Chunk '{cid}' missing from staged BM25 index."
+            )
+        bm25_chunk = staged_map[cid]
+        bm25_roles = sorted(bm25_chunk.get("allowed_roles") or [])
+        chunk_roles = sorted(chunk.allowed_roles or [])
+        if bm25_roles != chunk_roles:
+            raise IngestionConsistencyError(
+                f"Dual-index inconsistency: Role metadata mismatch for chunk '{cid}': "
+                f"BM25 has {bm25_roles}, expected {chunk_roles}."
+            )
+
+
 def sanitize_filename(filename: str) -> str:
     """Strip directory traversal, path characters, and invalid symbols from filename."""
     base_name = Path(filename).name
@@ -218,13 +254,13 @@ def ingest_uploaded_document(
         else:
             raise UploadValidationError("Document contains no indexable text content.")
 
-    # Enforce allowed_roles on every chunk
+    # Enforce allowed_roles on every chunk. Empty or missing roles mean DENY (no role has access).
     for c in chunks:
-        c.allowed_roles = list(target_roles)
+        c.allowed_roles = list(target_roles) if target_roles else []
         c.doc_id = final_doc_id
         c.doc_title = final_title
 
-    # 1. Dense Vector Indexing (Qdrant)
+    # Resolving indexers
     if qdrant_indexer is not None:
         qdrant = qdrant_indexer
     else:
@@ -234,9 +270,6 @@ def ingest_uploaded_document(
         except Exception:
             qdrant = QdrantIndexer()
 
-    qdrant.index_chunks(chunks)
-
-    # 2. Lexical Indexing (BM25 atomic merge)
     if bm25_indexer is not None:
         bm25 = bm25_indexer
     else:
@@ -246,9 +279,45 @@ def ingest_uploaded_document(
         except Exception:
             bm25 = BM25Indexer()
 
-    bm25.merge_and_save(chunks)
+    # STAGING PIPELINE:
+    # 1. Build staged BM25 index with existing + new chunks
+    staging_bm25_path = bm25.index_path.with_suffix(bm25.index_path.suffix + f".stage_{upload_uuid}.tmp")
+    staging_indexer = BM25Indexer(index_path=str(staging_bm25_path))
 
-    # 3. Database Catalog Registration (SQLite)
+    existing_chunks = []
+    if bm25.index_path.exists():
+        if bm25.bm25 is None:
+            bm25.load()
+        existing_chunks = [
+            DocumentChunk(**c) if isinstance(c, dict) else c
+            for c in (bm25.chunks or [])
+        ]
+    combined_chunks = existing_chunks + chunks
+
+    try:
+        staging_indexer.build_and_save(combined_chunks)
+
+        # 2. Verify dual-index consistency before applying live changes
+        verify_dual_index_consistency(chunks, staging_indexer.chunks)
+
+        # Simulation hook for test failure injection
+        if getattr(settings, "SIMULATE_INGESTION_FAILURE", False):
+            raise IngestionConsistencyError("SIMULATED_INGESTION_CRASH_BEFORE_SWAP")
+
+        # 3. Dense Vector Indexing (Qdrant)
+        qdrant.index_chunks(chunks)
+
+        # 4. Atomic Swap: Replace live BM25 with verified staged index
+        staging_bm25_path.replace(bm25.index_path)
+        bm25.load()
+
+    except Exception as exc:
+        if staging_bm25_path.exists():
+            staging_bm25_path.unlink(missing_ok=True)
+        logger.error("Ingestion failed during staging/verification; rolled back cleanly (%s).", exc)
+        raise IngestionConsistencyError(f"Ingestion failed and was safely rolled back: {exc}") from exc
+
+    # 5. Database Catalog Registration (SQLite)
     with get_db_connection() as conn:
         repo = Repository(conn)
         repo.register_document(

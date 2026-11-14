@@ -40,6 +40,8 @@ async def lifespan(app: FastAPI):
         logger.warning("LLM configuration readiness check deferred (%s).", type(exc).__name__)
     try:
         init_db()
+        from src.core.llm_client import purge_expired_cache
+        purge_expired_cache()
     except Exception:
         logger.exception("Database initialisation failed at startup.")
     try:

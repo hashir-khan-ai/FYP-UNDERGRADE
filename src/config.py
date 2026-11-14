@@ -145,8 +145,12 @@ class Settings(BaseSettings):
         description="Serve repeated requests from the on-disk response cache",
     )
     LLM_CACHE_TTL_DAYS: int = Field(
-        default=30,
+        default=1,
         description="Maximum age of a cached LLM response in days",
+    )
+    LLM_CACHE_TTL_HOURS: int = Field(
+        default=24,
+        description="Maximum age of a cached LLM response in hours (default 24h)",
     )
     PROMPT_VERSION: str = Field(
         default="v1",
@@ -229,6 +233,10 @@ class Settings(BaseSettings):
     UPLOAD_MAX_FILE_SIZE_MB: int = Field(
         default=10,
         description="Maximum upload file size in megabytes",
+    )
+    SIMULATE_INGESTION_FAILURE: bool = Field(
+        default=False,
+        description="Test-only hook to simulate crash mid-ingestion before atomic swap",
     )
     UPLOAD_ALLOWED_EXTENSIONS: list[str] = Field(
         default=["md", "txt", "pdf", "html", "htm"],
@@ -444,8 +452,11 @@ class Settings(BaseSettings):
         """Fail fast at startup when security flags are unsafe.
 
         Raises:
-            RuntimeError: if RBAC is disabled without a permitted label.
+            RuntimeError: if RBAC is disabled without a permitted label,
+                or if test-only mutant flags are set outside pytest.
         """
+        from src.core.mutants import check_no_mutant_flags_on_startup
+        check_no_mutant_flags_on_startup()
         _ = self.rbac_enabled
 
     @property

@@ -22,7 +22,7 @@ import type { AdminConfig, HealthResponse } from "@/lib/types";
 function Stat({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="rounded-[var(--r-sm)] border border-line bg-[rgba(3,6,10,0.35)] px-3 py-2">
-      <div className="text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-faint">
+      <div className="text-xs font-semibold uppercase tracking-[0.08em] text-faint">
         {label}
       </div>
       <div className="mt-1 truncate text-xs font-medium text-ink">{value}</div>
@@ -203,7 +203,7 @@ export function SystemSheet({
           </div>
 
           <div>
-            <div className="mb-2 text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-faint">
+            <div className="mb-2 text-xs font-semibold uppercase tracking-[0.08em] text-faint">
               Architecture layers
             </div>
             <div className="flex flex-wrap gap-1.5">

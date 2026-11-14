@@ -54,7 +54,7 @@ function Feature({
       </span>
       <div>
         <p className="text-xs font-semibold text-ink">{title}</p>
-        <p className="mt-0.5 text-[0.6875rem] leading-relaxed text-muted">{description}</p>
+        <p className="mt-0.5 text-xs leading-relaxed text-muted">{description}</p>
       </div>
     </div>
   );
@@ -64,6 +64,8 @@ export function LoginScreen({ health }: { health: HealthResponse | null }) {
   const router = useRouter();
   const [username, setUsername] = React.useState("");
   const [password, setPassword] = React.useState("");
+  const [usernameTouched, setUsernameTouched] = React.useState(false);
+  const [passwordTouched, setPasswordTouched] = React.useState(false);
   const [showPassword, setShowPassword] = React.useState(false);
   const [selectedPersona, setSelectedPersona] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
@@ -74,9 +76,20 @@ export function LoginScreen({ health }: { health: HealthResponse | null }) {
   const roleHint = PERSONAS.find((persona) => persona.username === username)?.role;
   const healthy = health?.status === "ok" || health?.status === "healthy";
 
+  const usernameError =
+    usernameTouched && username.trim().length > 0 && username.trim().length < 3
+      ? "Username must be at least 3 characters."
+      : null;
+
+  const passwordError =
+    passwordTouched && password.length > 0 && password.length < 6
+      ? "Password must be at least 6 characters."
+      : null;
+
   function fillPersona(persona: (typeof PERSONAS)[number]) {
     setUsername(persona.username);
     setSelectedPersona(persona.username);
+    setUsernameTouched(true);
     setError(null);
     passwordRef.current?.focus();
   }
@@ -133,7 +146,7 @@ export function LoginScreen({ health }: { health: HealthResponse | null }) {
 
           <div className="mt-6 rounded-[var(--r-lg)] border border-line bg-[rgba(3,6,10,0.3)] p-3.5">
             <TrustMap />
-            <p className="mt-1 text-center text-[0.625rem] text-faint">
+            <p className="mt-1.5 text-center text-xs text-faint">
               Corpus → role gate → relevance grader → verified answer or safe refusal
             </p>
           </div>
@@ -164,7 +177,7 @@ export function LoginScreen({ health }: { health: HealthResponse | null }) {
                 <h2 id="sign-in-heading" className="text-base font-semibold tracking-[-0.02em] text-ink">
                   Sign in to the workspace
                 </h2>
-                <p className="mt-1 text-[0.6875rem] leading-relaxed text-muted">
+                <p className="mt-1 text-xs leading-relaxed text-muted">
                   Synthetic personas only. No real customer or bank data is present.
                 </p>
               </div>
@@ -178,10 +191,10 @@ export function LoginScreen({ health }: { health: HealthResponse | null }) {
             </div>
 
             <div className="mt-5">
-              <p className="mb-2 text-[0.625rem] font-semibold uppercase tracking-[0.09em] text-faint">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-[0.08em] text-faint">
                 Quick-fill a persona
               </p>
-              <div className="grid grid-cols-3 gap-1.5">
+              <div className="grid grid-cols-3 gap-2">
                 {PERSONAS.map((persona) => {
                   const selected = selectedPersona === persona.username;
                   return (
@@ -191,7 +204,7 @@ export function LoginScreen({ health }: { health: HealthResponse | null }) {
                       aria-pressed={selected}
                       onClick={() => fillPersona(persona)}
                       className={cn(
-                        "flex flex-col items-center gap-1.5 rounded-[var(--r-md)] border px-2 py-2.5 text-center transition-[border-color,background-color,transform] duration-[var(--duration-fast)] hover:-translate-y-0.5",
+                        "flex min-h-[52px] flex-col items-center gap-1.5 rounded-[var(--r-md)] border px-2.5 py-2.5 text-center transition-[border-color,background-color,transform] duration-[var(--duration-fast)] hover:-translate-y-0.5",
                         selected
                           ? "border-line-accent bg-accent-soft"
                           : "border-line bg-surface-2/50 hover:border-line-strong",
@@ -199,13 +212,13 @@ export function LoginScreen({ health }: { health: HealthResponse | null }) {
                       title={persona.scope}
                     >
                       <Avatar name={persona.name} size="sm" />
-                      <span className="text-[0.6875rem] font-medium text-ink">{persona.role}</span>
-                      <span className="text-[0.625rem] text-faint">{persona.username}</span>
+                      <span className="text-xs font-semibold text-ink capitalize">{persona.role}</span>
+                      <span className="text-xs text-faint">{persona.username}</span>
                     </button>
                   );
                 })}
               </div>
-              <p className="mt-2 text-[0.625rem] leading-relaxed text-faint">
+              <p className="mt-2 text-xs leading-relaxed text-faint">
                 Quick-fill sets the username only. Enter the synthetic demo password from the project
                 runbook — it is deliberately not embedded in client code.
               </p>
@@ -225,14 +238,22 @@ export function LoginScreen({ health }: { health: HealthResponse | null }) {
                     setSelectedPersona(null);
                     setError(null);
                   }}
+                  onBlur={() => setUsernameTouched(true)}
                   placeholder="analyst_user"
-                  className="mt-1.5"
-                  aria-describedby={roleHint ? "role-hint" : undefined}
+                  className={cn("mt-1.5", usernameError && "border-danger focus:border-danger")}
+                  aria-invalid={Boolean(usernameError)}
+                  aria-describedby={
+                    usernameError ? "username-error" : roleHint ? "role-hint" : undefined
+                  }
                   disabled={submitting}
                   required
                 />
-                {roleHint ? (
-                  <p id="role-hint" className="mt-1 text-[0.625rem] text-faint">
+                {usernameError ? (
+                  <p id="username-error" className="mt-1 text-xs text-danger font-medium">
+                    {usernameError}
+                  </p>
+                ) : roleHint ? (
+                  <p id="role-hint" className="mt-1 text-xs text-faint">
                     Persona recognised: {roleHint} tier
                   </p>
                 ) : null}
@@ -244,11 +265,11 @@ export function LoginScreen({ health }: { health: HealthResponse | null }) {
                   <button
                     type="button"
                     onClick={() => setShowPassword((current) => !current)}
-                    className="inline-flex items-center gap-1 text-[0.625rem] text-faint transition-colors hover:text-ink"
+                    className="inline-flex min-h-[36px] items-center gap-1.5 px-1 text-xs text-faint transition-colors hover:text-ink"
                     aria-label={showPassword ? "Hide password" : "Show password"}
                     aria-pressed={showPassword}
                   >
-                    {showPassword ? <EyeOff className="size-3" /> : <Eye className="size-3" />}
+                    {showPassword ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
                     {showPassword ? "Hide" : "Show"}
                   </button>
                 </div>
@@ -263,17 +284,25 @@ export function LoginScreen({ health }: { health: HealthResponse | null }) {
                     setPassword(event.target.value);
                     setError(null);
                   }}
+                  onBlur={() => setPasswordTouched(true)}
                   placeholder="Synthetic demo password"
-                  className="mt-1.5"
+                  className={cn("mt-1.5", passwordError && "border-danger focus:border-danger")}
+                  aria-invalid={Boolean(passwordError)}
+                  aria-describedby={passwordError ? "password-error" : undefined}
                   disabled={submitting}
                   required
                 />
+                {passwordError ? (
+                  <p id="password-error" className="mt-1 text-xs text-danger font-medium">
+                    {passwordError}
+                  </p>
+                ) : null}
               </div>
 
               {error ? (
                 <div
                   role="alert"
-                  className="flex items-start gap-2 rounded-[var(--r-sm)] border border-[rgba(255,133,133,0.28)] bg-danger-soft px-3 py-2.5 text-[0.6875rem] leading-relaxed text-danger"
+                  className="flex items-start gap-2 rounded-[var(--r-sm)] border border-[rgba(255,133,133,0.28)] bg-danger-soft px-3 py-2.5 text-xs leading-relaxed text-danger"
                 >
                   <TriangleAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
                   <span>{error}</span>
@@ -293,9 +322,9 @@ export function LoginScreen({ health }: { health: HealthResponse | null }) {
               </Button>
             </form>
 
-            <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3 text-[0.625rem] text-faint">
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3 text-xs text-faint">
               <span className="inline-flex items-center gap-1">
-                <ShieldCheck className="size-3" aria-hidden="true" />
+                <ShieldCheck className="size-3.5" aria-hidden="true" />
                 Server-side RBAC
               </span>
               <span>Profile: {health?.llm.profile ?? "mock"}</span>
@@ -305,7 +334,7 @@ export function LoginScreen({ health }: { health: HealthResponse | null }) {
             </div>
           </div>
 
-          <p className="mt-3 px-1 text-center text-[0.625rem] leading-relaxed text-faint lg:text-left">
+          <p className="mt-3 px-1 text-center text-xs leading-relaxed text-faint lg:text-left">
             By signing in you enter a local demonstration environment. The session cookie is
             httpOnly, SameSite=Lax, and never written to a URL, log or browser-accessible store.
           </p>

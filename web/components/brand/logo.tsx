@@ -31,10 +31,10 @@ export function Logo({
       </svg>
       {showWordmark ? (
         <span className="flex flex-col leading-none">
-          <span className="text-[0.8125rem] font-semibold tracking-[-0.01em] text-ink">
+          <span className="text-sm font-semibold tracking-[-0.01em] text-ink">
             Compliance Desk
           </span>
-          <span className="mt-0.5 text-[0.625rem] font-medium uppercase tracking-[0.13em] text-faint">
+          <span className="mt-0.5 text-xs font-medium uppercase tracking-[0.08em] text-faint">
             Regulatory intelligence
           </span>
         </span>

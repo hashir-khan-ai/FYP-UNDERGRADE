@@ -47,20 +47,26 @@
   --non-grounded: #c1a8ff;
   --non-grounded-soft: rgba(193, 168, 255, 0.12);
 
-  /* Typography */
+  /* Typography: rem scale anchored at 16px base, labels >= 13px, body 16-17px */
   --type-ui: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
     "Helvetica Neue", Arial, sans-serif;
   --type-mono: "SF Mono", ui-monospace, Menlo, Monaco, Consolas, monospace;
-  --text-2xs: 0.6875rem;
-  --text-xs: 0.75rem;
-  --text-sm: 0.8125rem;
-  --text-base: 0.9375rem;
-  --text-md: 1rem;
-  --text-lg: 1.125rem;
-  --text-xl: 1.375rem;
-  --text-2xl: 1.75rem;
-  --text-3xl: 2.25rem;
-  --text-4xl: 2.875rem;
+  --text-2xs: 0.8125rem; /* 13px: strictly enforces minimum accessible label size */
+  --text-xs: 0.8125rem;  /* 13px: labels and captions */
+  --text-sm: 0.875rem;   /* 14px: secondary text */
+  --text-base: clamp(1rem, 0.96rem + 0.2vw, 1.0625rem); /* 16-17px: body */
+  --text-md: 1.0625rem;  /* 17px */
+  --text-lg: clamp(1.125rem, 1.05rem + 0.35vw, 1.25rem);
+  --text-xl: clamp(1.375rem, 1.25rem + 0.5vw, 1.5rem);
+  --text-2xl: clamp(1.75rem, 1.5rem + 0.8vw, 2rem);
+  --text-3xl: clamp(2.25rem, 1.9rem + 1.2vw, 2.6rem);
+  --text-4xl: clamp(2.75rem, 2.2rem + 1.8vw, 3.25rem);
+
+  /* Line heights */
+  --lh-tight: 1.25;
+  --lh-snug: 1.375;
+  --lh-body: 1.6;
+  --lh-relaxed: 1.65;
 
   /* Spacing rhythm: 4pt */
   --space-1: 0.25rem;
@@ -98,11 +104,12 @@
   --duration-base: 180ms;
   --duration-slow: 240ms;
 
-  /* Layout */
+  /* Layout: 880-960px chat column with clamp scaling (minimum never exceeds 100% of viewport) */
   --sidebar-width: 300px;
   --sidebar-collapsed: 76px;
-  --reading-width: 768px;
-  --content-width: 1120px;
+  --reading-width: clamp(min(100%, 880px), 62vw, 960px);
+  --content-width: clamp(min(100%, 1080px), 80vw, 1280px);
+  --tap-min: 44px; /* WCAG AA tap target size minimum */
 }
 
 @media (prefers-reduced-motion: reduce) {

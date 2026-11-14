@@ -27,6 +27,7 @@ import httpx
 from pydantic import BaseModel
 
 from src.config import ResolvedLLM, settings
+from src.core.acl_version import compute_index_acl_version
 from src.core.spend_guard import SpendGuard, SpendGuardExceededError, spend_guard
 from src.db.connection import get_db_connection
 from src.db.migrations import SCHEMA_DDL, apply_migrations
@@ -284,21 +285,19 @@ class ResilientLLMClient:
         step: str,
         role: str | None = None,
         user_id: int | None = None,
+        index_acl_version: str | None = None,
     ) -> str:
         """Return the deterministic SHA-256 cache key for one request."""
-        # Positive control: Mutant (d) strips role/user isolation from cache key
-        if os.environ.get("MUTANT_CACHE_NO_ROLE") == "1":
-            role_part = ""
-            user_part = ""
-        else:
-            role_part = str(role or "")
-            user_part = str(user_id or "")
+        role_part = str(role or "")
+        user_part = str(user_id or "")
+        acl_version = str(index_acl_version or compute_index_acl_version())
 
         key_raw = json.dumps(
             [
                 profile,
                 model,
                 settings.PROMPT_VERSION,
+                acl_version,
                 step,
                 system_prompt or "",
                 prompt,
@@ -312,15 +311,15 @@ class ResilientLLMClient:
         return hashlib.sha256(key_raw.encode("utf-8")).hexdigest()
 
     def _cache_row_is_fresh(self, created_at: Any) -> bool:
-        """Honour the configured cache TTL, tolerating older timestamp formats."""
-        ttl_days = settings.LLM_CACHE_TTL_DAYS
-        if ttl_days <= 0 or not created_at:
+        """Honour the configured cache TTL (default 24h), tolerating older timestamp formats."""
+        ttl_hours = getattr(settings, "LLM_CACHE_TTL_HOURS", 24)
+        if ttl_hours <= 0 or not created_at:
             return True
         try:
             created = datetime.fromisoformat(str(created_at).replace("Z", "+00:00"))
             if created.tzinfo is None:
                 created = created.replace(tzinfo=timezone.utc)
-            return datetime.now(timezone.utc) - created <= timedelta(days=ttl_days)
+            return datetime.now(timezone.utc) - created <= timedelta(hours=ttl_hours)
         except ValueError:
             return True
 
@@ -882,6 +881,54 @@ class ResilientLLMClient:
         return "Mock regulatory compliance response strictly generated offline."
 
 
+def purge_expired_cache(conn: Any = None, ttl_hours: int | None = None) -> int:
+    """Purge expired entries from llm_cache on startup or on demand.
+
+    Args:
+        conn: Optional SQLite connection. If None, acquires connection via get_db_connection().
+        ttl_hours: Optional TTL in hours. Defaults to settings.LLM_CACHE_TTL_HOURS (24).
+
+    Returns:
+        Number of purged cache rows.
+    """
+    ttl = ttl_hours if ttl_hours is not None else getattr(settings, "LLM_CACHE_TTL_HOURS", 24)
+    if ttl <= 0:
+        return 0
+    from src.db.connection import get_db_connection
+
+    if conn is None:
+        with get_db_connection() as db_conn:
+            try:
+                cur = db_conn.cursor()
+                cur.execute(
+                    "DELETE FROM llm_cache WHERE datetime(created_at) < datetime('now', ?);",
+                    (f"-{ttl} hours",),
+                )
+                purged = cur.rowcount
+                db_conn.commit()
+                if purged > 0:
+                    logger.info("Purged %d expired LLM cache entries older than %d hours.", purged, ttl)
+                return purged
+            except Exception as exc:
+                logger.warning("Cache purge failed: %s", exc)
+                return 0
+    else:
+        try:
+            cur = conn.cursor()
+            cur.execute(
+                "DELETE FROM llm_cache WHERE datetime(created_at) < datetime('now', ?);",
+                (f"-{ttl} hours",),
+            )
+            purged = cur.rowcount
+            conn.commit()
+            if purged > 0:
+                logger.info("Purged %d expired LLM cache entries older than %d hours.", purged, ttl)
+            return purged
+        except Exception as exc:
+            logger.warning("Cache purge failed: %s", exc)
+            return 0
+
+
 # Global client instance. Tests may construct their own client with a fake transport.
 llm_client = ResilientLLMClient()
 
@@ -898,4 +945,5 @@ __all__ = [
     "llm_client",
     "llm_profile_scope",
     "parse_json_response",
+    "purge_expired_cache",
 ]

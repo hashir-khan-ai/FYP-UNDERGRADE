@@ -23,7 +23,7 @@
 | 10| **Database Security** | Pass | SQLite WAL mode, foreign key integrity enforced, zero dynamic query interpolation. |
 | 11| **Secrets Management** | Pass | Credentials resolved strictly through `src/config.py` from `.env`; clean `.env.example`; no hardcoded keys. |
 | 12| **Encryption & Hashing** | Pass | PBKDF2 password derivation, SHA-256 LLM response cache hashing, SHA-256 JWT signature verification. |
-| 13| **CORS Configuration** | Pass | Restricts allowed origins strictly to `http://localhost:8501` and `http://127.0.0.1:8501`. |
+| 13| **CORS Configuration** | Pass | Restricts allowed origins strictly to `http://localhost:3000` and `http://127.0.0.1:3000`. |
 | 14| **Dependency Security** | Pass | Pinned versions in `requirements.txt` with justification comments; no unnecessary third-party packages. |
 | 15| **Logging & Monitoring** | Pass | Comprehensive telemetry in `audit_log` and `llm_calls`; prompts and credentials excluded from logs. |
 | 16| **Admin Security** | Pass | `/api/v1/audit/logs` endpoint restricted exclusively to authenticated users with `auditor` role. |

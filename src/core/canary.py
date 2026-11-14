@@ -114,10 +114,6 @@ def enforce_canary_guard(
     clean_trace = list(trace or [])
     violated = False
 
-    # Positive control: Mutant (a) disables output canary guard
-    if os.environ.get("MUTANT_DISABLE_CANARY_GUARD") == "1":
-        return text, clean_citations, clean_trace, False
-
     # Check text
     unauth_text = find_unauthorized_canaries(text, user_role)
     if unauth_text:

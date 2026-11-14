@@ -10,6 +10,8 @@ import {
   LogOut,
   MessageSquare,
   MoreHorizontal,
+  PanelLeftClose,
+  PanelLeftOpen,
   Pencil,
   Plus,
   Search,
@@ -27,15 +29,7 @@ import { SystemSheet } from "@/components/workspace/system-sheet";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogBody,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { DestructiveDialog } from "@/components/ui/destructive-dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -45,10 +39,17 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useSessions } from "@/components/providers/sessions-provider";
 import { canViewAudit, roleLabel, roleScope } from "@/lib/auth";
 import { api } from "@/lib/api-client";
 import { formatRelative } from "@/lib/format";
+import { useDebouncedValue } from "@/lib/hooks/use-debounce";
 import type { AdminConfig, HealthResponse, SessionSummary, UserProfile } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -58,6 +59,8 @@ interface SidebarProps {
   health: HealthResponse | null;
   mobileOpen: boolean;
   onMobileOpenChange: (open: boolean) => void;
+  collapsed?: boolean;
+  onToggleCollapsed?: () => void;
 }
 
 function NavItem({
@@ -67,6 +70,7 @@ function NavItem({
   active,
   disabled,
   hint,
+  collapsed,
   onNavigate,
 }: {
   href: string;
@@ -75,19 +79,63 @@ function NavItem({
   active: boolean;
   disabled?: boolean;
   hint?: string;
+  collapsed?: boolean;
   onNavigate?: () => void;
 }) {
   if (disabled) {
+    if (collapsed) {
+      return (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div
+              aria-disabled="true"
+              className="flex size-10 items-center justify-center rounded-[var(--r-sm)] text-faint/50 cursor-not-allowed"
+            >
+              <Icon className="size-5" aria-hidden="true" />
+            </div>
+          </TooltipTrigger>
+          <TooltipContent side="right">
+            <span>{label} (Restricted)</span>
+          </TooltipContent>
+        </Tooltip>
+      );
+    }
     return (
       <div
         aria-disabled="true"
         title={hint}
-        className="flex h-9 items-center gap-2.5 rounded-[var(--r-sm)] px-2.5 text-xs font-medium text-faint/70"
+        className="flex min-h-[44px] items-center gap-3 rounded-[var(--r-sm)] px-3 text-xs font-medium text-faint/70"
       >
-        <Icon className="size-4" aria-hidden="true" />
+        <Icon className="size-4.5" aria-hidden="true" />
         <span className="flex-1">{label}</span>
-        <Lock className="size-3" aria-hidden="true" />
+        <Lock className="size-3.5" aria-hidden="true" />
       </div>
+    );
+  }
+
+  if (collapsed) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Link
+            href={href}
+            onClick={onNavigate}
+            aria-current={active ? "page" : undefined}
+            aria-label={label}
+            className={cn(
+              "flex size-10 items-center justify-center rounded-[var(--r-sm)] transition-colors duration-[var(--duration-fast)]",
+              active
+                ? "bg-surface-2 text-accent shadow-[inset_0_1px_0_rgba(255,255,255,0.035)]"
+                : "text-muted hover:bg-surface-2/70 hover:text-ink",
+            )}
+          >
+            <Icon className="size-5" aria-hidden="true" />
+          </Link>
+        </TooltipTrigger>
+        <TooltipContent side="right">
+          <span>{label}</span>
+        </TooltipContent>
+      </Tooltip>
     );
   }
 
@@ -97,13 +145,13 @@ function NavItem({
       onClick={onNavigate}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "flex h-9 items-center gap-2.5 rounded-[var(--r-sm)] px-2.5 text-xs font-medium transition-colors duration-[var(--duration-fast)]",
+        "flex min-h-[44px] items-center gap-3 rounded-[var(--r-sm)] px-3 text-xs font-medium transition-colors duration-[var(--duration-fast)]",
         active
           ? "bg-surface-2 text-ink shadow-[inset_0_1px_0_rgba(255,255,255,0.035)]"
           : "text-muted hover:bg-surface-2/70 hover:text-ink",
       )}
     >
-      <Icon className={cn("size-4", active ? "text-accent" : "text-faint")} aria-hidden="true" />
+      <Icon className={cn("size-4.5", active ? "text-accent" : "text-faint")} aria-hidden="true" />
       <span className="flex-1">{label}</span>
     </Link>
   );
@@ -124,6 +172,7 @@ function SessionRow({
   const [value, setValue] = React.useState(session.title);
   const [saving, setSaving] = React.useState(false);
   const [deleteOpen, setDeleteOpen] = React.useState(false);
+  const [deleting, setDeleting] = React.useState(false);
   const inputRef = React.useRef<HTMLInputElement>(null);
 
   React.useEffect(() => {
@@ -154,7 +203,9 @@ function SessionRow({
   }
 
   async function confirmDelete() {
+    setDeleting(true);
     const ok = await deleteSession(session.id);
+    setDeleting(false);
     if (ok) {
       setDeleteOpen(false);
       toast.success("Session deleted");
@@ -164,7 +215,7 @@ function SessionRow({
 
   if (renaming) {
     return (
-      <div className="rounded-[var(--r-sm)] border border-line-accent bg-surface-2 p-1.5">
+      <div className="rounded-[var(--r-sm)] border border-line-accent bg-surface-2 p-2">
         <Input
           ref={inputRef}
           value={value}
@@ -180,10 +231,10 @@ function SessionRow({
               setValue(session.title);
             }
           }}
-          className="h-8 text-xs"
+          className="h-10 text-xs"
           aria-label={`Rename ${session.title}`}
         />
-        <div className="mt-1.5 flex justify-end gap-1">
+        <div className="mt-2 flex justify-end gap-1.5">
           <Button
             size="icon-sm"
             variant="ghost"
@@ -212,7 +263,7 @@ function SessionRow({
   return (
     <div
       className={cn(
-        "group relative flex items-center rounded-[var(--r-sm)] transition-colors",
+        "group relative flex min-h-[44px] items-center rounded-[var(--r-sm)] transition-colors",
         active ? "bg-surface-2" : "hover:bg-surface-2/60",
       )}
     >
@@ -220,17 +271,17 @@ function SessionRow({
         href={`/chat/${session.id}`}
         onClick={onNavigate}
         aria-current={active ? "page" : undefined}
-        className="min-w-0 flex-1 py-2 pl-2.5 pr-1"
+        className="min-w-0 flex-1 py-1.5 pl-3 pr-1"
       >
         <span
           className={cn(
-            "block truncate text-xs font-medium",
+            "block truncate text-xs font-semibold leading-snug",
             active ? "text-ink" : "text-ink-soft group-hover:text-ink",
           )}
         >
           {session.title}
         </span>
-        <span className="mt-0.5 block truncate text-[0.625rem] text-faint">
+        <span className="mt-0.5 block truncate text-[11px] text-faint">
           {formatRelative(session.updated_at ?? session.created_at)}
         </span>
       </Link>
@@ -262,39 +313,57 @@ function SessionRow({
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Delete this session?</DialogTitle>
-            <DialogDescription>
-              &ldquo;{session.title}&rdquo; and its conversation history will be removed. This
-              cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setDeleteOpen(false)}>
-              Cancel
-            </Button>
-            <Button variant="danger" onClick={() => void confirmDelete()}>
-              <Trash2 /> Delete session
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <DestructiveDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        title="Delete this session?"
+        description={`"${session.title}" and its conversation history will be permanently deleted. This action cannot be undone.`}
+        confirmLabel="Delete session"
+        onConfirm={confirmDelete}
+        isLoading={deleting}
+      />
     </div>
   );
+}
+
+function groupSessionsByDate(sessions: SessionSummary[]) {
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const sevenDaysAgo = startOfToday - 7 * 24 * 60 * 60 * 1000;
+
+  const today: SessionSummary[] = [];
+  const previous7Days: SessionSummary[] = [];
+  const older: SessionSummary[] = [];
+
+  for (const s of sessions) {
+    const timeStr = s.updated_at ?? s.created_at;
+    const time = timeStr ? new Date(timeStr).getTime() : 0;
+    if (time >= startOfToday) {
+      today.push(s);
+    } else if (time >= sevenDaysAgo) {
+      previous7Days.push(s);
+    } else {
+      older.push(s);
+    }
+  }
+
+  return { today, previous7Days, older };
 }
 
 function SidebarBody({
   user,
   config,
   health,
+  collapsed = false,
+  onToggleCollapsed,
   onNavigate,
   onClose,
 }: {
   user: UserProfile;
   config: AdminConfig | null;
   health: HealthResponse | null;
+  collapsed?: boolean;
+  onToggleCollapsed?: () => void;
   onNavigate?: () => void;
   onClose?: () => void;
 }) {
@@ -302,31 +371,171 @@ function SidebarBody({
   const router = useRouter();
   const { sessions, createSession, creating } = useSessions();
   const [query, setQuery] = React.useState("");
+  const debouncedQuery = useDebouncedValue(query, 250);
   const [signingOut, setSigningOut] = React.useState(false);
 
   const role = String(user.role ?? "").toLowerCase();
   const auditAllowed = canViewAudit(role);
+
   const filtered = React.useMemo(() => {
-    const needle = query.trim().toLowerCase();
+    const needle = debouncedQuery.trim().toLowerCase();
     if (!needle) return sessions;
     return sessions.filter((session) => session.title.toLowerCase().includes(needle));
-  }, [query, sessions]);
+  }, [debouncedQuery, sessions]);
+
+  const dateGroups = React.useMemo(() => {
+    return groupSessionsByDate(sessions);
+  }, [sessions]);
 
   async function handleSignOut() {
     setSigningOut(true);
     try {
       await api.logout();
     } catch {
-      // Clearing the local cookie happens in the BFF even if the API is offline.
+      // BFF clears session cookie even if API is offline
     }
     router.replace("/login");
     router.refresh();
   }
 
+  // Collapsed Sidebar View (64px icon bar)
+  if (collapsed) {
+    return (
+      <TooltipProvider>
+        <div className="flex h-full min-h-0 flex-col items-center justify-between bg-canvas-raised/80 py-3">
+          <div className="flex flex-col items-center gap-3">
+            <Logo showWordmark={false} />
+            {onToggleCollapsed ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={onToggleCollapsed}
+                    aria-label="Expand sidebar"
+                  >
+                    <PanelLeftOpen className="size-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="right">Expand sidebar (Ctrl+B)</TooltipContent>
+              </Tooltip>
+            ) : null}
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="primary"
+                  size="icon-sm"
+                  onClick={() => {
+                    void createSession();
+                    onNavigate?.();
+                  }}
+                  disabled={creating}
+                  aria-label="New session"
+                >
+                  <Plus className="size-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right">New session</TooltipContent>
+            </Tooltip>
+
+            <nav aria-label="Workspace mini navigation" className="mt-2 flex flex-col gap-1.5">
+              <NavItem
+                href="/chat"
+                label="Compliance chat"
+                icon={MessageSquare}
+                active={Boolean(pathname?.startsWith("/chat"))}
+                collapsed
+                onNavigate={onNavigate}
+              />
+              <NavItem
+                href="/documents"
+                label="Document catalog"
+                icon={FileText}
+                active={pathname === "/documents"}
+                collapsed
+                onNavigate={onNavigate}
+              />
+              <NavItem
+                href="/audit"
+                label="Audit & RBAC"
+                icon={ShieldCheck}
+                active={pathname === "/audit"}
+                disabled={!auditAllowed}
+                hint="Auditor role required"
+                collapsed
+                onNavigate={onNavigate}
+              />
+            </nav>
+          </div>
+
+          <div className="flex flex-col items-center gap-3">
+            <SystemSheet
+              health={health}
+              config={config}
+              trigger={
+                <Button variant="ghost" size="icon-sm" aria-label="System status">
+                  <ServerCog className="size-4" />
+                </Button>
+              }
+            />
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                  aria-label="Account menu"
+                >
+                  <Avatar name={user.full_name} size="sm" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>
+                  <span className="block font-medium">{user.full_name}</span>
+                  <span className="block text-xs text-faint">@{user.username} · {roleLabel(role)}</span>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={() => router.push("/documents")}>
+                  <FileText /> Document catalog
+                </DropdownMenuItem>
+                {auditAllowed ? (
+                  <DropdownMenuItem onSelect={() => router.push("/audit")}>
+                    <ShieldCheck /> Audit summaries
+                  </DropdownMenuItem>
+                ) : null}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onSelect={() => void handleSignOut()}
+                  disabled={signingOut}
+                  className="text-danger data-[highlighted]:bg-danger-soft data-[highlighted]:text-danger"
+                >
+                  <LogOut /> {signingOut ? "Signing out…" : "Sign out"}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+      </TooltipProvider>
+    );
+  }
+
+  // Expanded Standard Sidebar View
   return (
     <div className="flex h-full min-h-0 flex-col bg-canvas-raised/60">
       <div className="flex items-center gap-2 px-4 pb-1 pt-4">
         <Logo showWordmark className="min-w-0 flex-1" />
+        {onToggleCollapsed ? (
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={onToggleCollapsed}
+            aria-label="Collapse sidebar"
+            title="Collapse sidebar (Ctrl+B)"
+          >
+            <PanelLeftClose className="size-4" />
+          </Button>
+        ) : null}
         <SystemSheet
           health={health}
           config={config}
@@ -343,7 +552,7 @@ function SidebarBody({
         ) : null}
       </div>
 
-      <div className="px-3 pt-4">
+      <div className="px-3 pt-3">
         <Button
           variant="primary"
           size="md"
@@ -359,7 +568,7 @@ function SidebarBody({
         </Button>
       </div>
 
-      <nav aria-label="Workspace" className="mt-4 space-y-0.5 px-3">
+      <nav aria-label="Workspace" className="mt-3 space-y-0.5 px-3">
         <NavItem
           href="/chat"
           label="Compliance chat"
@@ -385,17 +594,17 @@ function SidebarBody({
         />
       </nav>
 
-      <div className="mt-5 flex items-center justify-between px-4">
-        <span className="text-[0.625rem] font-semibold uppercase tracking-[0.1em] text-faint">
+      <div className="mt-4 flex items-center justify-between px-4">
+        <span className="text-xs font-semibold uppercase tracking-[0.08em] text-faint">
           Sessions
         </span>
-        <span className="tabular text-[0.625rem] text-faint">{sessions.length}</span>
+        <span className="tabular text-xs text-faint">{sessions.length}</span>
       </div>
 
       <div className="px-3 pt-2">
         <div className="relative">
           <Search
-            className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-faint"
+            className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-faint"
             aria-hidden="true"
           />
           <Input
@@ -403,7 +612,7 @@ function SidebarBody({
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search sessions"
             aria-label="Search sessions"
-            className="h-8 pl-8 text-xs"
+            className="h-9 pl-9 text-xs"
           />
         </div>
       </div>
@@ -414,14 +623,15 @@ function SidebarBody({
             <p className="text-xs font-medium text-ink-soft">
               {sessions.length === 0 ? "No sessions yet" : "No matching sessions"}
             </p>
-            <p className="mt-1 text-[0.6875rem] leading-relaxed text-faint">
+            <p className="mt-1 text-xs leading-relaxed text-faint">
               {sessions.length === 0
                 ? "Create one to start a compliance conversation."
                 : "Try a shorter search term."}
             </p>
           </div>
-        ) : (
-          <div className="space-y-0.5">
+        ) : debouncedQuery.trim() ? (
+          // Search results
+          <div className="space-y-1">
             {filtered.map((session) => (
               <SessionRow
                 key={session.id}
@@ -430,6 +640,63 @@ function SidebarBody({
                 onNavigate={onNavigate}
               />
             ))}
+          </div>
+        ) : (
+          // Date-grouped sessions
+          <div className="space-y-2">
+            {dateGroups.today.length > 0 ? (
+              <div>
+                <div className="px-2 pb-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-faint">
+                  Today
+                </div>
+                <div className="space-y-1">
+                  {dateGroups.today.map((s) => (
+                    <SessionRow
+                      key={s.id}
+                      session={s}
+                      active={pathname === `/chat/${s.id}`}
+                      onNavigate={onNavigate}
+                    />
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {dateGroups.previous7Days.length > 0 ? (
+              <div>
+                <div className="px-2 pt-2 pb-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-faint">
+                  Previous 7 days
+                </div>
+                <div className="space-y-1">
+                  {dateGroups.previous7Days.map((s) => (
+                    <SessionRow
+                      key={s.id}
+                      session={s}
+                      active={pathname === `/chat/${s.id}`}
+                      onNavigate={onNavigate}
+                    />
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {dateGroups.older.length > 0 ? (
+              <div>
+                <div className="px-2 pt-2 pb-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-faint">
+                  Older
+                </div>
+                <div className="space-y-1">
+                  {dateGroups.older.map((s) => (
+                    <SessionRow
+                      key={s.id}
+                      session={s}
+                      active={pathname === `/chat/${s.id}`}
+                      onNavigate={onNavigate}
+                    />
+                  ))}
+                </div>
+              </div>
+            ) : null}
           </div>
         )}
       </div>
@@ -448,25 +715,24 @@ function SidebarBody({
             {health ? "Live" : "Offline"}
           </Badge>
         </div>
-        <p className="mb-2.5 text-[0.625rem] leading-relaxed text-faint">{roleScope(role)}</p>
+        <p className="mb-2 text-xs leading-relaxed text-faint">{roleScope(role)}</p>
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
               type="button"
-              className="flex w-full items-center gap-2.5 rounded-[var(--r-sm)] border border-line bg-surface-2/60 p-2 text-left transition-colors hover:border-line-strong hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-              aria-label="Account menu"
+              className="flex min-h-[44px] w-full items-center gap-2.5 rounded-[var(--r-sm)] border border-line bg-surface-2/60 p-2 text-left transition-colors hover:border-line-strong hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             >
               <Avatar name={user.full_name} size="sm" />
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-xs font-medium text-ink">
                   {user.full_name}
                 </span>
-                <span className="block truncate text-[0.625rem] text-faint">
+                <span className="block truncate text-xs text-faint">
                   @{user.username} · {roleLabel(role)}
                 </span>
               </span>
-              <MoreHorizontal className="size-3.5 text-faint" aria-hidden="true" />
+              <MoreHorizontal className="size-4 text-faint" aria-hidden="true" />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-56">
@@ -498,34 +764,62 @@ function SidebarBody({
   );
 }
 
-export function Sidebar({ user, config, health, mobileOpen, onMobileOpenChange }: SidebarProps) {
+export function Sidebar({
+  user,
+  config,
+  health,
+  mobileOpen,
+  onMobileOpenChange,
+  collapsed = false,
+  onToggleCollapsed,
+}: SidebarProps) {
   return (
     <>
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[var(--sidebar-width)] border-r border-line lg:block">
-        <SidebarBody user={user} config={config} health={health} />
+      <aside
+        className={cn(
+          "fixed inset-y-0 left-0 z-30 hidden border-r border-line lg:block transition-[width] duration-200",
+          collapsed ? "w-16" : "w-[var(--sidebar-width)]",
+        )}
+      >
+        <SidebarBody
+          user={user}
+          config={config}
+          health={health}
+          collapsed={collapsed}
+          onToggleCollapsed={onToggleCollapsed}
+        />
       </aside>
 
-      <Dialog open={mobileOpen} onOpenChange={onMobileOpenChange}>
-        <DialogContent
-          showClose={false}
-          className="fixed left-0 top-0 h-dvh max-h-none w-[min(88vw,340px)] max-w-none translate-x-0 translate-y-0 rounded-none border-y-0 border-l-0 bg-canvas-raised p-0"
-          aria-label="Workspace navigation"
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Workspace navigation"
+        className={cn(
+          "fixed inset-0 z-50 lg:hidden transition-opacity duration-200",
+          mobileOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none",
+        )}
+      >
+        <div
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm"
+          onClick={() => onMobileOpenChange(false)}
+          aria-hidden="true"
+        />
+        <div
+          className={cn(
+            "fixed inset-y-0 left-0 w-[min(88vw,340px)] bg-canvas-raised shadow-2xl transition-transform duration-200",
+            mobileOpen ? "translate-x-0" : "-translate-x-full",
+          )}
         >
-          <DialogTitle className="sr-only">Workspace navigation</DialogTitle>
-          <DialogDescription className="sr-only">
-            Sessions, workspace views and account controls.
-          </DialogDescription>
-          <DialogBody className="h-full p-0">
-            <SidebarBody
-              user={user}
-              config={config}
-              health={health}
-              onNavigate={() => onMobileOpenChange(false)}
-              onClose={() => onMobileOpenChange(false)}
-            />
-          </DialogBody>
-        </DialogContent>
-      </Dialog>
+          <SidebarBody
+            user={user}
+            config={config}
+            health={health}
+            collapsed={false}
+            onNavigate={() => onMobileOpenChange(false)}
+            onClose={() => onMobileOpenChange(false)}
+          />
+        </div>
+      </div>
     </>
   );
 }

@@ -39,12 +39,18 @@ export function UploadDialog({
   const [docId, setDocId] = React.useState("");
   const [docType, setDocType] = React.useState<string>("policy");
   const [roles, setRoles] = React.useState<string[]>(["manager", "auditor"]);
+  const [titleTouched, setTitleTouched] = React.useState(false);
+  const [rolesTouched, setRolesTouched] = React.useState(false);
   const [stage, setStage] = React.useState<Stage>("idle");
   const [error, setError] = React.useState<string | null>(null);
   const [result, setResult] = React.useState<DocumentUploadResponse | null>(null);
   const [dragging, setDragging] = React.useState(false);
   const inputRef = React.useRef<HTMLInputElement>(null);
   const timerRef = React.useRef<number | null>(null);
+
+  const titleError = titleTouched && !title.trim() ? "Document title cannot be empty." : null;
+  const rolesError =
+    rolesTouched && roles.length === 0 ? "Select at least one permitted role." : null;
 
   React.useEffect(() => {
     if (!open) {
@@ -147,7 +153,7 @@ export function UploadDialog({
                 <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-success" aria-hidden="true" />
                 <div className="min-w-0">
                   <p className="text-xs font-semibold text-ink">Indexed successfully</p>
-                  <p className="mt-1 text-[0.6875rem] leading-relaxed text-muted">
+                  <p className="mt-1 text-xs leading-relaxed text-muted">
                     {result.title} · {result.chunks_indexed} chunks · {result.doc_id}
                   </p>
                   <div className="mt-2 flex flex-wrap gap-1.5">
@@ -195,7 +201,7 @@ export function UploadDialog({
                   <p className="text-xs font-medium text-ink-soft">
                     {file ? file.name : "Drop a file here or choose one"}
                   </p>
-                  <p className="mt-1 text-[0.625rem] text-faint">
+                  <p className="mt-1 text-xs text-faint">
                     PDF, TXT, MD or DOCX · up to 20 MB
                   </p>
                   <Button
@@ -216,12 +222,23 @@ export function UploadDialog({
                   <Input
                     id="upload-title"
                     value={title}
-                    onChange={(event) => setTitle(event.target.value)}
+                    onChange={(event) => {
+                      setTitle(event.target.value);
+                      setTitleTouched(true);
+                    }}
+                    onBlur={() => setTitleTouched(true)}
                     maxLength={160}
                     placeholder="e.g. AML Escalation Policy"
-                    className="mt-1.5"
+                    className={cn("mt-1.5", titleError && "border-danger focus:border-danger")}
+                    aria-invalid={Boolean(titleError)}
+                    aria-describedby={titleError ? "upload-title-error" : undefined}
                     disabled={busy}
                   />
+                  {titleError ? (
+                    <p id="upload-title-error" className="mt-1 text-xs text-danger font-medium">
+                      {titleError}
+                    </p>
+                  ) : null}
                 </div>
                 <div>
                   <Label htmlFor="upload-doc-id">Document ID (optional)</Label>
@@ -254,7 +271,7 @@ export function UploadDialog({
                     ))}
                   </select>
                 </div>
-                <fieldset>
+                <fieldset aria-describedby={rolesError ? "upload-roles-error" : undefined}>
                   <legend className="text-xs font-medium text-ink-soft">Read access</legend>
                   <div className="mt-1.5 flex flex-wrap gap-1.5">
                     {UPLOAD_ROLES.map((role) => {
@@ -265,15 +282,16 @@ export function UploadDialog({
                           type="button"
                           aria-pressed={checked}
                           disabled={busy}
-                          onClick={() =>
+                          onClick={() => {
+                            setRolesTouched(true);
                             setRoles((current) =>
                               current.includes(role)
                                 ? current.filter((item) => item !== role)
                                 : [...current, role],
-                            )
-                          }
+                            );
+                          }}
                           className={cn(
-                            "rounded-full border px-2.5 py-1 text-[0.6875rem] font-medium transition-colors disabled:opacity-50",
+                            "rounded-full border px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-50",
                             checked
                               ? "border-line-accent bg-accent-soft text-accent"
                               : "border-line bg-surface-2 text-faint hover:text-ink",
@@ -284,7 +302,12 @@ export function UploadDialog({
                       );
                     })}
                   </div>
-                  <p className="mt-1.5 text-[0.625rem] leading-relaxed text-faint">
+                  {rolesError ? (
+                    <p id="upload-roles-error" className="mt-1 text-xs text-danger font-medium">
+                      {rolesError}
+                    </p>
+                  ) : null}
+                  <p className="mt-1.5 text-xs leading-relaxed text-faint">
                     At least one role is required. Analysts can never read internal audit files
                     unless you explicitly grant analyst access.
                   </p>
@@ -293,7 +316,7 @@ export function UploadDialog({
 
               {busy ? (
                 <div className="rounded-[var(--r-md)] border border-line bg-surface-2/50 p-3">
-                  <div className="mb-2 flex items-center gap-2 text-[0.6875rem] text-ink-soft">
+                  <div className="mb-2 flex items-center gap-2 text-xs text-ink-soft">
                     <LoaderCircle className="size-3.5 animate-spin text-accent" aria-hidden="true" />
                     {stage === "uploading"
                       ? "Uploading and validating the file…"
@@ -310,7 +333,7 @@ export function UploadDialog({
               {error ? (
                 <div
                   role="alert"
-                  className="flex items-start gap-2 rounded-[var(--r-sm)] border border-[rgba(255,133,133,0.28)] bg-danger-soft px-3 py-2 text-[0.6875rem] text-danger"
+                  className="flex items-start gap-2 rounded-[var(--r-sm)] border border-[rgba(255,133,133,0.28)] bg-danger-soft px-3 py-2 text-xs text-danger"
                 >
                   <AlertTriangle className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
                   <span>{error}</span>

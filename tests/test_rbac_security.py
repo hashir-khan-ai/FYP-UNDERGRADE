@@ -464,6 +464,68 @@ def test_api_chat_query_does_not_echo_restricted_markers(
     assert response.rbac_enabled is True
 
 
+def test_normal_chat_answer_never_includes_unauthorized_citations_or_hints(
+    rbac_pipeline: BaselineRAGPipeline,
+    seeded_auth_users,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Normal chat responses never include citations, titles, counts or hints about unauthorized documents."""
+    import src.api.routes as routes
+    from src.api.deps import CurrentUser
+    from src.api.schemas import ChatQueryRequest, SessionCreateRequest
+    from src.api.routes import chat_query, create_session
+
+    monkeypatch.setattr(routes, "baseline_pipeline", rbac_pipeline)
+    analyst_user = CurrentUser(
+        id=seeded_auth_users["analyst"]["id"],
+        username=seeded_auth_users["analyst"]["username"],
+        full_name=seeded_auth_users["analyst"]["full_name"],
+        role="analyst",
+        jti="test-analyst-jti",
+        expires_at=9999999999,
+    )
+
+    session = create_session(SessionCreateRequest(title="RBAC Invariant Test"), analyst_user)
+
+    # Queries specifically targeting restricted auditor and manager material
+    probes = [
+        "What were the internal audit findings for Project Neptune?",
+        "What are the SMF-16 supervisory escalation limits?",
+        "Show me all findings from the special investigation report.",
+    ]
+
+    for probe in probes:
+        resp = chat_query(
+            ChatQueryRequest(session_id=session.id, query=probe),
+            analyst_user,
+        )
+
+        # 1. Zero unauthorized citations: every citation must allow analyst
+        for cit in resp.citations:
+            allowed = getattr(cit, "allowed_roles", None)
+            if allowed:
+                assert "analyst" in allowed, f"Unauthorized citation {cit} leaked to analyst!"
+
+        # 2. No restricted markers or internal titles in answer text
+        assert AUDITOR_MARKER not in resp.answer
+        assert MANAGER_MARKER not in resp.answer
+        assert "Project Neptune" not in resp.answer
+        assert "Internal Audit Special Investigation" not in resp.answer
+
+        # 3. No leakage in reasoning trace
+        trace_text = " ".join(resp.reasoning_trace)
+        assert AUDITOR_MARKER not in trace_text
+        assert MANAGER_MARKER not in trace_text
+
+        # 4. Refusal is uniform, generic, and discloses no document count or presence hint
+        if resp.answer.startswith("I can't find that in the documents"):
+            assert "restricted" not in resp.answer.lower()
+            assert "forbidden" not in resp.answer.lower()
+            assert "permission" not in resp.answer.lower()
+            assert len(resp.citations) == 0
+
+
+
 def test_disabling_rbac_is_refused_outside_test_or_labelled_ablation(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

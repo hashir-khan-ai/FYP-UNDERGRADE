@@ -61,17 +61,17 @@ function UserTurn({
 }) {
   return (
     <div className="flex justify-end">
-      <div className="group max-w-[min(88%,44rem)]">
-        <div className="rounded-[var(--r-lg)] rounded-br-[var(--r-xs)] border border-[rgba(120,169,255,0.22)] bg-accent-soft px-3.5 py-2.5">
-          <p className="whitespace-pre-wrap break-words text-[0.8125rem] leading-relaxed text-ink">
+      <div className="group max-w-[min(90%,46rem)]">
+        <div className="rounded-[var(--r-lg)] rounded-br-[var(--r-xs)] border border-[rgba(120,169,255,0.24)] bg-accent-soft px-4 py-3 shadow-[var(--elev-sm)]">
+          <p className="whitespace-pre-wrap break-words text-sm sm:text-base leading-relaxed text-ink">
             {message.content}
           </p>
         </div>
-        <div className="mt-1 flex items-center justify-end gap-1 text-[0.625rem] text-faint">
+        <div className="mt-1 flex items-center justify-end gap-1.5 text-xs text-faint">
           <span>{formatTime(message.created_at)}</span>
           <span aria-hidden="true">·</span>
-          <span>{message.user_role ?? "user"}</span>
-          <span className="ml-1 flex items-center opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+          <span className="capitalize">{message.user_role ?? "user"}</span>
+          <span className="ml-1.5 flex items-center opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
             {onEdit ? (
               <Button
                 variant="ghost"
@@ -114,15 +114,15 @@ function AssistantTurn({
   const followUps = message.metadata?.suggested_follow_ups ?? [];
 
   return (
-    <div className="flex gap-2.5 sm:gap-3">
+    <div className="flex gap-3 sm:gap-3.5">
       <span
-        className="mt-0.5 inline-flex size-7 shrink-0 items-center justify-center rounded-full border border-line bg-surface-2 text-accent"
+        className="mt-0.5 inline-flex size-8 shrink-0 items-center justify-center rounded-full border border-line bg-surface-2 text-accent shadow-[var(--elev-sm)]"
         aria-hidden="true"
       >
-        <ShieldCheck className="size-3.5" />
+        <ShieldCheck className="size-4" />
       </span>
       <div className="min-w-0 flex-1">
-        <div className="mb-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+        <div className="mb-2 flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
           {flags.isRefusal ? (
             <Badge tone="warning">Refusal</Badge>
           ) : flags.grounded ? (
@@ -134,9 +134,9 @@ function AssistantTurn({
               <Sparkles /> Open knowledge · not grounded
             </Badge>
           )}
-          <span className="font-mono text-[0.625rem] text-faint">{message.route_used ?? "unknown"}</span>
-          <span className="text-[0.625rem] text-faint">{formatTime(message.created_at)}</span>
-          <span className="ml-auto flex items-center gap-0.5 opacity-70 transition-opacity focus-within:opacity-100 hover:opacity-100">
+          <span className="font-mono text-xs text-faint">{message.route_used ?? "unknown"}</span>
+          <span className="text-xs text-faint">{formatTime(message.created_at)}</span>
+          <span className="ml-auto flex items-center gap-1 opacity-70 transition-opacity focus-within:opacity-100 hover:opacity-100">
             <CopyButton text={message.content} label="Copy answer" />
             {canRegenerate ? (
               <Button
@@ -213,7 +213,7 @@ export function MessageList({
         if (message.sender === "system") {
           return (
             <div key={message.id} className="flex justify-center">
-              <div className="max-w-lg rounded-full border border-line bg-surface-2/60 px-3 py-1 text-center text-[0.6875rem] text-faint">
+              <div className="max-w-lg rounded-full border border-line bg-surface-2/60 px-4 py-1.5 text-center text-xs text-faint">
                 {message.content}
               </div>
             </div>

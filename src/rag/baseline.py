@@ -442,9 +442,6 @@ class BaselineRAGPipeline:
         start = time.perf_counter()
         top_k = settings.RETRIEVAL_TOP_K_HYBRID
         effective_role = normalize_role(role) if settings.rbac_enabled else None
-        # Positive control: Mutant (c) disables pre-fusion vector/lexical RBAC filter
-        if os.environ.get("MUTANT_DISABLE_PRE_FUSION_RBAC") == "1":
-            effective_role = None
 
         try:
             bm25_result = self.bm25.search(query, top_k=top_k, role=effective_role)
@@ -502,8 +499,7 @@ class BaselineRAGPipeline:
         """
         start = time.perf_counter()
         reranked = self.reranker.rerank(query, candidates, top_n=settings.RERANKER_TOP_N)
-        # Positive control: Mutant (b) disables post-rerank RBAC defense-in-depth guard
-        if settings.rbac_enabled and os.environ.get("MUTANT_DISABLE_POST_RERANK_RBAC") != "1":
+        if settings.rbac_enabled:
             permitted, dropped = enforce_role_visibility(reranked, role)
             if dropped:
                 # Count only: passage text is never written to logs.
@@ -558,6 +554,10 @@ class BaselineRAGPipeline:
             pass
         return self.generate(query, passages, **kwargs)
 
+    def _build_empty_refusal_message(self, query: str, role: str | None = None) -> str:
+        """Return the uniform refusal message for empty or unauthorized results."""
+        return REFUSAL_TEXT
+
     def generate(
         self,
         query: str,
@@ -586,15 +586,7 @@ class BaselineRAGPipeline:
         passage_ids = [passage["chunk_id"] for passage in passages if passage.get("chunk_id")]
 
         if not passages:
-            refusal_msg = REFUSAL_TEXT
-            # Positive control: Mutant (f) replaces uniform refusal with distinct restricted message
-            if os.environ.get("MUTANT_DISTINCT_REFUSAL") == "1":
-                try:
-                    unrestricted = self.bm25.search(query, top_k=1, role=None).hits
-                    if unrestricted:
-                        refusal_msg = "ACCESS RESTRICTED: Documents were found but are withheld due to your role permissions."
-                except Exception:
-                    pass
+            refusal_msg = self._build_empty_refusal_message(query, role)
             return refusal_msg, [], False, 0.0, {
                 "calls": 0,
                 "cached_calls": 0,

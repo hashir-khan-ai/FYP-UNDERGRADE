@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu";
+import { Check } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
@@ -46,6 +47,31 @@ export function DropdownMenuItem({
   );
 }
 
+export function DropdownMenuCheckboxItem({
+  className,
+  children,
+  checked,
+  ...props
+}: React.ComponentProps<typeof DropdownMenuPrimitive.CheckboxItem>) {
+  return (
+    <DropdownMenuPrimitive.CheckboxItem
+      className={cn(
+        "relative flex cursor-default select-none items-center rounded-[var(--r-xs)] py-1.5 pl-7 pr-2.5 text-xs text-ink-soft outline-none transition-colors data-[highlighted]:bg-surface-2 data-[highlighted]:text-ink data-[disabled]:pointer-events-none data-[disabled]:opacity-45",
+        className,
+      )}
+      checked={checked}
+      {...props}
+    >
+      <span className="absolute left-2 flex size-3.5 items-center justify-center">
+        <DropdownMenuPrimitive.ItemIndicator>
+          <Check className="size-3.5 text-accent" />
+        </DropdownMenuPrimitive.ItemIndicator>
+      </span>
+      {children}
+    </DropdownMenuPrimitive.CheckboxItem>
+  );
+}
+
 export function DropdownMenuSeparator({
   className,
   ...props
@@ -64,7 +90,7 @@ export function DropdownMenuLabel({
 }: React.ComponentProps<typeof DropdownMenuPrimitive.Label>) {
   return (
     <DropdownMenuPrimitive.Label
-      className={cn("px-2.5 pb-1 pt-1.5 text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-faint", className)}
+      className={cn("px-3 pb-1.5 pt-2 text-xs font-semibold uppercase tracking-[0.08em] text-faint", className)}
       {...props}
     />
   );

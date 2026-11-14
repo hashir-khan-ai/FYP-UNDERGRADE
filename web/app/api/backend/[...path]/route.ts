@@ -31,7 +31,10 @@ const RULES: RouteRule[] = [
   { pattern: /^admin\/health$/, methods: new Set(["GET"]) },
   { pattern: /^admin\/metrics$/, methods: new Set(["GET"]) },
   { pattern: /^documents$/, methods: new Set(["GET"]) },
+  { pattern: /^documents\/[^/]+$/, methods: new Set(["GET", "PATCH", "DELETE"]) },
   { pattern: /^documents\/upload$/, methods: new Set(["POST"]) },
+  { pattern: /^views$/, methods: new Set(["GET", "POST"]) },
+  { pattern: /^views\/[^/]+$/, methods: new Set(["DELETE"]) },
 ];
 
 function envelope(status: number, code: string, message: string) {

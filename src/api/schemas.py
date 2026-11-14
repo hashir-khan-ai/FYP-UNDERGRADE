@@ -358,3 +358,31 @@ class DocumentListResponse(BaseModel):
     documents: list[DocumentListItem]
     total: int
 
+
+class SavedViewItem(BaseModel):
+    id: str
+    view_name: str
+    page: str
+    filters_json: str
+    created_at: str | None = None
+
+
+class SavedViewListResponse(BaseModel):
+    views: list[SavedViewItem]
+
+
+class SavedViewCreateRequest(BaseModel):
+    view_name: str = Field(..., min_length=1, max_length=100)
+    page: str = Field(..., min_length=1, max_length=50)
+    filters_json: str = Field(..., min_length=2)
+
+
+class SavedViewUpdateRequest(BaseModel):
+    view_name: str | None = Field(default=None, min_length=1, max_length=100)
+    filters_json: str | None = Field(default=None, min_length=2)
+
+
+class DocumentUpdateRequest(BaseModel):
+    title: str | None = Field(default=None, max_length=200)
+    allowed_roles: list[str] | None = None
+

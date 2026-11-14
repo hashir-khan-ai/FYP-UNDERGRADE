@@ -27,7 +27,7 @@ export function RestrictedPanel({
         </Badge>
       ) : null}
       {children ? <div className="mt-6">{children}</div> : null}
-      <p className="mt-6 max-w-md text-[0.6875rem] leading-relaxed text-faint">
+      <p className="mt-6 max-w-md text-xs leading-relaxed text-faint">
         This is a user-experience restriction. Authorisation itself is always enforced inside the
         retrieval engine and the API, never by this screen.
       </p>

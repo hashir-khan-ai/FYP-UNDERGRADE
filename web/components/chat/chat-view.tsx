@@ -11,6 +11,7 @@ import { ThinkingPanel } from "@/components/chat/thinking-panel";
 import { useSessions } from "@/components/providers/sessions-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useThrottledCallback } from "@/lib/hooks/use-throttle";
 import { ApiError, api } from "@/lib/api-client";
 import { roleLabel, roleScope } from "@/lib/auth";
 import { lastUserPrompt, messageFromChatResponse, optimisticUserMessage } from "@/lib/messages";
@@ -67,9 +68,11 @@ export function ChatView({
     [],
   );
 
-  const scrollToBottom = React.useCallback((behavior: ScrollBehavior = "smooth") => {
+  const rawScrollToBottom = React.useCallback((behavior: ScrollBehavior = "smooth") => {
     bottomRef.current?.scrollIntoView({ behavior, block: "end" });
   }, []);
+
+  const scrollToBottom = useThrottledCallback(rawScrollToBottom, 150);
 
   React.useEffect(() => {
     scrollToBottom(messages.length > 0 ? "smooth" : "auto");
@@ -179,24 +182,24 @@ export function ChatView({
       <header className="flex h-14 shrink-0 items-center gap-3 border-b border-line px-3 sm:px-5 lg:px-8">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <h1 className="truncate text-[0.8125rem] font-semibold tracking-[-0.01em] text-ink">
+            <h1 className="truncate text-sm sm:text-base font-semibold tracking-[-0.01em] text-ink">
               {title}
             </h1>
             <Badge tone="success" className="hidden sm:inline-flex">
               RBAC enforced
             </Badge>
           </div>
-          <p className="truncate text-[0.625rem] text-faint">
+          <p className="truncate text-xs text-faint">
             {roleLabel(role)} · {roleScope(role)} · profile {profile}
           </p>
         </div>
-        <div className="hidden items-center gap-1.5 md:flex">
+        <div className="hidden items-center gap-2 md:flex">
           <Badge tone="neutral">Sources collapsed by default</Badge>
           <Link
             href="/documents"
-            className="inline-flex items-center gap-1 rounded-[var(--r-xs)] px-1.5 py-1 text-[0.6875rem] text-muted transition-colors hover:text-ink"
+            className="inline-flex min-h-[44px] items-center gap-1 rounded-[var(--r-xs)] px-2 py-1 text-xs text-muted transition-colors hover:text-ink"
           >
-            Catalog <ArrowUpRight className="size-3" aria-hidden="true" />
+            Catalog <ArrowUpRight className="size-3.5" aria-hidden="true" />
           </Link>
         </div>
       </header>
@@ -241,9 +244,9 @@ export function ChatView({
               <div className="flex items-start gap-2.5">
                 <AlertTriangle className="mt-0.5 size-4 shrink-0 text-danger" aria-hidden="true" />
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs font-semibold text-ink">The answer could not be completed</p>
-                  <p className="mt-1 text-[0.6875rem] leading-relaxed text-muted">{error.message}</p>
-                  <p className="mt-1 font-mono text-[0.625rem] text-faint">{error.code}</p>
+                  <p className="text-sm font-semibold text-ink">The answer could not be completed</p>
+                  <p className="mt-1 text-xs leading-relaxed text-muted">{error.message}</p>
+                  <p className="mt-1 font-mono text-xs text-faint">{error.code}</p>
                   <div className="mt-2.5 flex flex-wrap gap-2">
                     <Button
                       size="sm"

@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { Textarea } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useThrottledCallback } from "@/lib/hooks/use-throttle";
 import { INTENT_MODES, RESPONSE_MODES, intentModeMeta, responseModeMeta } from "@/lib/modes";
 import type { IntentMode, ResponseMode } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -59,6 +60,8 @@ export function Composer({
   const modeMeta = intentModeMeta(intentMode);
   const styleMeta = responseModeMeta(responseMode);
 
+  const throttledOnSend = useThrottledCallback(onSend, 1000);
+
   React.useEffect(() => {
     const element = textareaRef.current;
     if (!element) return;
@@ -68,14 +71,14 @@ export function Composer({
 
   function submit() {
     if (!canSend) return;
-    onSend();
+    throttledOnSend();
   }
 
   return (
-    <div className="glass-bar border-t px-3 pb-3 pt-2.5 sm:px-5 lg:px-8">
+    <div className="glass-bar border-t px-3 pb-4 pt-3 sm:px-5 lg:px-8">
       <div className="mx-auto w-full max-w-[var(--reading-width)]">
-        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex flex-wrap items-center gap-2">
+        <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2.5">
+          <div className="flex flex-wrap items-center gap-2.5">
             <SegmentedControl
               ariaLabel="Retrieval scope"
               options={MODE_OPTIONS}
@@ -83,15 +86,15 @@ export function Composer({
               onValueChange={onIntentModeChange}
               size="sm"
             />
-            <span className="hidden items-center gap-1 text-[0.625rem] text-faint sm:inline-flex">
+            <span className="hidden items-center gap-1.5 text-xs text-faint sm:inline-flex">
               {intentMode === "rag" ? (
-                <LockKeyhole className="size-2.5" aria-hidden="true" />
+                <LockKeyhole className="size-3.5" aria-hidden="true" />
               ) : null}
               {modeMeta.description}
             </span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="hidden text-[0.625rem] text-faint sm:inline">Style</span>
+            <span className="hidden text-xs text-faint sm:inline">Style</span>
             <SegmentedControl
               ariaLabel="Response style"
               options={STYLE_OPTIONS}
@@ -108,7 +111,7 @@ export function Composer({
             submit();
           }}
           className={cn(
-            "rounded-[var(--r-lg)] border bg-[rgba(3,6,10,0.5)] p-1.5 transition-[border-color,box-shadow] duration-[var(--duration-fast)]",
+            "rounded-[var(--r-lg)] border bg-[rgba(3,6,10,0.5)] p-2 transition-[border-color,box-shadow] duration-[var(--duration-fast)]",
             focused
               ? "border-line-accent shadow-[0_0_0_3px_rgba(120,169,255,0.1)]"
               : "border-line hover:border-line-strong",
@@ -131,10 +134,10 @@ export function Composer({
             placeholder="Ask a compliance question…"
             aria-label="Compliance question"
             disabled={offline}
-            className="max-h-[168px] min-h-[44px] border-0 bg-transparent px-2.5 py-2.5 shadow-none focus:shadow-none"
+            className="max-h-[192px] min-h-[56px] border-0 bg-transparent px-3 py-3 text-base shadow-none focus:shadow-none placeholder:text-muted leading-relaxed"
           />
-          <div className="flex items-center justify-between gap-2 px-1 pb-0.5 pt-1">
-            <div className="flex min-w-0 items-center gap-2 text-[0.625rem] text-faint">
+          <div className="flex items-center justify-between gap-2 px-1.5 pb-1 pt-1.5">
+            <div className="flex min-w-0 items-center gap-2 text-xs text-faint">
               <span className="hidden sm:inline">
                 <kbd className="kbd">Enter</kbd> send · <kbd className="kbd">Shift</kbd>+
                 <kbd className="kbd">Enter</kbd> newline
@@ -146,11 +149,11 @@ export function Composer({
                 </span>
               ) : null}
             </div>
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-2">
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <span className="hidden items-center gap-1 rounded-full border border-line px-2 py-0.5 text-[0.625rem] text-faint sm:inline-flex">
-                    <Sparkles className="size-2.5" aria-hidden="true" />
+                  <span className="hidden items-center gap-1.5 rounded-full border border-line px-2.5 py-1 text-xs text-faint sm:inline-flex">
+                    <Sparkles className="size-3.5" aria-hidden="true" />
                     {modeMeta.shortLabel}
                   </span>
                 </TooltipTrigger>
@@ -174,12 +177,12 @@ export function Composer({
           </div>
         </form>
 
-        <p className="mt-1.5 flex items-center justify-center gap-1 text-center text-[0.625rem] leading-relaxed text-faint">
-          <LockKeyhole className="size-2.5 shrink-0" aria-hidden="true" />
+        <p className="mt-2 flex items-center justify-center gap-1.5 text-center text-xs leading-relaxed text-faint">
+          <LockKeyhole className="size-3 shrink-0" aria-hidden="true" />
           Role filtering runs server-side. Restricted passages never enter the model context.
           {offline ? (
             <span className="ml-1 inline-flex items-center gap-1 font-medium text-warning">
-              <Check className="size-2.5" aria-hidden="true" /> Offline — reconnect to send.
+              <Check className="size-3" aria-hidden="true" /> Offline — reconnect to send.
             </span>
           ) : null}
         </p>

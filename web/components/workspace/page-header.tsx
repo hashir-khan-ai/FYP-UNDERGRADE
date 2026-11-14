@@ -1,20 +1,32 @@
 import type { ReactNode } from "react";
 
+import { Badge } from "@/components/ui/badge";
+import { roleLabel } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
 export function PageHeader({
   eyebrow,
   title,
   description,
+  role,
   actions,
   className,
 }: {
   eyebrow?: string;
   title: string;
   description?: string;
+  role?: string;
   actions?: ReactNode;
   className?: string;
 }) {
+  const normalizedRole = role?.toLowerCase();
+  const roleTone =
+    normalizedRole === "auditor"
+      ? "info"
+      : normalizedRole === "manager"
+        ? "warning"
+        : "neutral";
+
   return (
     <header
       className={cn(
@@ -23,11 +35,18 @@ export function PageHeader({
       )}
     >
       <div className="min-w-0 max-w-2xl">
-        {eyebrow ? (
-          <p className="mb-1 text-[0.625rem] font-semibold uppercase tracking-[0.12em] text-faint">
-            {eyebrow}
-          </p>
-        ) : null}
+        <div className="mb-1 flex flex-wrap items-center gap-2">
+          {eyebrow ? (
+            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-faint">
+              {eyebrow}
+            </p>
+          ) : null}
+          {normalizedRole ? (
+            <Badge tone={roleTone} className="capitalize">
+              {roleLabel(normalizedRole)}
+            </Badge>
+          ) : null}
+        </div>
         <h1 className="text-lg font-semibold tracking-[-0.02em] text-ink sm:text-xl">{title}</h1>
         {description ? (
           <p className="mt-1.5 text-xs leading-relaxed text-muted sm:text-[0.8125rem]">

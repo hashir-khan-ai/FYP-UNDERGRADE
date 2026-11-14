@@ -14,7 +14,7 @@ import uuid
 from pathlib import Path
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, File, Form, Query, Request, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, Query, Request, Response, UploadFile, status
 
 from src.api.deps import (
     ApiError,
@@ -34,6 +34,7 @@ from src.api.schemas import (
     Citation,
     DocumentListItem,
     DocumentListResponse,
+    DocumentUpdateRequest,
     DocumentUploadResponse,
     GraderStats,
     IndexMetrics,
@@ -45,6 +46,10 @@ from src.api.schemas import (
     MessageSummary,
     RetrievalStats,
     RouterStats,
+    SavedViewCreateRequest,
+    SavedViewItem,
+    SavedViewListResponse,
+    SavedViewUpdateRequest,
     SessionCreateRequest,
     SessionListResponse,
     SessionMessagesResponse,
@@ -436,6 +441,14 @@ def chat_query(
         return _execute_chat_turn(payload=payload, user=user)
 
 
+def _resolve_effective_role(user: CurrentUser, payload: ChatQueryRequest) -> str:
+    """Return the authenticated user role from the verified JWT.
+
+    The client request body role is strictly ignored in production to prevent role forgery.
+    """
+    return user.role
+
+
 def _execute_chat_turn(
     payload: ChatQueryRequest,
     user: CurrentUser,
@@ -445,10 +458,7 @@ def _execute_chat_turn(
     query = payload.query.strip()
     response_mode = getattr(payload, "response_mode", "compliance")
 
-    # Positive control: Mutant (g) allows client request body to forge/override authenticated role
-    active_role = user.role
-    if os.environ.get("MUTANT_ROLE_FROM_BODY") == "1" and getattr(payload, "role", None):
-        active_role = payload.role
+    active_role = _resolve_effective_role(user, payload)
 
     if len(query) < 2:
         raise ApiError(400, "EMPTY_QUERY", "Query string cannot be empty.")
@@ -1023,6 +1033,110 @@ def _percentile(sorted_vals: list[float], pct: float) -> float:
     return round(sorted_vals[low] + frac * (sorted_vals[high] - sorted_vals[low]), 2)
 
 
+def sanitize_csv_cell(val: Any) -> str:
+    """Neutralize CSV formula injection by prefixing formula triggers with a single quote."""
+    if val is None:
+        return ""
+    s = str(val)
+    if s and s[0] in ("=", "+", "-", "@", "\t", "\r"):
+        return f"'{s}"
+    return s
+
+
+@router.get("/api/v1/audit/export")
+def export_audit_logs(
+    limit: Annotated[int, Query(ge=1, le=5000)] = 1000,
+    offset: Annotated[int, Query(ge=0)] = 0,
+    user_id: Annotated[int | None, Query()] = None,
+    start_date: Annotated[str | None, Query()] = None,
+    route: Annotated[str | None, Query()] = None,
+    user_role: Annotated[str | None, Query()] = None,
+    user: CurrentUser = Depends(require_role("auditor")),
+) -> Response:
+    """Export audit log records to CSV with formula injection neutralization. Auditor only."""
+    import csv
+    import io
+    import time
+
+    start_time = time.perf_counter()
+    with get_db_connection() as conn:
+        repo = Repository(conn)
+        rows = repo.list_audit_logs(
+            limit=limit,
+            offset=offset,
+            user_id=user_id,
+            start_date=start_date,
+            route=route,
+            user_role=user_role,
+        )
+        row_count = len(rows)
+
+        # Build CSV with formula injection neutralization on every single cell
+        output = io.StringIO()
+        fieldnames = [
+            "audit_id",
+            "session_id",
+            "user_id",
+            "user_role",
+            "final_route",
+            "latency_ms",
+            "tokens_prompt",
+            "tokens_completion",
+            "llm_profile",
+            "llm_model",
+            "candidates_retrieved",
+            "candidates_filtered",
+            "router_confidence",
+            "entry_hash",
+            "prev_hash",
+            "timestamp",
+        ]
+        writer = csv.writer(output, quoting=csv.QUOTE_MINIMAL)
+        writer.writerow(fieldnames)
+
+        for r in rows:
+            row_dict = dict(r)
+            row_values = [
+                sanitize_csv_cell(row_dict.get(col, ""))
+                for col in fieldnames
+            ]
+            writer.writerow(row_values)
+
+        csv_content = output.getvalue()
+        duration_ms = (time.perf_counter() - start_time) * 1000.0
+
+        # Audit log the export action itself (who, when, row count, filters)
+        filters_used = {
+            "limit": limit,
+            "offset": offset,
+            "user_id": user_id,
+            "start_date": start_date,
+            "route": route,
+            "user_role": user_role,
+        }
+        repo.create_audit_log(
+            session_id=None,
+            user_id=user.id,
+            user_role=user.role,
+            query_text=f"AUDIT_EXPORT: exported {row_count} records",
+            final_route="AUDIT_EXPORT",
+            retrieved_chunk_ids=[],
+            relevance_scores=[],
+            response_text=json.dumps({"row_count": row_count, "filters": filters_used}),
+            latency_ms=round(duration_ms, 2),
+            candidates_retrieved=row_count,
+            candidates_filtered=0,
+        )
+        conn.commit()
+
+    filename = f"audit_export_{int(time.time())}.csv"
+    return Response(
+        content=csv_content,
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 @router.get("/api/v1/audit/logs", response_model=list[AuditLogEntry])
 def audit_logs(
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
@@ -1356,6 +1470,204 @@ def list_documents(user: CurrentUser = Depends(get_current_user)) -> DocumentLis
             )
 
     return DocumentListResponse(documents=items, total=len(items))
+
+
+@router.patch("/api/v1/documents/{doc_id}")
+def update_document(
+    doc_id: str,
+    payload: DocumentUpdateRequest,
+    user: CurrentUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    """Update a document's title or permitted roles. Manager/Auditor only."""
+    if user.role not in ("manager", "auditor"):
+        raise ApiError(403, "FORBIDDEN", f"Role '{user.role}' is not authorized to edit documents.")
+    with get_db_connection() as conn:
+        repo = Repository(conn)
+        old_doc = repo.get_document(doc_id)
+        if not old_doc:
+            raise ApiError(404, "DOCUMENT_NOT_FOUND", "Document not found in catalog.")
+
+        old_title = str(old_doc["filename"])
+        raw_roles = old_doc["allowed_roles"]
+        if isinstance(raw_roles, str):
+            try:
+                old_roles = json.loads(raw_roles)
+            except Exception:
+                old_roles = [r.strip() for r in raw_roles.split(",") if r.strip()]
+        else:
+            old_roles = list(raw_roles) if raw_roles else []
+
+        success = repo.update_document_metadata(doc_id, title=payload.title, allowed_roles=payload.allowed_roles)
+        if not success:
+            raise ApiError(404, "DOCUMENT_NOT_FOUND", "Document not found in catalog.")
+
+        # Determine changes
+        new_title = payload.title if payload.title is not None else old_title
+        new_roles = payload.allowed_roles if payload.allowed_roles is not None else old_roles
+
+        title_changed = (payload.title is not None and payload.title != old_title)
+        roles_changed = (payload.allowed_roles is not None and sorted(payload.allowed_roles) != sorted(old_roles))
+
+        # Audit log title and role changes once per saved change
+        if title_changed or roles_changed:
+            change_details = {
+                "doc_id": doc_id,
+                "title_changed": title_changed,
+                "old_title": old_title,
+                "new_title": new_title,
+                "roles_changed": roles_changed,
+                "old_roles": old_roles,
+                "new_roles": new_roles,
+            }
+            repo.create_audit_log(
+                session_id=None,
+                user_id=user.id,
+                user_role=user.role,
+                query_text=f"DOCUMENT_UPDATE: doc_id={doc_id}",
+                final_route="DOCUMENT_UPDATE",
+                retrieved_chunk_ids=[],
+                relevance_scores=[],
+                response_text=json.dumps(change_details),
+                latency_ms=1.0,
+            )
+
+            # Invalidate cache entries when permitted roles change
+            if roles_changed:
+                purged = repo.clear_all_llm_cache()
+                logger.info("Purged %d cached LLM responses due to role ACL change on %s", purged, doc_id)
+
+        conn.commit()
+    return {"status": "ok", "doc_id": doc_id, "message": "Document updated successfully."}
+
+
+@router.delete("/api/v1/documents/{doc_id}")
+def delete_document(
+    doc_id: str,
+    user: CurrentUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    """Delete a document from the catalog. Manager/Auditor only."""
+    if user.role not in ("manager", "auditor"):
+        raise ApiError(403, "FORBIDDEN", f"Role '{user.role}' is not authorized to delete documents.")
+    with get_db_connection() as conn:
+        repo = Repository(conn)
+        success = repo.delete_document(doc_id)
+        if not success:
+            raise ApiError(404, "DOCUMENT_NOT_FOUND", "Document not found in catalog.")
+        conn.commit()
+    return {"status": "ok", "doc_id": doc_id, "message": "Document deleted successfully."}
+
+
+@router.get("/api/v1/views", response_model=SavedViewListResponse)
+def get_user_views(
+    page: str | None = None,
+    user: CurrentUser = Depends(get_current_user),
+) -> SavedViewListResponse:
+    """List saved filter views scoped strictly to authenticated user."""
+    with get_db_connection() as conn:
+        rows = Repository(conn).list_user_views(user_id=user.id, page=page)
+    items = [
+        SavedViewItem(
+            id=str(r["id"]),
+            view_name=str(r["view_name"]),
+            page=str(r["page"]),
+            filters_json=str(r["filters_json"]),
+            created_at=str(r["created_at"]) if r["created_at"] else None,
+        )
+        for r in rows
+    ]
+    return SavedViewListResponse(views=items)
+
+
+@router.get("/api/v1/views/{view_id}", response_model=SavedViewItem)
+def get_user_view_by_id(
+    view_id: str,
+    user: CurrentUser = Depends(get_current_user),
+) -> SavedViewItem:
+    """Get a single saved filter view, strictly scoped to the authenticated owner."""
+    with get_db_connection() as conn:
+        repo = Repository(conn)
+        row = repo.get_user_view(user_id=user.id, view_id=view_id)
+        if not row:
+            raise ApiError(404, "VIEW_NOT_FOUND", "Saved view not found or not owned by user.")
+    return SavedViewItem(
+        id=str(row["id"]),
+        view_name=str(row["view_name"]),
+        page=str(row["page"]),
+        filters_json=str(row["filters_json"]),
+        created_at=str(row["created_at"]) if row["created_at"] else None,
+    )
+
+
+@router.post("/api/v1/views", response_model=SavedViewItem)
+def create_user_view(
+    payload: SavedViewCreateRequest,
+    user: CurrentUser = Depends(get_current_user),
+) -> SavedViewItem:
+    """Save a named filter view scoped to user."""
+    with get_db_connection() as conn:
+        repo = Repository(conn)
+        view_id = repo.save_user_view(
+            user_id=user.id,
+            view_name=payload.view_name,
+            page=payload.page,
+            filters_json=payload.filters_json,
+        )
+        conn.commit()
+        rows = repo.list_user_views(user_id=user.id, page=payload.page)
+        created_row = next((r for r in rows if r["id"] == view_id), None)
+    return SavedViewItem(
+        id=view_id,
+        view_name=payload.view_name,
+        page=payload.page,
+        filters_json=payload.filters_json,
+        created_at=str(created_row["created_at"]) if created_row and created_row["created_at"] else None,
+    )
+
+
+@router.put("/api/v1/views/{view_id}", response_model=SavedViewItem)
+def update_user_view(
+    view_id: str,
+    payload: SavedViewUpdateRequest,
+    user: CurrentUser = Depends(get_current_user),
+) -> SavedViewItem:
+    """Update an existing saved filter view strictly verifying owner identity."""
+    with get_db_connection() as conn:
+        repo = Repository(conn)
+        row = repo.get_user_view(user_id=user.id, view_id=view_id)
+        if not row:
+            raise ApiError(404, "VIEW_NOT_FOUND", "Saved view not found or not owned by user.")
+        success = repo.update_user_view(
+            user_id=user.id,
+            view_id=view_id,
+            view_name=payload.view_name,
+            filters_json=payload.filters_json,
+        )
+        if not success:
+            raise ApiError(400, "UPDATE_FAILED", "Failed to update saved view.")
+        conn.commit()
+        updated_row = repo.get_user_view(user_id=user.id, view_id=view_id)
+    return SavedViewItem(
+        id=str(updated_row["id"]),
+        view_name=str(updated_row["view_name"]),
+        page=str(updated_row["page"]),
+        filters_json=str(updated_row["filters_json"]),
+        created_at=str(updated_row["created_at"]) if updated_row and updated_row["created_at"] else None,
+    )
+
+
+@router.delete("/api/v1/views/{view_id}")
+def delete_user_view(
+    view_id: str,
+    user: CurrentUser = Depends(get_current_user),
+) -> dict[str, str]:
+    """Delete a saved filter view owned by user."""
+    with get_db_connection() as conn:
+        repo = Repository(conn)
+        success = repo.delete_user_view(user_id=user.id, view_id=view_id)
+        if not success:
+            raise ApiError(404, "VIEW_NOT_FOUND", "Saved view not found or not owned by user.")
+        conn.commit()
+    return {"status": "ok", "message": "Saved view deleted successfully."}
 
 
 __all__ = ["router"]

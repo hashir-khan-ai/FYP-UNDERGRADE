@@ -250,11 +250,7 @@ class QdrantIndexer:
         Raises:
             InvalidRoleError: if a non-None role is not in the frozen role model.
         """
-        # Positive control: Mutant (c) disables pre-fusion vector RBAC filter
-        if os.environ.get("MUTANT_DISABLE_PRE_FUSION_RBAC") == "1":
-            role_filter = None
-        else:
-            role_filter = get_role_filter(role) if role is not None else None
+        role_filter = get_role_filter(role) if role is not None else None
         with self._lock:
             client = self._get_client()
             try:
@@ -469,8 +465,7 @@ class BM25Indexer:
         else:
             # Plain library BM25Plus baseline behavior
             positive = [index for index in range(len(scores)) if float(scores[index]) > 0.0]
-        # Positive control: Mutant (c) disables pre-fusion BM25 role filter
-        if role is None or os.environ.get("MUTANT_DISABLE_PRE_FUSION_RBAC") == "1":
+        if role is None:
             eligible = positive
         else:
             eligible = [

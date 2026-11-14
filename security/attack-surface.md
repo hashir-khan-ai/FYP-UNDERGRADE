@@ -131,7 +131,7 @@ All HTTP endpoints are defined in `src/api/routes.py` and `src/api/main.py`:
   )
   ```
   `allow_headers=["*"]` allows arbitrary HTTP headers from permitted origins.
-- **Risk:** Permissive header specifications can expose the API to custom header manipulation if a permitted origin (`localhost:8501`) suffers from XSS.
+- **Risk:** Permissive header specifications can expose the API to custom header manipulation if a permitted origin (`localhost:3000`) suffers from XSS.
 - **Affected Location:** `src/api/main.py:50`
 - **Why It Matters:** Defense-in-depth requires explicit whitelisting of accepted headers (`Authorization`, `Content-Type`).
 - **Recommended Fix:** Explicitly whitelist permitted request headers (`["Authorization", "Content-Type", "Accept"]`) rather than wildcard `["*"]`.
