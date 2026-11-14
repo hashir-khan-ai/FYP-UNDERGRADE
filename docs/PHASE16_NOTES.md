@@ -151,6 +151,9 @@ All token foregrounds tested mathematically across all 5 theme surfaces (`canvas
 - **Root Cause:** In `web/components/chat/pipeline-stepper.tsx`, latency pills lacked `whitespace-nowrap` and the stage list used `sm:items-center` instead of `sm:items-stretch`, causing multi-digit durations (such as `664 ms`) to wrap across two lines inside narrow containers and stretch the `Re-rank` card above sibling stage cards while crowding `Answer`. In addition, `buildPipelineStages` checked `"retrieve_ms"` / `"generate"` instead of FastAPI's `"retrieval_ms"`, `"generation_ms"`, and `router.latency_ms`.
 - **Fix:** Updated `PipelineStepper` (`sm:items-stretch`, `self-center` dotted connectors, `sm:min-w-[88px]`, `overflow-x-auto`, `whitespace-nowrap` on stage labels and badges) and mapped `retrieval_ms`, `generation_ms`, and `router.latency_ms` in `pipeline-stepper.tsx` and `advanced-details.tsx`. Verified visually in headless Chrome (`780x900`: all 5 stage cards equal `57px` height, `top: 352`, single-line `18px` pills, `STEPPER_LAYOUT_PASS`).
 
-### 5. Final Post-Edit Verification Results
-- **Frontend (`npm --prefix web run typecheck`, `npm --prefix web test`, `npm --prefix web run build`):** `tsc --noEmit` `0` errors; Vitest `10` files, **`68` passed, `0` failed**; Next.js `16.4.6` compiled cleanly in `2.9s`.
+### 5. Removed Redundant Right-Side Clause Index Panel
+- Removed the desktop right-side `Clause index` marginalia panel from `web/components/chat/message-list.tsx` per user preference; full clause details, page numbers, and source links remain cleanly accessible via the collapsible `Sources (N)` drawer or clicking inline citation pins `[1]`, `[2]`, etc. Updated `web/tests/phase16b-polish.test.tsx` to assert absence of `[data-cite-marginalia]` and highlight behavior on `[data-cite-pin]` / `[data-cite-card]`.
+
+### 6. Final Post-Edit Verification Results
+- **Frontend (`npm --prefix web run typecheck`, `npm --prefix web test`, `npm --prefix web run build`):** `tsc --noEmit` `0` errors; Vitest `10` files, **`68` passed, `0` failed**; Next.js `16.4.6` compiled cleanly in `5.7s`.
 - **Python Suite (`.venv\Scripts\python.exe -m pytest -q`):** **`291` passed, `2` failed** in `69.68s` (all 3 new `tests/test_gold_review_tool.py` cases pass; the 2 failures remain the pre-existing `140 == 100` count checks on `data/eval/gold_set.jsonl`).

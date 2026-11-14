@@ -197,25 +197,33 @@ describe("Phase 16 Addendum polish", () => {
       />,
     );
 
+    expect(screen.queryByText(/clause index/i)).not.toBeInTheDocument();
+    expect(document.querySelector('[data-cite-marginalia="1"]')).toBeNull();
+
     const pin = screen.getByRole("button", { name: "Jump to source 1" });
-    const marginaliaCard = document.querySelector('[data-cite-marginalia="1"]');
-    expect(marginaliaCard).not.toBeNull();
-    expect(marginaliaCard?.className).not.toContain("bg-accent-soft");
+    expect(pin.className).not.toContain("bg-accent text-accent-ink");
 
     await user.hover(pin);
-    expect(marginaliaCard?.className).toContain("bg-accent-soft");
+    expect(pin.className).toContain("bg-accent text-accent-ink");
     await user.unhover(pin);
-    expect(marginaliaCard?.className).not.toContain("bg-accent-soft");
+    expect(pin.className).not.toContain("bg-accent text-accent-ink");
 
     fireEvent.focus(pin);
-    expect(marginaliaCard?.className).toContain("bg-accent-soft");
+    expect(pin.className).toContain("bg-accent text-accent-ink");
     fireEvent.blur(pin);
-    expect(marginaliaCard?.className).not.toContain("bg-accent-soft");
+    expect(pin.className).not.toContain("bg-accent text-accent-ink");
 
     await user.click(screen.getByRole("button", { name: /sources \(1\)/i }));
     expect(screen.getByText("FCA Handbook — SYSC")).toBeInTheDocument();
     const clauseMatches = screen.getAllByText("SYSC 8.1.1");
     expect(clauseMatches.some((el) => el.tagName === "P")).toBe(true);
+
+    const citeCard = document.querySelector('[data-cite-card="1"]');
+    expect(citeCard).not.toBeNull();
+    await user.hover(pin);
+    expect(citeCard?.className).toContain("ring-line-accent");
+    await user.unhover(pin);
+    expect(citeCard?.className).not.toContain("ring-line-accent");
   });
 
   it("ErrorState treats LLM_AUTH_ERROR distinctly rather than claiming localhost:8000 is offline", async () => {

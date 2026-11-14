@@ -12,7 +12,6 @@ import { RefusalCard } from "@/components/chat/refusal-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { LedgerSealIcon } from "@/components/ui/icons";
-import { citationClause, citationHeading, citationPage } from "@/lib/citations";
 import { formatTime } from "@/lib/format";
 import { turnFlags } from "@/lib/messages";
 import { prefersReducedMotion } from "@/lib/motion";
@@ -132,11 +131,8 @@ function CitationConnectorOverlay({
         pins.find((el) => el === document.activeElement || el.matches(":hover")) ??
         pins[0] ??
         null;
-      const marginalia = container.querySelector<HTMLElement>(`[data-cite-marginalia="${n}"]`);
       const card = container.querySelector<HTMLElement>(`[data-cite-card="${n}"]`);
-      const target =
-        (marginalia && marginalia.getBoundingClientRect().height > 0 ? marginalia : null) ??
-        (card && card.getBoundingClientRect().height > 0 ? card : null);
+      const target = card && card.getBoundingClientRect().height > 0 ? card : null;
 
       if (!pin || !target) {
         setGeom(null);
@@ -151,27 +147,13 @@ function CitationConnectorOverlay({
         return;
       }
 
-      const isSideMarginalia = target === marginalia;
-      const x1 = isSideMarginalia
-        ? pRect.right - cRect.left + 4
-        : pRect.left + pRect.width / 2 - cRect.left;
-      const y1 = isSideMarginalia
-        ? pRect.top + pRect.height / 2 - cRect.top
-        : pRect.bottom - cRect.top + 3;
-      const x2 = isSideMarginalia ? tRect.left - cRect.left - 4 : tRect.left + 16 - cRect.left;
-      const y2 = isSideMarginalia
-        ? tRect.top + Math.min(26, tRect.height / 2) - cRect.top
-        : tRect.top - cRect.top - 3;
+      const x1 = pRect.left + pRect.width / 2 - cRect.left;
+      const y1 = pRect.bottom - cRect.top + 3;
+      const x2 = tRect.left + 16 - cRect.left;
+      const y2 = tRect.top - cRect.top - 3;
 
-      const d = isSideMarginalia
-        ? (() => {
-            const dx = Math.max(36, Math.abs(x2 - x1) * 0.45);
-            return `M ${x1.toFixed(1)} ${y1.toFixed(1)} C ${(x1 + dx).toFixed(1)} ${y1.toFixed(1)}, ${(x2 - dx).toFixed(1)} ${y2.toFixed(1)}, ${x2.toFixed(1)} ${y2.toFixed(1)}`;
-          })()
-        : (() => {
-            const midY = (y1 + y2) / 2;
-            return `M ${x1.toFixed(1)} ${y1.toFixed(1)} C ${x1.toFixed(1)} ${midY.toFixed(1)}, ${x2.toFixed(1)} ${midY.toFixed(1)}, ${x2.toFixed(1)} ${y2.toFixed(1)}`;
-          })();
+      const midY = (y1 + y2) / 2;
+      const d = `M ${x1.toFixed(1)} ${y1.toFixed(1)} C ${x1.toFixed(1)} ${midY.toFixed(1)}, ${x2.toFixed(1)} ${midY.toFixed(1)}, ${x2.toFixed(1)} ${y2.toFixed(1)}`;
 
       setGeom({
         w: Math.max(1, Math.round(cRect.width)),
@@ -283,8 +265,6 @@ function AssistantTurn({
     [message.id],
   );
 
-  const showMarginalia = !flags.isRefusal && citations.length > 0;
-
   return (
     <article className="flex gap-3 sm:gap-4">
       <span
@@ -326,19 +306,12 @@ function AssistantTurn({
           </span>
         </div>
 
-        <div
-          ref={connectorHostRef}
-          className={cn(
-            "relative",
-            showMarginalia &&
-              "grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,68ch)_230px] xl:items-start",
-          )}
-        >
+        <div ref={connectorHostRef} className="relative">
           <CitationConnectorOverlay
             containerRef={connectorHostRef}
             activeCiteIndex={activeCiteIndex}
           />
-          <div className="min-w-0 max-w-[70ch]">
+          <div className="min-w-0 max-w-[72ch]">
             {flags.isRefusal ? (
               <RefusalCard
                 answer={message.content}
@@ -387,56 +360,6 @@ function AssistantTurn({
               <AdvancedDetails message={message} />
             </div>
           </div>
-
-          {showMarginalia ? (
-            <aside
-              aria-label="Clause marginalia notes"
-              className="hidden space-y-3 rounded-[var(--r-xl)] bg-surface p-4 shadow-[var(--elev-2)] xl:sticky xl:top-6 xl:block"
-            >
-              <p className="font-mono text-xs font-semibold uppercase tracking-[0.1em] text-faint">
-                Clause index
-              </p>
-              <ul className="space-y-2.5">
-                {citations.map((citation, idx) => {
-                  const clause = citationClause(citation) || citationHeading(citation) || "Cited passage";
-                  const page = citationPage(citation);
-                  const snippet = (citation.snippet?.trim() || citation.quote_snippet?.trim() || "").slice(0, 96);
-                  const isActive = activeCiteIndex === idx;
-                  return (
-                    <li key={`${citation.chunk_id ?? citation.doc_id}-margin-${idx}`}>
-                      <button
-                        type="button"
-                        data-cite-marginalia={idx + 1}
-                        onMouseEnter={() => setActiveCiteIndex(idx)}
-                        onMouseLeave={() => setActiveCiteIndex(null)}
-                        onFocus={() => setActiveCiteIndex(idx)}
-                        onBlur={() => setActiveCiteIndex(null)}
-                        onClick={() => handleJumpCite(idx)}
-                        className={cn(
-                          "w-full rounded-[var(--r-lg)] px-3.5 py-3 text-left transition-[background-color,box-shadow] duration-[var(--duration-fast)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
-                          isActive
-                            ? "bg-accent-soft shadow-[var(--elev-1)] ring-1 ring-inset ring-line-accent"
-                            : "bg-inset shadow-[var(--inner-inset)] hover:bg-surface-2",
-                        )}
-                      >
-                        <div className="flex items-center justify-between gap-2 font-mono">
-                          <span className={cn("text-sm font-semibold tracking-tight", isActive ? "text-accent-link" : "text-ink")}>
-                            [{idx + 1}] {clause}
-                          </span>
-                          {page ? <span className="tabular shrink-0 text-xs text-faint">p.{page}</span> : null}
-                        </div>
-                        {snippet ? (
-                          <p className="mt-1.5 line-clamp-2 text-xs leading-relaxed text-muted">
-                            {snippet}
-                          </p>
-                        ) : null}
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            </aside>
-          ) : null}
         </div>
       </div>
     </article>
